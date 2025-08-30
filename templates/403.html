@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Acceso denegado{% endblock %}
+{% block content %}
+<div class="alert alert-warning mt-4">
+  <h4 class="alert-heading">Acceso denegado</h4>
+  <p>No tienes permisos para ver este contenido.</p>
+  <a class="btn btn-secondary" href="javascript:history.back()">Volver</a>
+</div>
+{% endblock %}

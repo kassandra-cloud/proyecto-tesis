@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% load can %}
+{% block title %}Usuarios{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-body">
+
+    <!-- Título + botón Nuevo (según rol) -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h1 class="h4 m-0">Usuarios</h1>
+      {% user_can 'usuarios' 'create' as puede_crear %}
+      {% if puede_crear %}
+        <a class="btn btn-dark" href="{% url 'crear_usuario' %}">
+          <span class="me-1">+</span> Nuevo
+        </a>
+      {% endif %}
+    </div>
+
+    <!-- Búsqueda -->
+    <form class="row g-2 mb-3" method="get" action="{% url 'lista_usuarios' %}">
+      <div class="col-sm-6 col-md-5 col-lg-4">
+        <input type="text" name="q" value="{{ q }}" class="form-control"
+               placeholder="Buscar por username, email, nombre, apellido, RUT…">
+      </div>
+      <div class="col-auto">
+        <select name="per_page" class="form-select">
+          {% for n in opciones_per_page %}
+            <option value="{{ n }}" {% if per_page == n %}selected{% endif %}>{{ n }} registros</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-auto">
+        <button class="btn btn-primary" type="submit">Buscar</button>
+      </div>
+      {% if q %}
+      <div class="col-auto">
+        <a class="btn btn-outline-secondary" href="{% url 'lista_usuarios' %}">Limpiar</a>
+      </div>
+      {% endif %}
+      <input type="hidden" name="sort" value="{{ sort }}">
+      <input type="hidden" name="dir"  value="{{ dir }}">
+    </form>
+
+    <!-- Tabla de usuarios -->
+    <div class="table-responsive">
+      <table class="table align-middle">
+        <thead>
+          <tr>
+            <th>Username</th>
+            <th>Email</th>
+            <th>Nombre</th>
+            <th>Apellido</th>
+            <th>RUT</th>
+            <th>Rol</th>
+            <th class="text-end">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in page_obj.object_list %}
+          <tr>
+            <td>{{ u.username }}</td>
+            <td>{{ u.email }}</td>
+            <td>{{ u.first_name|default:"-" }}</td>
+            <td>{{ u.last_name|default:"-" }}</td>
+            <td>{{ u.perfil.rut|default:"-" }}</td>
+            <td>{{ u.perfil.get_rol_display|default:"-" }}</td>
+
+            <td class="text-end">
+              {% user_can 'usuarios' 'edit' as puede_editar %}
+              {% if puede_editar %}
+                <a href="{% url 'editar_usuario' u.pk %}" class="btn btn-sm btn-outline-secondary">Editar</a>
+              {% endif %}
+
+              {% user_can 'usuarios' 'delete' as puede_eliminar %}
+              {% if puede_eliminar %}
+                <a href="{% url 'eliminar_usuario' u.pk %}"
+                   class="btn btn-sm btn-outline-danger"
+                   onclick="return confirm('¿Eliminar usuario {{ u.username }}?')">Eliminar</a>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="7" class="text-center text-muted py-4">No hay resultados.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Paginación -->
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
+      <div class="text-muted small">
+        {{ total }} registro{{ total|pluralize }} • página {{ page_obj.number }} de {{ paginator.num_pages }}
+      </div>
+
+      {% if paginator.num_pages > 1 %}
+      <nav aria-label="Paginación">
+        <ul class="pagination mb-0">
+          {% if page_obj.has_previous %}
+            <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}">Anterior</a></li>
+          {% else %}
+            <li class="page-item disabled"><span class="page-link">Anterior</span></li>
+          {% endif %}
+
+          {% for num in page_obj.paginator.page_range %}
+            {% if num >= page_obj.number|add:-2 and num <= page_obj.number|add:2 %}
+              {% if num == page_obj.number %}
+                <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+              {% else %}
+                <li class="page-item"><a class="page-link" href="?page={{ num }}">{{ num }}</a></li>
+              {% endif %}
+            {% endif %}
+          {% endfor %}
+
+          {% if page_obj.has_next %}
+            <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}">Siguiente</a></li>
+          {% else %}
+            <li class="page-item disabled"><span class="page-link">Siguiente</span></li>
+          {% endif %}
+        </ul>
+      </nav>
+      {% endif %}
+    </div>
+
+  </div>
+</div>
+{% endblock %}

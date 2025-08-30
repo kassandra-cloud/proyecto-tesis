@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% load can %}
+
+{% block title %}Detalle de Reunión{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm">
+    <div class="card-header">
+        <h1 class="h4 mb-0">{{ reunion.titulo }}</h1>
+    </div>
+    <div class="card-body">
+        <p><strong>Tipo:</strong> {{ reunion.tipo }}</p>
+        <p><strong>Fecha y Hora:</strong> {{ reunion.fecha|date:"d/m/Y H:i" }} hrs</p>
+
+        <h5 class="mt-4">Tabla de Contenidos (Temas a tratar)</h5>
+        <div class="p-3 bg-light rounded border">
+            {{ reunion.tabla|linebreaks }}
+        </div>
+
+        <hr>
+        <div class="d-flex gap-2">
+            <a href="{% url 'reuniones:lista_reuniones' %}" class="btn btn-secondary">← Volver a la lista</a>
+
+            {% user_can 'reuniones' 'asistencia' as puede_pasar_lista %}
+            {% if puede_pasar_lista %}
+            <a href="{% url 'reuniones:lista_asistencia' reunion.pk %}" class="btn btn-primary">Registrar Asistencia</a>
+            {% endif %}
+            {% user_can 'actas' 'edit' as puede_editar_acta %}
+            {% if puede_editar_acta %}
+            <a href="{% url 'reuniones:editar_acta' reunion.pk %}" class="btn btn-info">Editar Acta</a>
+            {% endif %}
+            {% if reunion.acta %} {# Mostramos el botón solo si existe un acta #}
+            <a href="{% url 'reuniones:exportar_acta_pdf' reunion.pk %}" class="btn btn-success">Exportar a PDF</a>
+            {% endif %}
+        </div>
+    </div>
+    <div class="card-footer text-muted small">
+        Reunión creada por {{ reunion.creada_por.username }} el {{ reunion.creada_el|date:"d/m/Y" }}
+    </div>
+</div>
+{% endblock %}
