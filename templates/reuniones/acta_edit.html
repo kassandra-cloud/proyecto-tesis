@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% load can %}
+
+{% block title %}{{ titulo }}{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm">
+  <div class="card-body">
+    <h1 class="h4 mb-4">{{ titulo }}</h1>
+
+    <form method="post">
+        {% csrf_token %}
+
+        <div class="mb-3">
+          {{ form.contenido.label_tag }}
+          {{ form.contenido }}
+        </div>
+
+        <div class="mt-4 d-flex gap-2">
+            <button type="submit" class="btn btn-dark">Guardar Acta</button>
+            <a href="{% url 'reuniones:detalle_reunion' reunion.pk %}" class="btn btn-outline-secondary">Cancelar</a>
+        </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

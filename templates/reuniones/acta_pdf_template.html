@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            font-family: "Helvetica", "Arial", sans-serif;
+            color: #333;
+        }
+        h1 {
+            font-size: 24px;
+            color: #111;
+        }
+        h3 {
+            font-size: 16px;
+            color: #555;
+            margin-top: 0;
+        }
+        .content {
+            margin-top: 20px;
+            white-space: pre-wrap; /* Respeta los saltos de línea y espacios */
+            font-size: 12px;
+            line-height: 1.6;
+        }
+        .footer {
+            position: fixed;
+            bottom: 0;
+            width: 100%;
+            text-align: center;
+            font-size: 10px;
+            color: #888;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Acta de Reunión</h1>
+        <h3>Junta de Vecinos "Villa Vista al Mar"</h3>
+    </div>
+
+    <hr>
+
+    <h2>{{ reunion.titulo }}</h2>
+    <p><strong>Fecha:</strong> {{ reunion.fecha|date:"d/m/Y H:i" }} hrs</p>
+    <p><strong>Tipo:</strong> {{ reunion.tipo }}</p>
+
+    <div class="content">
+        {{ acta.contenido }}
+    </div>
+
+    <div class="footer">
+        Documento generado automáticamente por el sistema de gestión.
+    </div>
+</body>
+</html>

@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}{{ titulo }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h1 class="h4 mb-4">{{ titulo }}</h1>
+
+        <form method="post" novalidate>
+          {% csrf_token %}
+
+          <div class="mb-3">
+            <label class="form-label">{{ form.titulo.label }}</label>
+            {{ form.titulo }}
+            {% if form.titulo.errors %}<div class="text-danger small">{{ form.titulo.errors|striptags }}</div>{% endif %}
+          </div>
+
+          <div class="row g-3">
+            <div class="col-md-6 mb-3">
+              <label class="form-label">{{ form.tipo.label }}</label>
+              {{ form.tipo }}
+              {% if form.tipo.errors %}<div class="text-danger small">{{ form.tipo.errors|striptags }}</div>{% endif %}
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">{{ form.fecha.label }}</label>
+              {{ form.fecha }}
+              {% if form.fecha.errors %}<div class="text-danger small">{{ form.fecha.errors|striptags }}</div>{% endif %}
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">{{ form.tabla.label }}</label>
+            {{ form.tabla }}
+            {% if form.tabla.errors %}<div class="text-danger small">{{ form.tabla.errors|striptags }}</div>{% endif %}
+          </div>
+
+          <div class="mt-4 d-flex gap-2">
+            <button type="submit" class="btn btn-dark">Guardar Reunión</button>
+            <a href="{% url 'reuniones:lista_reuniones' %}" class="btn btn-outline-secondary">Cancelar</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

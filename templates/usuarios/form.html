@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}{{ titulo }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h1 class="h4 mb-4">{{ titulo }}</h1>
+
+        {% if form.non_field_errors %}
+          <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+        {% endif %}
+
+        <form method="post" novalidate id="user-form">
+          {% csrf_token %}
+
+          <!-- Username -->
+          <div class="mb-3">
+            <label class="form-label">{{ form.username.label }}</label>
+            {{ form.username }}
+            {% if form.username.errors %}<div class="text-danger small">{{ form.username.errors|striptags }}</div>{% endif %}
+          </div>
+
+          <!-- Nombre / Apellidos -->
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">{{ form.first_name.label }}</label>
+              {{ form.first_name }}
+              {% if form.first_name.errors %}<div class="text-danger small">{{ form.first_name.errors|striptags }}</div>{% endif %}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">{{ form.last_name.label }}</label>
+              {{ form.last_name }}
+              {% if form.last_name.errors %}<div class="text-danger small">{{ form.last_name.errors|striptags }}</div>{% endif %}
+            </div>
+          </div>
+
+          <!-- Email -->
+          <div class="mb-3 mt-3">
+            <label class="form-label">{{ form.email.label }}</label>
+            {{ form.email }}
+            {% if form.email.errors %}<div class="text-danger small">{{ form.email.errors|striptags }}</div>{% endif %}
+          </div>
+
+          {# CREAR: contraseñas + checklist + “coinciden” #}
+          {% if form.password1 %}
+          <div class="row g-4">
+            <div class="col-md-6">
+              <label class="form-label">{{ form.password1.label }}</label>
+              {{ form.password1 }}
+              <ul class="list-unstyled small mt-2" id="pw-checklist">
+                <li id="pm-create-len"   class="text-danger"><span class="pm-icon">✖</span> Mínimo 12 caracteres</li>
+                <li id="pm-create-upper" class="text-danger"><span class="pm-icon">✖</span> Al menos 1 mayúscula</li>
+                <li id="pm-create-lower" class="text-danger"><span class="pm-icon">✖</span> Al menos 1 minúscula</li>
+                <li id="pm-create-sym"   class="text-danger"><span class="pm-icon">✖</span> Al menos 1 símbolo</li>
+              </ul>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">{{ form.password2.label }}</label>
+              {{ form.password2 }}
+              <div class="small mt-2" id="pw-match" aria-live="polite">
+                <span class="text-danger">✖ Las contraseñas no coinciden.</span>
+              </div>
+            </div>
+          </div>
+          {% endif %}
+
+          <!-- Rol / RUT -->
+          <div class="row g-3 mt-1">
+            <div class="col-md-4">
+              <label class="form-label">{{ form.rol.label }}</label>
+              {{ form.rol }}
+            </div>
+            <div class="col-md-5">
+              <label class="form-label">RUT (cuerpo)</label>
+              {{ form.rut_cuerpo }}
+              <div class="form-text">Solo números (7–9 dígitos).</div>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">DV</label>
+              {{ form.rut_dv }}
+            </div>
+          </div>
+
+          <!-- Botones -->
+          <div class="mt-4 d-flex gap-2">
+            <button id="btn-guardar" class="btn btn-dark">Guardar</button>
+            <a href="{% url 'lista_usuarios' %}" class="btn btn-outline-secondary">Cancelar</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+  <script src="{% static 'js/usuarios.js' %}"></script>
+  <script src="{% static 'js/password-meter.js' %}"></script>
+{% endblock %}

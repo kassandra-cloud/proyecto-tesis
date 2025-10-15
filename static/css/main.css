@@ -1,0 +1,114 @@
+:root{
+  --brand-primary:  #1199D6; /* azul */
+  --brand-teal:     #13A3B0; /* teal */
+  --brand-secondary:#7F2D2F; /* vino */
+  --brand-secondary-600:#8F3A3C; /* vino aclarado para cabeceras */
+  --brand-accent:   #2DB84A; /* verde */
+  --brand-yellow:   #F2C74F; /* sol */
+  --brand-brown:    #3B2C25; /* montañas */
+  --brand-gray:     #7E8288; /* camino */
+  --brand-bg:       #F4FAFE; /* fondo muy suave */
+}
+
+/* Fondo general con leve degradado y respiración */
+body{
+  background: radial-gradient(1200px 600px at 20% -10%, #EAF6FD 0%, transparent 60%),
+              radial-gradient(1200px 600px at 120% 20%, #E7F8F9 0%, transparent 60%),
+              var(--brand-bg) !important;
+}
+
+/* NAVBAR: elegante, con blur y sombra */
+.navbar{
+  background: linear-gradient(90deg, var(--brand-primary), var(--brand-teal)) !important;
+  color:#fff !important;
+  backdrop-filter: saturate(120%) blur(2px);
+  box-shadow: 0 4px 16px rgba(0,0,0,.08);
+}
+.navbar .navbar-brand,
+.navbar .nav-link{ color:#fff !important; opacity:.95 }
+.navbar .nav-link:hover{ opacity:1 }
+
+/* CONTENEDOR: tarjeta elevada */
+.card-elevated{
+  border: 0 !important;
+  border-radius: 18px !important;
+  box-shadow: 0 12px 30px rgba(17,153,214,.12);
+  background: #ffffffd9; /* leve transparencia */
+  backdrop-filter: blur(2px);
+}
+
+/* Título de página */
+.page-title{
+  font-weight: 800;
+  letter-spacing: .2px;
+  color: #0C2E3C; /* texto más sofisticado que negro puro */
+}
+
+/* Botón “Nuevo” estilo pill */
+.btn-brand{
+  background: var(--brand-secondary) !important;
+  border-color: var(--brand-secondary) !important;
+  color:#fff !important;
+  border-radius: 12px !important;
+  padding: .5rem 1rem !important;
+  box-shadow: 0 6px 16px rgba(127,45,47,.25);
+}
+.btn-brand:hover{ filter: brightness(.95) }
+
+/* Botones secundarios */
+.btn-outline-secondary{
+  border-color: var(--brand-gray) !important;
+  color: #23323A !important;
+}
+.btn-outline-danger{
+  border-radius: 10px !important;
+}
+
+/* Tabla: header vino elegante, filas con zebra suave y hover */
+.table-brand thead th{
+  background: var(--brand-secondary-600) !important;
+  color:#fff !important;
+  font-weight: 700 !important;
+  border: none !important;
+}
+.table-brand{
+  --row-zebra: rgba(17,153,214,.06);
+  --row-hover: rgba(17,153,214,.12);
+  border-collapse: separate;
+  border-spacing: 0 10px;  /* filas separadas, “chips” */
+}
+.table-brand tbody tr{
+  background: #fff;
+  box-shadow: 0 4px 18px rgba(0,0,0,.04);
+}
+.table-brand tbody tr:hover{ background: var(--row-hover) }
+.table-brand tbody tr td{
+  border-top: none !important;
+  border-bottom: none !important;
+}
+.table-brand tbody tr td:first-child{ border-radius: 12px 0 0 12px; }
+.table-brand tbody tr td:last-child{ border-radius: 0 12px 12px 0; }
+
+/* Definicion por roles */
+.badge-role.presidente { background: #7F2D2F; color:#fff; } /* vino */
+.badge-role.secretaria { background: #13A3B0; color:#fff; } /* teal */
+.badge-role.tesorero   { background: #F2C74F; color:#222; } /* amarillo */
+.badge-role.suplente   { background: #7E8288; color:#fff; } /* gris */
+.badge-role.vecino     { background: #2DB84A; color:#fff; } /* verde */
+
+/* Focus accesible */
+.form-control:focus, .form-select:focus{
+  border-color: var(--brand-primary) !important;
+  box-shadow: 0 0 0 .2rem rgba(17,153,214,.25) !important;
+}
+
+/* Pequeño pulido de paginación */
+.page-link{ color: var(--brand-primary) }
+.page-item.active .page-link{
+  background: var(--brand-primary); border-color: var(--brand-primary);
+}
+/* --- FIX de superposición del dropdown --- */
+.navbar{ position: relative; z-index: 1100; }      /* navbar por encima de cards/tablas */
+.dropdown-menu{ z-index: 2000 !important; }        /* menú por encima de todo */
+
+.card, .card-elevated, .table-responsive{ position: relative; z-index: 1; } /* garantizan orden correcto */
