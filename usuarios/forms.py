@@ -51,8 +51,7 @@ class UsuarioCrearForm(forms.ModelForm):
                                  widget=forms.TextInput(attrs={'readonly': 'readonly'}))
     password1  = forms.CharField(label="Contraseña", widget=forms.PasswordInput)
     password2  = forms.CharField(label="Confirmar contraseña", widget=forms.PasswordInput)
-    rol        = forms.ChoiceField(label="Rol", choices=Perfil.Roles.choices,
-                                   initial=Perfil.Roles.VECINO)
+    rol        = forms.ChoiceField(label="Rol", choices=Perfil.Roles.choices)
 
     class Meta:
         model  = User

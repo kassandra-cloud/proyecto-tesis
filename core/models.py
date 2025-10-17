@@ -18,10 +18,10 @@ class Perfil(models.Model):
         SECRETARIA = "secretaria", "SECRETARIA"
         TESORERO   = "tesorero",  "TESORERO"
         SUPLENTE   = "suplente",  "SUPLENTE"
-        VECINO     = "vecino",    "VECINO"
+       
 
     usuario = models.OneToOneField(User, on_delete=models.CASCADE, related_name="perfil")
-    rol     = models.CharField(max_length=20, choices=Roles.choices, default=Roles.VECINO)
+    rol     = models.CharField(max_length=20, choices=Roles.choices)
     rut     = models.CharField(max_length=12, unique=True, null=False, blank=False, help_text="12345678-9")
 
     def save(self, *args, **kwargs):
