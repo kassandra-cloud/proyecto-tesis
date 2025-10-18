@@ -1,4 +1,3 @@
-# tesis-prueba-gemini
 Sigue estos pasos para configurar y ejecutar el servidor en tu máquina local.
 Esto es lo que haces cada vez que empiezas a trabajar en el proyecto.
 
