@@ -24,6 +24,10 @@ class Perfil(models.Model):
     rol     = models.CharField(max_length=20, choices=Roles.choices)
     rut     = models.CharField(max_length=12, unique=True, null=False, blank=False, help_text="12345678-9")
 
+      # 🔹 NUEVO
+    apellido_paterno = models.CharField(max_length=100, blank=True)
+    apellido_materno = models.CharField(max_length=100, blank=True)
+
     def save(self, *args, **kwargs):
         if not self.rut or not self.rut.strip():
             from django.core.exceptions import ValidationError

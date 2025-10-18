@@ -50,7 +50,8 @@
             <th>Username</th>
             <th>Email</th>
             <th>Nombre</th>
-            <th>Apellido</th>
+            <th>Apellido Paterno</th>   
+            <th>Apellido Materno</th> 
             <th>RUT</th>
             <th>Rol</th>
             <th class="text-end">Acciones</th>
@@ -62,7 +63,8 @@
             <td>{{ u.username }}</td>
             <td>{{ u.email }}</td>
             <td>{{ u.first_name|default:"-" }}</td>
-            <td>{{ u.last_name|default:"-" }}</td>
+            <td>{{ u.perfil.apellido_paterno|default:"-" }}</td>
+            <td>{{ u.perfil.apellido_materno|default:"-" }}</td>
             <td>{{ u.perfil.rut|default:"-" }}</td>
             <td>{{ u.perfil.get_rol_display|default:"-" }}</td>
 

@@ -4,6 +4,7 @@ from django import forms
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.core.validators import RegexValidator
+from django.shortcuts import get_object_or_404
 
 from core.models import Perfil
 from core.rut import normalizar_rut, dv_mod11, validar_rut
@@ -53,16 +54,23 @@ class UsuarioCrearForm(forms.ModelForm):
     password2  = forms.CharField(label="Confirmar contraseña", widget=forms.PasswordInput)
     rol        = forms.ChoiceField(label="Rol", choices=Perfil.Roles.choices)
 
+    # 🔹 NUEVOS CAMPOS (se guardan en Perfil)
+    apellido_paterno = forms.CharField(label="Apellido paterno", max_length=100, required=False)
+    apellido_materno = forms.CharField(label="Apellido materno", max_length=100, required=False)
+
     class Meta:
         model  = User
-        fields = ["username", "email", "first_name", "last_name"]
-        labels = {"first_name": "Nombre", "last_name": "Apellido"}
+        # quitamos last_name del form para no duplicar los apellidos
+        fields = ["username", "email", "first_name"]
+        labels = {"first_name": "Nombre"}
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
         # Estética
-        for name in ("username","email","first_name","last_name",
-                     "password1","password2","rut_cuerpo","rut_dv"):
+        for name in ("username","email","first_name",
+                     "password1","password2","rut_cuerpo","rut_dv",
+                     "apellido_paterno","apellido_materno"):
             self.fields[name].widget.attrs.setdefault("class", "form-control")
         self.fields["rol"].widget.attrs.setdefault("class", "form-select")
         self.fields["username"].widget.attrs.setdefault("placeholder", "ej: kassandra")
@@ -84,8 +92,14 @@ class UsuarioCrearForm(forms.ModelForm):
             NAME_VALIDATOR(v)
         return v
 
-    def clean_last_name(self):
-        v = (self.cleaned_data.get("last_name") or "").strip()
+    def clean_apellido_paterno(self):
+        v = (self.cleaned_data.get("apellido_paterno") or "").strip()
+        if v:
+            NAME_VALIDATOR(v)
+        return v
+
+    def clean_apellido_materno(self):
+        v = (self.cleaned_data.get("apellido_materno") or "").strip()
         if v:
             NAME_VALIDATOR(v)
         return v
@@ -122,7 +136,12 @@ class UsuarioCrearForm(forms.ModelForm):
         user.username   = self.cleaned_data["username"].strip()
         user.email      = (self.cleaned_data.get("email") or "").strip()
         user.first_name = (self.cleaned_data.get("first_name") or "").strip()
-        user.last_name  = (self.cleaned_data.get("last_name") or "").strip()
+
+        # mantener compatibilidad con auth_user.last_name
+        ap = (self.cleaned_data.get("apellido_paterno") or "").strip()
+        am = (self.cleaned_data.get("apellido_materno") or "").strip()
+        user.last_name  = f"{ap} {am}".strip()
+
         user.set_password(self.cleaned_data["password1"])
 
         if commit:
@@ -133,6 +152,8 @@ class UsuarioCrearForm(forms.ModelForm):
             usuario=user,
             rol=self.cleaned_data["rol"],
             rut=self.cleaned_data["rut"],
+            apellido_paterno=ap,
+            apellido_materno=am,
         )
         return user
 
@@ -147,29 +168,37 @@ class UsuarioEditarForm(forms.ModelForm):
                                  widget=forms.TextInput(attrs={'readonly': 'readonly'}))
     rol        = forms.ChoiceField(label="Rol", choices=Perfil.Roles.choices)
 
+    # 🔹 NUEVOS CAMPOS
+    apellido_paterno = forms.CharField(label="Apellido paterno", max_length=100, required=False)
+    apellido_materno = forms.CharField(label="Apellido materno", max_length=100, required=False)
+
     class Meta:
         model  = User
-        fields = ["username", "email", "first_name", "last_name"]
-        labels = {"first_name": "Nombre", "last_name": "Apellido"}
+        fields = ["username", "email", "first_name"]
+        labels = {"first_name": "Nombre"}
 
     def __init__(self, *args, **kwargs):
         self.instance_user: User = kwargs.get("instance")
         super().__init__(*args, **kwargs)
 
         # Estética
-        for name in ("username","email","first_name","last_name","rut_cuerpo","rut_dv"):
+        for name in ("username","email","first_name","rut_cuerpo","rut_dv",
+                     "apellido_paterno","apellido_materno"):
             self.fields[name].widget.attrs.setdefault("class", "form-control")
         self.fields["rol"].widget.attrs.setdefault("class", "form-select")
         self.fields["rut_dv"].widget.attrs["readonly"] = "readonly"
 
-        # Pre-cargar RUT y rol desde Perfil
+        # Pre-cargar RUT/rol y apellidos desde Perfil
         if self.instance_user and hasattr(self.instance_user, "perfil"):
-            rut = self.instance_user.perfil.rut or ""
+            p = self.instance_user.perfil
+            rut = p.rut or ""
             if "-" in rut:
                 cuerpo, dv = rut.split("-", 1)
                 self.fields["rut_cuerpo"].initial = cuerpo
                 self.fields["rut_dv"].initial = dv
-            self.fields["rol"].initial = self.instance_user.perfil.rol
+            self.fields["rol"].initial = p.rol
+            self.fields["apellido_paterno"].initial = p.apellido_paterno
+            self.fields["apellido_materno"].initial = p.apellido_materno
 
     # ----- field-level -----
     def clean_username(self):
@@ -190,8 +219,14 @@ class UsuarioEditarForm(forms.ModelForm):
             NAME_VALIDATOR(v)
         return v
 
-    def clean_last_name(self):
-        v = (self.cleaned_data.get("last_name") or "").strip()
+    def clean_apellido_paterno(self):
+        v = (self.cleaned_data.get("apellido_paterno") or "").strip()
+        if v:
+            NAME_VALIDATOR(v)
+        return v
+
+    def clean_apellido_materno(self):
+        v = (self.cleaned_data.get("apellido_materno") or "").strip()
         if v:
             NAME_VALIDATOR(v)
         return v
@@ -203,7 +238,6 @@ class UsuarioEditarForm(forms.ModelForm):
         rut, dv = _armar_rut_desde_cuerpo(cleaned.get("rut_cuerpo"))
         qs = Perfil.objects.filter(rut__iexact=rut)
 
-        # <<< ARREGLO: no usar perfil_id; obtener pk del perfil de forma segura >>>
         perfil_pk = getattr(getattr(self.instance_user, "perfil", None), "pk", None)
         if perfil_pk:
             qs = qs.exclude(pk=perfil_pk)
@@ -228,7 +262,10 @@ class UsuarioEditarForm(forms.ModelForm):
         user.username   = (self.cleaned_data.get("username") or "").strip()
         user.email      = (self.cleaned_data.get("email") or "").strip()
         user.first_name = (self.cleaned_data.get("first_name") or "").strip()
-        user.last_name  = (self.cleaned_data.get("last_name") or "").strip()
+
+        ap = (self.cleaned_data.get("apellido_paterno") or "").strip()
+        am = (self.cleaned_data.get("apellido_materno") or "").strip()
+        user.last_name  = f"{ap} {am}".strip()  # compatibilidad con auth_user.last_name
 
         if commit:
             user.save()
@@ -237,5 +274,7 @@ class UsuarioEditarForm(forms.ModelForm):
         perfil, _ = Perfil.objects.get_or_create(usuario=user)
         perfil.rol = self.cleaned_data["rol"]
         perfil.rut = self.cleaned_data["rut"]
+        perfil.apellido_paterno = ap
+        perfil.apellido_materno = am
         perfil.save()
         return user
