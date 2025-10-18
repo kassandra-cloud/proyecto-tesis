@@ -9,6 +9,7 @@ cssselect2==0.8.0
 defusedxml==0.7.1
 Django==5.0.8
 django-widget-tweaks==1.5.0
+djangorestframework==3.16.1
 fonttools==4.59.2
 fpdf2==2.7.7
 html5lib==1.1
