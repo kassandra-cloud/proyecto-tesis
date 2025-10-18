@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% load can %}
+
+{% block title %}Votaciones{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h4 m-0">Votaciones</h1>
+    {% user_can 'votaciones' 'create' as puede_crear_votacion %}
+    {% if puede_crear_votacion %}
+    <a class="btn btn-dark" href="{% url 'votaciones:crear_votacion' %}">
+        <span class="me-1">+</span> Nueva Votación
+    </a>
+    {% endif %}
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header">Votaciones Abiertas</div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <tbody>
+                {% for votacion in votaciones_abiertas %}
+                <tr>
+                    <td>
+                        <a href="{% url 'votaciones:detalle_votacion' votacion.pk %}">{{ votacion.pregunta }}</a>
+                        <span class="small text-muted d-block">Cierra el: {{ votacion.fecha_cierre|date:"d/m/Y H:i" }}</span>
+                    </td>
+                    <td class="text-end">
+                        {# Solo el Presidente puede Editar o Eliminar votaciones ABIERTAS #}
+                        {% user_can 'votaciones' 'edit' as puede_editar %}
+                        {% if puede_editar %}
+                            <a href="{% url 'votaciones:editar_votacion' votacion.pk %}" class="btn btn-sm btn-outline-secondary">Editar</a>
+                        {% endif %}
+                        {% user_can 'votaciones' 'delete' as puede_eliminar %}
+                        {% if puede_eliminar %}
+                             <a href="{% url 'votaciones:eliminar_votacion' votacion.pk %}" class="btn btn-sm btn-outline-danger">Eliminar</a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td class="text-muted p-3">No hay votaciones abiertas en este momento.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-header">Votaciones Cerradas (Historial)</div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <tbody>
+                {% for votacion in votaciones_cerradas %}
+                <tr>
+                    <td>
+                        <a href="{% url 'votaciones:detalle_votacion' votacion.pk %}">{{ votacion.pregunta }}</a>
+                         <span class="small text-muted d-block">Cerró el: {{ votacion.fecha_cierre|date:"d/m/Y H:i" }}</span>
+                    </td>
+                    <td class="text-end">
+                        {# --- BOTÓN ELIMINAR QUITADO DE AQUÍ --- #}
+                        {# Las votaciones cerradas son un registro histórico y no se pueden eliminar. #}
+                        <a href="{% url 'votaciones:detalle_votacion' votacion.pk %}" class="btn btn-sm btn-outline-info">Ver Resultados</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td class="text-muted p-3">No hay votaciones en el historial.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

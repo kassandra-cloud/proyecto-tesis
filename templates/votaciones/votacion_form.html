@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block title %}{{ titulo }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h1 class="h4 mb-4">{{ titulo }}</h1>
+                
+                <form method="post" novalidate id="votacion-form">
+                    {% csrf_token %}
+                    
+                    {% if form.non_field_errors %}
+                        <div class="alert alert-danger">
+                            {{ form.non_field_errors|striptags }}
+                        </div>
+                    {% endif %}
+
+                    {{ form.opciones }}
+
+                    <div class="mb-3">
+                        <label class="form-label">{{ form.pregunta.label }}</label>
+                        {{ form.pregunta }}
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">{{ form.fecha_cierre_date.label }}</label>
+                            {{ form.fecha_cierre_date }}
+                            {% if form.fecha_cierre_date.errors %}
+                                <div class="text-danger small mt-1">{{ form.fecha_cierre_date.errors|striptags }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">{{ form.fecha_cierre_time.label }}</label>
+                            {{ form.fecha_cierre_time }}
+                             {% if form.fecha_cierre_time.errors %}
+                                <div class="text-danger small mt-1">{{ form.fecha_cierre_time.errors|striptags }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Opciones de Voto</label>
+                        <div id="opciones-container">
+                            </div>
+                        <button type="button" id="add-opcion-btn" class="btn btn-sm btn-outline-primary mt-2">
+                            + Agregar Opción
+                        </button>
+                    </div>
+
+                    <div class="mt-4">
+                        <button type="submit" class="btn btn-dark">Guardar Votación</button>
+                        <a href="{% url 'votaciones:lista_votaciones' %}" class="btn btn-outline-secondary">Cancelar</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const container = document.getElementById('opciones-container');
+    const addButton = document.getElementById('add-opcion-btn');
+    const form = document.getElementById('votacion-form');
+    const hiddenOptionsInput = document.getElementById('id_opciones');
+    let optionCount = 0;
+
+    // Función para añadir un nuevo campo de opción
+    function addOptionInput() {
+        optionCount++;
+        const div = document.createElement('div');
+        div.className = 'input-group mb-2';
+        div.innerHTML = `
+            <input type="text" name="opcion_dinamica_${optionCount}" class="form-control" placeholder="Texto de la opción ${optionCount}">
+            <button type="button" class="btn btn-outline-danger remove-opcion-btn">Eliminar</button>
+        `;
+        container.appendChild(div);
+        updateRemoveButtons();
+    }
+
+    // Función para actualizar el estado de los botones "Eliminar"
+    function updateRemoveButtons() {
+        const removeButtons = container.querySelectorAll('.remove-opcion-btn');
+        const canRemove = removeButtons.length > 2;
+        removeButtons.forEach(btn => {
+            btn.disabled = !canRemove;
+        });
+    }
+
+    // Evento para añadir un nuevo campo
+    addButton.addEventListener('click', addOptionInput);
+
+    // Evento para eliminar un campo (usando delegación de eventos)
+    container.addEventListener('click', function(e) {
+        if (e.target.classList.contains('remove-opcion-btn')) {
+            e.target.closest('.input-group').remove();
+            updateRemoveButtons();
+        }
+    });
+
+    // Antes de enviar el formulario, consolidamos las opciones en el campo oculto
+    form.addEventListener('submit', function() {
+        const options = [];
+        container.querySelectorAll('input[type="text"]').forEach(input => {
+            if (input.value.trim() !== '') {
+                options.push(input.value.trim());
+            }
+        });
+        hiddenOptionsInput.value = options.join('\\n');
+    });
+
+    // Iniciar con dos opciones por defecto
+    addOptionInput();
+    addOptionInput();
+});
+</script>
+{% endblock %}

@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     'widget_tweaks',
     "reuniones",
     "talleres",
+    "votaciones",
     'rest_framework',
     'rest_framework.authtoken',
 ]

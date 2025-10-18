@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}Editar Votación{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h1 class="h4 mb-4">Editar Votación</h1>
+                
+                <div class="alert alert-secondary">
+                    <p class="fw-bold mb-1">Pregunta de la Votación:</p>
+                    <p class="mb-0">{{ votacion.pregunta }}</p>
+                    <hr>
+                    <p class="fw-bold mb-1">Opciones (no editables):</p>
+                    <ul>
+                        {% for opcion in votacion.opciones.all %}
+                            <li>{{ opcion.texto }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+
+                <form method="post" novalidate>
+                    {% csrf_token %}
+                    
+                    {% if form.non_field_errors %}
+                        <div class="alert alert-danger">{{ form.non_field_errors|striptags }}</div>
+                    {% endif %}
+
+                    <div class="row mt-4">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">{{ form.fecha_cierre_date.label }}</label>
+                            {{ form.fecha_cierre_date }}
+                            {% if form.fecha_cierre_date.errors %}
+                                <div class="text-danger small mt-1">{{ form.fecha_cierre_date.errors|striptags }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">{{ form.fecha_cierre_time.label }}</label>
+                            {{ form.fecha_cierre_time }}
+                             {% if form.fecha_cierre_time.errors %}
+                                <div class="text-danger small mt-1">{{ form.fecha_cierre_time.errors|striptags }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="mt-4">
+                        <button type="submit" class="btn btn-dark">Actualizar Fecha</button>
+                        <a href="{% url 'votaciones:lista_votaciones' %}" class="btn btn-outline-secondary">Cancelar</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

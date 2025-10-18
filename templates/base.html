@@ -58,6 +58,15 @@
           </li>
           {% endif %}
 
+          {# Menú Votaciones (solo si el rol tiene permiso) #}
+          {% user_can 'votaciones' 'view' as puede_ver_votaciones %}
+          {% if puede_ver_votaciones %}
+          <li class="nav-item">
+            <a class="nav-link {% if request.resolver_match.app_name == 'votaciones' %}active{% endif %}"
+              href="{% url 'votaciones:lista_votaciones' %}">Votaciones</a>
+          </li>
+          {% endif %}
+
           {% if user.is_authenticated %}
           <li class="nav-item dropdown ms-lg-3">
             <a class="nav-link dropdown-toggle" href="#" id="userMenu" role="button" data-bs-toggle="dropdown"

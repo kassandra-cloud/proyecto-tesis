@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block title %}Confirmar Eliminación{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card shadow-sm border-danger">
+            <div class="card-body">
+                <h1 class="h4 mb-3 text-danger">Confirmar Eliminación</h1>
+                <p>¿Estás seguro de que quieres eliminar la votación <strong>"{{ votacion.pregunta }}"</strong>?</p>
+                <p class="text-muted">Esta acción es irreversible y se perderán todos los datos asociados a ella.</p>
+
+                <form method="post" action="{% url 'votaciones:eliminar_votacion' votacion.pk %}">
+                    {% csrf_token %}
+                    <div class="mt-4 d-flex gap-2">
+                        <button type="submit" class="btn btn-danger">Sí, eliminar</button>
+                        <a href="{% url 'votaciones:lista_votaciones' %}" class="btn btn-outline-secondary">Cancelar</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -16,6 +16,17 @@
         <div class="p-3 bg-light rounded border">
             {{ reunion.tabla|linebreaks }}
         </div>
+        
+        {% if reunion.acta and reunion.acta.contenido %}
+        <h5 class="mt-4">Contenido del Acta (Previsualización)</h5>
+        <div class="p-3 bg-white rounded border" style="white-space: pre-wrap;">
+            {{ reunion.acta.contenido|linebreaks }}
+        </div>
+        {% else %}
+        <div class="alert alert-info mt-4">
+            Aún no se ha redactado el acta para esta reunión.
+        </div>
+        {% endif %}
 
         <hr>
         <div class="d-flex gap-2">

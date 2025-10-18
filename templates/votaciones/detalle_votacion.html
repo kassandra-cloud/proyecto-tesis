@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% load can %}
+
+{% block title %}Detalle de Votación{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm">
+    <div class="card-header">
+        <h1 class="h4 m-0">{{ votacion.pregunta }}</h1>
+    </div>
+    <div class="card-body">
+
+        {# CASO 1: Si el usuario es Directiva, muestra la previsualización de resultados #}
+        {% if puede_previsualizar %}
+            
+            {% if votacion.esta_abierta %}
+                <div class="alert alert-info">Esta votación está en curso. Los resultados se actualizan en tiempo real.</div>
+            {% else %}
+                <div class="alert alert-secondary">Esta votación ha finalizado.</div>
+            {% endif %}
+            
+            <h5 class="mt-4">Resultados Actuales</h5>
+            <p class="text-muted small">Total de votos hasta ahora: {{ total_votos }}</p>
+            
+            {% for opcion in resultados %}
+            <div class="mb-3">
+                <div class="d-flex justify-content-between">
+                    <span>{{ opcion.texto }}</span>
+                    <strong>{{ opcion.votos }} voto(s) ({{ opcion.porcentaje }}%)</strong>
+                </div>
+                <div class="progress" style="height: 20px;">
+                    {# MUESTRA ERROR PERO ESTA BIEN #}
+                    <div class="progress-bar" role="progressbar" style="width: {{ opcion.porcentaje }}%" aria-valuenow="{{ opcion.porcentaje }}" aria-valuemin="0" aria-valuemax="100"></div>
+                </div>
+            </div>
+            {% empty %}
+                <p class="text-muted">Aún no se han registrado votos.</p>
+            {% endfor %}
+
+        {# CASO 2: Si no es Directiva, muestra un mensaje simple #}
+        {% else %}
+            <div class="alert alert-secondary">
+                La información detallada de la votación está disponible para la directiva. Los vecinos participan a través de la aplicación móvil.
+            </div>
+        {% endif %}
+
+        {# ZONA DE ADMINISTRACIÓN (botón para cerrar) #}
+        {% user_can 'votaciones' 'close' as puede_cerrar_votacion %}
+        {% if puede_cerrar_votacion and votacion.esta_abierta %}
+            <hr>
+            <div class="mt-3 p-3 bg-light border rounded">
+                <h5 class="text-danger">Zona de Administración</h5>
+                <p class="small text-muted">Esta acción cerrará la votación para todos los usuarios de forma inmediata.</p>
+                <form action="{% url 'votaciones:cerrar_votacion' votacion.pk %}" method="post" onsubmit="return confirm('¿Estás seguro de que quieres cerrar esta votación? Esta acción no se puede deshacer.');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger">Cerrar Votación Ahora</button>
+                </form>
+            </div>
+        {% endif %}
+    </div>
+
+    <div class="card-footer d-flex justify-content-between align-items-center">
+        <a href="{% url 'votaciones:lista_votaciones' %}" class="btn btn-secondary">← Volver a la lista</a>
+        <small class="text-muted">
+            Votación creada por {{ votacion.creada_por.username }}
+        </small>
+    </div>
+</div>
+{% endblock %}
