@@ -112,7 +112,7 @@ Hemos añadido un archivo llamado `.gitignore`. Su propósito es **decirle a Git
 
 Al ignorar estos archivos, mantenemos el repositorio ligero, limpio y evitamos conflictos innecesarios.
 
-📡 API REST de Votaciones (v1)
+## 📡 API REST de Votaciones (v1)
 
 Esta API permite a la app web y móvil interactuar con el módulo de votaciones.
 
