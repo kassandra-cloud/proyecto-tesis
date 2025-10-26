@@ -144,10 +144,13 @@ STATICFILES_DIRS = [BASE_DIR / 'static']
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 #Configutacion para envio de correo
+import os
+from dotenv import load_dotenv
+load_dotenv()
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')  # Usa variables de entorno
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'kassramosveg@gmail.com'
-EMAIL_HOST_PASSWORD = 'uqpzmexwsaypqfen'
-DEFAULT_FROM_EMAIL = 'kassramosveg@gmail.com'
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER')  # Defínelas en el entorno
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD')  # Lo mismo aquí
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL')
