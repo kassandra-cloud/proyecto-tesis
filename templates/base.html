@@ -35,9 +35,12 @@
 
       <div id="nav" class="collapse navbar-collapse">
         <ul class="navbar-nav ms-auto align-items-lg-center">
+          <!-- Mostrar "Inicio" solo si el usuario está autenticado -->
           <li class="nav-item">
-            <a class="nav-link {% if request.resolver_match.url_name == 'home' %}active{% endif %}"
-              href="{% url 'home' %}">Inicio</a>
+            {% if user.is_authenticated %}
+              <a class="nav-link {% if request.resolver_match.url_name == 'home' %}active{% endif %}"
+                href="{% url 'home' %}">Inicio</a>
+            {% endif %}
           </li>
 
           {# Mostrar el menú Usuarios solo si el rol tiene permiso #}
@@ -105,7 +108,7 @@
   {% if messages %}
   <div class="container mt-3">
     {% for m in messages %}
-    <div class="alert {% if m.tags == 'error' %}alert-danger{% else %}alert-{{ m.tags|default:'secondary' }}{% endif %}
+    <div class="alert {% if m.tags == 'error' %}alert-danger{% else %}alert-{{ m.tags|default:'secondary' }}{% endif %} 
                     alert-dismissible fade show mb-2" role="alert">
       {{ m }}
       <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
