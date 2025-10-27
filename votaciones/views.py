@@ -5,10 +5,16 @@ from django.utils import timezone
 from .models import Votacion, Opcion, Voto
 from .forms import VotacionForm  
 from core.authz import role_required
-from django.db.models import Count
+from django.db.models import Count, OuterRef, Subquery, Value, IntegerField
 from core.authz import can
 from .forms import VotacionForm, VotacionEditForm
-
+from .models import Votacion, Opcion, Voto
+from django.db.models import Count
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from django.db.models.functions import Coalesce
+from rest_framework.views import APIView
 @login_required
 @role_required("votaciones", "view")
 def lista_votaciones(request):
@@ -169,3 +175,5 @@ def eliminar_votacion(request, pk):
     
     # Si no es POST, mostramos la página de confirmación como antes.
     return render(request, 'votaciones/votacion_confirm_delete.html', {'votacion': votacion})
+
+

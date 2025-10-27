@@ -2,7 +2,8 @@ from django.urls import path
 from . import views
 from . import api as api_views
 app_name = 'votaciones'
-
+from .api import ResultadosView
+app_name = 'votaciones'
 urlpatterns = [
     path('', views.lista_votaciones, name='lista_votaciones'),
     path('crear/', views.crear_votacion, name='crear_votacion'),
@@ -13,5 +14,5 @@ urlpatterns = [
     path('<int:pk>/eliminar/', views.eliminar_votacion, name='eliminar_votacion'),
     path('api/v1/abiertas/', api_views.abiertas, name='api_abiertas'),
     path('api/v1/<int:pk>/votar/', api_views.votar, name='api_votar'),
-    path('api/v1/<int:pk>/resultados/', api_views.resultados, name='api_resultados'),
+    path('api/v1/<int:pk>/resultados/', ResultadosView.as_view(), name='api_resultados'),
 ]

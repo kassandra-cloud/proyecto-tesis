@@ -6,9 +6,15 @@ from rest_framework.decorators import api_view, authentication_classes, permissi
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework import status
 from .models import Votacion, Opcion, Voto
-
+from django.shortcuts import get_object_or_404
+from django.db.models import Count
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView  # ← IMPORTANTE
+from rest_framework.authentication import TokenAuthentication, SessionAuthentication  # ← AÑADE ESTO
+from .models import Votacion, Opcion, Voto
 def _dto_votacion(v, user):
     # ¿ya votó este usuario?
     voto = Voto.objects.filter(votante=user, opcion__votacion=v).select_related('opcion').first()
@@ -53,16 +59,26 @@ def votar(request, pk: int):
 
     return Response({"ok": True, "mensaje": "Voto registrado"})
 
-@api_view(["GET"])
-@authentication_classes([TokenAuthentication])
-@permission_classes([IsAuthenticated])
-def resultados(request, pk: int):
-    v = get_object_or_404(Votacion, pk=pk)
-    filas = Opcion.objects.filter(votacion=v).annotate(votos=Count("votos"))
-    total = sum(f.votos for f in filas)
-    data = {
-        "votacion": {"id": v.id, "pregunta": v.pregunta},
-        "total_votos": total,
-        "opciones": [{"opcion_id": f.id, "texto": f.texto, "votos": f.votos} for f in filas],
-    }
-    return Response(data)
+class ResultadosView(APIView):
+    # Fuerza autenticación por Token (y opcionalmente sesión)
+    authentication_classes = [TokenAuthentication, SessionAuthentication]  # ← CLAVE
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        v = get_object_or_404(Votacion, pk=pk)
+
+        agregados = (
+            Voto.objects.filter(opcion__votacion=v)
+            .values("opcion_id")
+            .annotate(c=Count("id"))
+        )
+        counts = {row["opcion_id"]: row["c"] for row in agregados}
+
+        opciones = []
+        total = 0
+        for o in Opcion.objects.filter(votacion=v).values("id", "texto"):  # cambia "texto" si tu campo se llama distinto
+            votos = counts.get(o["id"], 0)
+            total += votos
+            opciones.append({"id": o["id"], "texto": o["texto"], "votos": votos})
+
+        return Response({"votacion_id": v.id, "total_votos": total, "opciones": opciones})

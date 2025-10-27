@@ -145,8 +145,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 #Configutacion para envio de correo
 import os
-from dotenv import load_dotenv
-load_dotenv()
+
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')  # Usa variables de entorno
 EMAIL_PORT = 587
