@@ -1,6 +1,7 @@
 from django.urls import path
 from . import views
-
+from rest_framework.routers import DefaultRouter
+from .api import ReunionViewSet, ActaViewSet,AsistenciaViewSet
 app_name = "reuniones"
 
 urlpatterns = [
@@ -11,3 +12,8 @@ urlpatterns = [
     path("<int:pk>/asistencia/", views.asistencia_list, name="lista_asistencia"),
     path("<int:pk>/acta/pdf/", views.acta_export_pdf, name="exportar_acta_pdf"),
 ]
+router = DefaultRouter()
+router.register(r"api/reuniones", ReunionViewSet, basename="api_reuniones")
+router.register(r"api/actas", ActaViewSet, basename="api_actas")
+router.register(r"api/asistencias", AsistenciaViewSet,basename="api_asistencias") 
+urlpatterns += router.urls
