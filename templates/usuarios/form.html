@@ -2,60 +2,101 @@
 {% load static %}
 {% block title %}{{ titulo }}{% endblock %}
 
+{% block extra_css %}
+<style>
+  /* Estilos sutiles para el checklist de contraseña */
+  #pw-checklist li { display: flex; align-items: center; gap: .5rem; }
+  #pw-checklist .text-success .pm-icon { font-weight: 700; }
+  #pw-checklist .text-danger .pm-icon { opacity: .9; }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="row justify-content-center">
   <div class="col-lg-8">
     <div class="card shadow-sm">
       <div class="card-body">
-        <h1 class="h4 mb-4">{{ titulo }}</h1>
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <h1 class="h4 mb-0">{{ titulo }}</h1>
+          <a href="{% url 'lista_usuarios' %}" class="btn btn-outline-secondary">
+            ← Volver a la lista
+          </a>
+        </div>
 
         {% if form.non_field_errors %}
-          <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+          <div class="alert alert-danger" role="alert">
+            {{ form.non_field_errors }}
+          </div>
         {% endif %}
 
-        <form method="post" novalidate id="user-form">
+        <form method="post" novalidate id="user-form" autocomplete="off">
           {% csrf_token %}
 
           <!-- Username -->
           <div class="mb-3">
-            <label class="form-label">{{ form.username.label }}</label>
+            <label for="{{ form.username.id_for_label }}" class="form-label">
+              {{ form.username.label }}
+            </label>
             {{ form.username }}
-            {% if form.username.errors %}<div class="text-danger small">{{ form.username.errors|striptags }}</div>{% endif %}
+            {% if form.username.errors %}
+              <div class="text-danger small">{{ form.username.errors|striptags }}</div>
+            {% endif %}
           </div>
 
           <!-- Nombre / Apellidos -->
           <div class="row g-3">
             <div class="col-md-4">
-              <label class="form-label">{{ form.first_name.label }}</label>
+              <label for="{{ form.first_name.id_for_label }}" class="form-label">
+                {{ form.first_name.label }}
+              </label>
               {{ form.first_name }}
-              {% if form.first_name.errors %}<div class="text-danger small">{{ form.first_name.errors|striptags }}</div>{% endif %}
+              {% if form.first_name.errors %}
+                <div class="text-danger small">{{ form.first_name.errors|striptags }}</div>
+              {% endif %}
             </div>
             <div class="col-md-4">
-              <label class="form-label">{{ form.apellido_paterno.label }}</label>
+              <label for="{{ form.apellido_paterno.id_for_label }}" class="form-label">
+                {{ form.apellido_paterno.label }}
+              </label>
               {{ form.apellido_paterno }}
-              {% if form.apellido_paterno.errors %}<div class="text-danger small">{{ form.apellido_paterno.errors|striptags }}</div>{% endif %}
+              {% if form.apellido_paterno.errors %}
+                <div class="text-danger small">{{ form.apellido_paterno.errors|striptags }}</div>
+              {% endif %}
             </div>
             <div class="col-md-4">
-              <label class="form-label">{{ form.apellido_materno.label }}</label>
+              <label for="{{ form.apellido_materno.id_for_label }}" class="form-label">
+                {{ form.apellido_materno.label }}
+              </label>
               {{ form.apellido_materno }}
-              {% if form.apellido_materno.errors %}<div class="text-danger small">{{ form.apellido_materno.errors|striptags }}</div>{% endif %}
+              {% if form.apellido_materno.errors %}
+                <div class="text-danger small">{{ form.apellido_materno.errors|striptags }}</div>
+              {% endif %}
             </div>
           </div>
 
           <!-- Email -->
           <div class="mb-3 mt-3">
-            <label class="form-label">{{ form.email.label }}</label>
+            <label for="{{ form.email.id_for_label }}" class="form-label">
+              {{ form.email.label }}
+            </label>
             {{ form.email }}
-            {% if form.email.errors %}<div class="text-danger small">{{ form.email.errors|striptags }}</div>{% endif %}
+            {% if form.email.errors %}
+              <div class="text-danger small">{{ form.email.errors|striptags }}</div>
+            {% endif %}
           </div>
 
-          {# CREAR: contraseñas + checklist + “coinciden” #}
+          {# CREAR: contraseñas + checklist + “coinciden” (solo si el form las trae) #}
           {% if form.password1 %}
           <div class="row g-4">
             <div class="col-md-6">
-              <label class="form-label">{{ form.password1.label }}</label>
+              <label for="{{ form.password1.id_for_label }}" class="form-label">
+                {{ form.password1.label }}
+              </label>
               {{ form.password1 }}
-              <ul class="list-unstyled small mt-2" id="pw-checklist">
+              {% if form.password1.errors %}
+                <div class="text-danger small">{{ form.password1.errors|striptags }}</div>
+              {% endif %}
+              <ul class="list-unstyled small mt-2" id="pw-checklist" aria-live="polite">
                 <li id="pm-create-len"   class="text-danger"><span class="pm-icon">✖</span> Mínimo 12 caracteres</li>
                 <li id="pm-create-upper" class="text-danger"><span class="pm-icon">✖</span> Al menos 1 mayúscula</li>
                 <li id="pm-create-lower" class="text-danger"><span class="pm-icon">✖</span> Al menos 1 minúscula</li>
@@ -63,8 +104,13 @@
               </ul>
             </div>
             <div class="col-md-6">
-              <label class="form-label">{{ form.password2.label }}</label>
+              <label for="{{ form.password2.id_for_label }}" class="form-label">
+                {{ form.password2.label }}
+              </label>
               {{ form.password2 }}
+              {% if form.password2.errors %}
+                <div class="text-danger small">{{ form.password2.errors|striptags }}</div>
+              {% endif %}
               <div class="small mt-2" id="pw-match" aria-live="polite">
                 <span class="text-danger">✖ Las contraseñas no coinciden.</span>
               </div>
@@ -75,26 +121,39 @@
           <!-- Rol / RUT -->
           <div class="row g-3 mt-1">
             <div class="col-md-4">
-              <label class="form-label">{{ form.rol.label }}</label>
+              <label for="{{ form.rol.id_for_label }}" class="form-label">
+                {{ form.rol.label }}
+              </label>
               {{ form.rol }}
+              {% if form.rol.errors %}
+                <div class="text-danger small">{{ form.rol.errors|striptags }}</div>
+              {% endif %}
             </div>
             <div class="col-md-5">
-              <label class="form-label">RUT (cuerpo)</label>
+              <label for="{{ form.rut_cuerpo.id_for_label }}" class="form-label">RUT (cuerpo)</label>
               {{ form.rut_cuerpo }}
               <div class="form-text">Solo números (7–9 dígitos).</div>
+              {% if form.rut_cuerpo.errors %}
+                <div class="text-danger small">{{ form.rut_cuerpo.errors|striptags }}</div>
+              {% endif %}
             </div>
             <div class="col-md-3">
-              <label class="form-label">DV</label>
+              <label for="{{ form.rut_dv.id_for_label }}" class="form-label">DV</label>
               {{ form.rut_dv }}
+              {% if form.rut_dv.errors %}
+                <div class="text-danger small">{{ form.rut_dv.errors|striptags }}</div>
+              {% endif %}
             </div>
           </div>
 
           <!-- Botones -->
           <div class="mt-4 d-flex gap-2">
-            <button id="btn-guardar" class="btn btn-dark">Guardar</button>
+            <button id="btn-guardar" class="btn btn-dark" type="submit">Guardar</button>
             <a href="{% url 'lista_usuarios' %}" class="btn btn-outline-secondary">Cancelar</a>
           </div>
         </form>
+
+        {% if form.media %}{{ form.media }}{% endif %}
       </div>
     </div>
   </div>
@@ -104,4 +163,50 @@
 {% block extra_js %}
   <script src="{% static 'js/usuarios.js' %}"></script>
   <script src="{% static 'js/password-meter.js' %}"></script>
+  <script>
+    // Fallback mínimo para coincidencia y checklist si no carga password-meter.js
+    (function() {
+      const pw1 = document.getElementById('id_password1');
+      const pw2 = document.getElementById('id_password2');
+      const matchBox = document.getElementById('pw-match');
+
+      const elLen   = document.getElementById('pm-create-len');
+      const elUp    = document.getElementById('pm-create-upper');
+      const elLow   = document.getElementById('pm-create-lower');
+      const elSym   = document.getElementById('pm-create-sym');
+
+      function setOk(el, ok) {
+        if (!el) return;
+        el.classList.toggle('text-success', ok);
+        el.classList.toggle('text-danger', !ok);
+        const icon = el.querySelector('.pm-icon');
+        if (icon) icon.textContent = ok ? '✔' : '✖';
+      }
+
+      function checkStrength() {
+        if (!pw1) return;
+        const v = pw1.value || '';
+        setOk(elLen, v.length >= 12);
+        setOk(elUp, /[A-ZÁÉÍÓÚÑ]/.test(v));
+        setOk(elLow, /[a-záéíóúñ]/.test(v));
+        setOk(elSym, /[^A-Za-z0-9]/.test(v));
+      }
+
+      function checkMatch() {
+        if (!pw1 || !pw2 || !matchBox) return;
+        const ok = pw1.value && pw2.value && pw1.value === pw2.value;
+        matchBox.innerHTML = ok
+          ? '<span class="text-success">✔ Las contraseñas coinciden.</span>'
+          : '<span class="text-danger">✖ Las contraseñas no coinciden.</span>';
+      }
+
+      if (pw1) {
+        pw1.addEventListener('input', function(){ checkStrength(); checkMatch(); });
+      }
+      if (pw2) pw2.addEventListener('input', checkMatch);
+
+      // Primera evaluación al cargar
+      checkStrength(); checkMatch();
+    })();
+  </script>
 {% endblock %}

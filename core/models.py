@@ -18,6 +18,7 @@ class Perfil(models.Model):
         SECRETARIA = "secretaria", "SECRETARIA"
         TESORERO   = "tesorero",  "TESORERO"
         SUPLENTE   = "suplente",  "SUPLENTE"
+        VECINO     = "vecino",    "VECINO"
        
 
     usuario = models.OneToOneField(User, on_delete=models.CASCADE, related_name="perfil")
