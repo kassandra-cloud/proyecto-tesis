@@ -4,11 +4,14 @@ from xhtml2pdf import pisa
 from io import BytesIO
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required,permission_required
 from .models import Reunion, Asistencia, Acta # <--- MODIFICAR ESTA LÍNEA
 from .forms import ReunionForm, ActaForm 
 from core.authz import role_required
 from django.contrib.auth import get_user_model
+from django.contrib import messages
+from django.views.decorators.http import require_POST
+from .models import Reunion, Acta
 
 User = get_user_model()
 
@@ -156,3 +159,42 @@ def acta_export_pdf(request, pk):
         # ----------------------------------
 
     return HttpResponse("Error al generar el PDF", status=500)
+
+@login_required
+@permission_required("reuniones.change_acta", raise_exception=True)
+@require_POST
+def aprobar_acta(request, pk):
+    reunion = get_object_or_404(Reunion, pk=pk)
+    acta = get_object_or_404(Acta, pk=reunion.pk)
+
+    if not acta.aprobada:
+        acta.aprobada = True
+        acta.save(update_fields=["aprobada"])
+        messages.success(request, "Acta aprobada correctamente.")
+    else:
+        messages.info(request, "El acta ya estaba aprobada.")
+
+    next_url = request.POST.get("next")
+    if next_url:
+        return redirect(next_url)
+    return redirect("reuniones:detalle_reunion", pk=pk)
+
+
+@login_required
+@permission_required("reuniones.change_acta", raise_exception=True)
+@require_POST
+def rechazar_acta(request, pk):
+    reunion = get_object_or_404(Reunion, pk=pk)
+    acta = get_object_or_404(Acta, pk=reunion.pk)
+
+    if acta.aprobada:
+        acta.aprobada = False
+        acta.save(update_fields=["aprobada"])
+        messages.success(request, "Acta marcada como no aprobada.")
+    else:
+        messages.info(request, "El acta ya estaba como no aprobada.")
+
+    next_url = request.POST.get("next")
+    if next_url:
+        return redirect(next_url)
+    return redirect("reuniones:detalle_reunion", pk=pk)

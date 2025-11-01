@@ -11,6 +11,8 @@ urlpatterns = [
     path("<int:pk>/acta/", views.acta_edit, name="editar_acta"),
     path("<int:pk>/asistencia/", views.asistencia_list, name="lista_asistencia"),
     path("<int:pk>/acta/pdf/", views.acta_export_pdf, name="exportar_acta_pdf"),
+    path("<int:pk>/acta/aprobar/", views.aprobar_acta, name="aprobar_acta"),
+    path("<int:pk>/acta/rechazar/", views.rechazar_acta, name="rechazar_acta"),
 ]
 router = DefaultRouter()
 router.register(r"api/reuniones", ReunionViewSet, basename="api_reuniones")

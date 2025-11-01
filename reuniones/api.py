@@ -54,7 +54,7 @@ class AsistenciaViewSet(viewsets.ReadOnlyModelViewSet):
     ordering_fields    = ["id"]
 
     def get_queryset(self):
-        # ✅ en tu modelo la FK es 'vecino', no 'usuario'
+
         qs = Asistencia.objects.select_related("vecino", "reunion")
         reunion_id = self.request.query_params.get("reunion")
         if reunion_id:

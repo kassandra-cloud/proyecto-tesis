@@ -9,6 +9,55 @@
       <div class="card-body">
         <h1 class="h4 mb-4">{{ titulo }}</h1>
 
+        {# --- BLOQUE ACTA (solo en edición) --- #}
+        {% if form.instance.pk %}
+          <div class="border rounded p-3 mb-4 bg-light">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+              <div>
+                <strong>Acta:</strong>
+                {% if acta %}
+                  {% if acta.aprobada %}
+                    <span class="badge bg-success">Aprobada</span>
+                  {% else %}
+                    <span class="badge bg-secondary">Pendiente / No aprobada</span>
+                  {% endif %}
+                {% else %}
+                  <span class="badge bg-light text-dark">Sin acta</span>
+                {% endif %}
+              </div>
+
+              {% if acta and perms.reuniones.change_acta %}
+                <div class="d-flex gap-2">
+                  {% if acta.aprobada %}
+                    <form method="post" action="{% url 'reuniones:rechazar_acta' form.instance.pk %}">
+                      {% csrf_token %}
+                      <button type="submit" class="btn btn-warning btn-sm"
+                              onclick="return confirm('¿Marcar el acta como NO aprobada?');">
+                        No aprobar
+                      </button>
+                    </form>
+                  {% else %}
+                    <form method="post" action="{% url 'reuniones:aprobar_acta' form.instance.pk %}">
+                      {% csrf_token %}
+                      <button type="submit" class="btn btn-success btn-sm"
+                              onclick="return confirm('¿Aprobar el acta?');">
+                        Aprobar
+                      </button>
+                    </form>
+                  {% endif %}
+                </div>
+              {% endif %}
+            </div>
+
+            {% if acta %}
+              <div class="mt-2 small text-muted">
+                Vista previa: {{ acta.contenido|truncatechars:140 }}
+              </div>
+            {% endif %}
+          </div>
+        {% endif %}
+        {# --- FIN BLOQUE ACTA --- #}
+
         <form method="post" novalidate>
           {% csrf_token %}
 
