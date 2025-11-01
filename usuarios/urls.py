@@ -2,6 +2,7 @@ from django.urls import path
 from . import views
 from .views import health
 from django.contrib.auth import views as auth_views
+from usuarios import views as u
 urlpatterns = [
     path("", views.lista_usuarios, name="lista_usuarios"),
     path("crear/", views.crear_usuario, name="crear_usuario"),
@@ -14,4 +15,6 @@ urlpatterns = [
     path('accounts/password_reset/done/', auth_views.PasswordResetDoneView.as_view(), name='password_reset_done'),
     path('accounts/reset/<uidb64>/<token>/', auth_views.PasswordResetConfirmView.as_view(), name='password_reset_confirm'),
     path('accounts/reset/done/', auth_views.PasswordResetCompleteView.as_view(), name='password_reset_complete'),
+    path("usuarios/<int:pk>/deshabilitar/", u.deshabilitar_usuario, name="deshabilitar"),
+    path("usuarios/<int:pk>/restaurar/", u.restaurar_usuario, name="restaurar"),
 ]

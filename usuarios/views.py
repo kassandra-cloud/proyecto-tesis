@@ -23,7 +23,7 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 User = get_user_model()
 import json
-
+from django.views.decorators.http import require_POST
 # -------------------------------------------------------------------
 # Config
 # -------------------------------------------------------------------
@@ -86,28 +86,39 @@ def _aplicar_orden(qs, sort_key: str | None, direction: str | None):
 def lista_usuarios(request):
     """
     Lista Users con su Perfil (RUT/rol), con búsqueda, orden y paginación.
+    Muestra:
+      - Tabla paginada de usuarios ACTIVOS (con botón Deshabilitar).
+      - Acordeón con usuarios DESHABILITADOS (con botón Restaurar).
     """
     q = (request.GET.get("q") or "").strip()
-    sort = (request.GET.get("sort") or "").strip().lower()
+    sort = (request.GET.get("sort") or "username").strip().lower()
     dir_ = (request.GET.get("dir") or "asc").strip().lower()
     next_dir = "desc" if dir_ == "asc" else "asc"
 
-    qs = User.objects.select_related("perfil")
-    qs = _aplicar_busqueda(qs, q)
-    qs = _aplicar_orden(qs, sort, dir_)
+    # Base query con perfil asociado
+    base = User.objects.select_related("perfil")
+    base = _aplicar_busqueda(base, q)
+    base = _aplicar_orden(base, sort, dir_)
 
-    page_obj, per_page, paginator = _paginar(request, qs, default_per_page=10)
+    # Separamos activos/inactivos
+    activos_qs = base.filter(is_active=True)
+    inactivos_qs = base.filter(is_active=False)
+
+    # Paginamos SOLO los activos (lo usual)
+    page_obj, per_page, paginator = _paginar(request, activos_qs, default_per_page=10)
 
     ctx = {
-        "page_obj": page_obj,
+        "page_obj": page_obj,             # activos paginados
         "per_page": per_page,
         "paginator": paginator,
-        "total": qs.count(),
+        "total": base.count(),
         "q": q,
         "opciones_per_page": OPCIONES_PER_PAGE,
         "sort": sort,
         "dir": dir_,
         "next_dir": next_dir,
+        "usuarios_inactivos": inactivos_qs,  # lista completa para acordeón
+        "titulo": "Usuarios",
     }
     return render(request, "usuarios/lista.html", ctx)
 
@@ -215,3 +226,40 @@ def health(request):
 @csrf_exempt
 def ping(request):
     return JsonResponse({"ok": True, "detail": "pong"})
+
+@login_required
+@role_required("usuarios", "edit")
+@require_POST
+def deshabilitar_usuario(request, pk):
+    usuario = get_object_or_404(User, pk=pk)
+
+    # Reglas básicas de protección
+    if usuario == request.user:
+        messages.warning(request, "No puedes deshabilitar tu propia cuenta.")
+        return redirect("usuarios:lista")
+    if usuario.is_superuser:
+        messages.warning(request, "No puedes deshabilitar a un superusuario.")
+        return redirect("usuarios:lista")
+
+    if not usuario.is_active:
+        messages.info(request, "El usuario ya estaba deshabilitado.")
+    else:
+        usuario.is_active = False
+        usuario.save(update_fields=["is_active"])
+        messages.success(request, f"Usuario “{usuario.username}” deshabilitado.")
+    return redirect("lista_usuarios")
+
+
+@login_required
+@role_required("usuarios", "edit")
+@require_POST
+def restaurar_usuario(request, pk):
+    usuario = get_object_or_404(User, pk=pk)
+
+    if usuario.is_active:
+        messages.info(request, "El usuario ya estaba activo.")
+    else:
+        usuario.is_active = True
+        usuario.save(update_fields=["is_active"])
+        messages.success(request, f"Usuario “{usuario.username}” restaurado.")
+    return redirect("lista_usuarios")
