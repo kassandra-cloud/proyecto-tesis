@@ -15,12 +15,29 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.db.models.functions import Coalesce
 from rest_framework.views import APIView
+from django.db.models import Q
 @login_required
 @role_required("votaciones", "view")
 def lista_votaciones(request):
-    # Separa las votaciones en abiertas y cerradas para la plantilla
-    votaciones_abiertas = Votacion.objects.filter(activa=True, fecha_cierre__gt=timezone.now()).order_by('-fecha_cierre')
-    votaciones_cerradas = Votacion.objects.filter(activa=False).order_by('-fecha_cierre')
+    # 1) Marcar como cerradas todas las que ya vencieron
+    Votacion.objects.filter(
+        activa=True,
+        fecha_cierre__lte=timezone.now()
+    ).update(activa=False)
+
+    # 2) Listar separadas para la plantilla
+    votaciones_abiertas = (
+        Votacion.objects
+        .filter(activa=True, fecha_cierre__gt=timezone.now())
+        .order_by('-fecha_cierre')
+    )
+
+    votaciones_cerradas = (
+        Votacion.objects
+        .filter(Q(activa=False) | Q(fecha_cierre__lte=timezone.now()))
+        .order_by('-fecha_cierre')
+    )
+
     context = {
         'votaciones_abiertas': votaciones_abiertas,
         'votaciones_cerradas': votaciones_cerradas,

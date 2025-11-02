@@ -26,9 +26,10 @@ SECRET_KEY = 'django-insecure-6lu+0m4s29g@q0lve!eckhba1r1+xe8w*$d%84re_1*0b_p0u=
 DEBUG = True
 
 ALLOWED_HOSTS = [
-    "127.0.0.1",
+    "192.168.0.106",
     "localhost",
-    "10.0.2.2",      # ← emulador Android
+    "10.0.2.2",  
+    "127.0.0.1",       # ← emulador Android
     # Si pruebas desde teléfono real en tu Wi-Fi, agrega la IP de tu PC, ej.:
     # "192.168.1.50",
 ]

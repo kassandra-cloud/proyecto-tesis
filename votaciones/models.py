@@ -4,15 +4,31 @@ from django.utils import timezone
 
 class Votacion(models.Model):
     pregunta = models.CharField(max_length=255, verbose_name="Pregunta")
-    fecha_cierre = models.DateTimeField(verbose_name="Fecha de cierre")
-    creada_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True)
-    activa = models.BooleanField(default=True)
+    fecha_cierre = models.DateTimeField(verbose_name="Fecha de cierre", db_index=True)
+    creada_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name="Creada por"
+    )
+    activa = models.BooleanField(default=True, db_index=True)
 
-    def esta_abierta(self):
+    def esta_abierta(self) -> bool:
+        """True si está activa y aún no llega la fecha de cierre."""
         return self.activa and self.fecha_cierre > timezone.now()
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.pregunta
+
+    class Meta:
+        ordering = ["-fecha_cierre", "-id"]
+        indexes = [
+            models.Index(fields=["activa", "fecha_cierre"]),  # ⚡ para listar abiertas rápido
+        ]
+        verbose_name = "Votación"
+        verbose_name_plural = "Votaciones"
+
 
 class Opcion(models.Model):
     votacion = models.ForeignKey(Votacion, related_name='opciones', on_delete=models.CASCADE)
