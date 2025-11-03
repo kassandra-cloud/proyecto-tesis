@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+
+{% block content %}
+    
+    <h1>{{ taller.nombre }}</h1>
+    <p>{{ taller.descripcion }}</p>
+    <hr>
+    <h3>Información del Taller</h3>
+    <ul class="list-group">
+        <li class="list-group-item">Cupos Totales: {{ taller.cupos_totales }}</li>
+        <li class="list-group-item">Inscritos: {{ taller.inscritos_count }}</li>
+        <li class="list-group-item">Cupos Disponibles: <span class="badge bg-success rounded-pill">{{ taller.cupos_disponibles }}</span></li>
+    </ul>
+
+    <hr>
+    <h3 class="mt-4">Lista de Vecinos Inscritos</h3>
+    <table class="table table-striped">
+        </table>
+
+    <div class="mt-4">
+        <a href="{% url 'lista_talleres' %}" class="btn btn-primary">Volver a la lista</a>
+        <a href="{% url 'editar_taller' taller.id %}" class="btn btn-warning">Editar Taller</a>
+        <a href="{% url 'eliminar_taller' taller.id %}" class="btn btn-danger">Eliminar Taller</a>
+    </div>
+    
+{% endblock %}

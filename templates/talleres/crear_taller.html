@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+{% if taller %}
+    <h1>Editar Taller: {{ taller.nombre }}</h1>
+{% else %}
+    <h1>Crear Nuevo Taller</h1>
+{% endif %}
+
+<form method="post" novalidate>
+    {% csrf_token %}
+    
+    {% for field in form %}
+        <div class="mb-3">
+            {{ field.label_tag }}
+            {{ field }}
+            {% if field.errors %}
+                <div class="invalid-feedback d-block">
+                    {{ field.errors.0 }}
+                </div>
+            {% endif %}
+        </div>
+    {% endfor %}
+    
+    <button type="submit" class="btn btn-success">Guardar Cambios</button>
+    <a href="{% url 'lista_talleres' %}" class="btn btn-secondary">Cancelar</a>
+</form>
+
+{% endblock %}

@@ -42,7 +42,6 @@
                 href="{% url 'home' %}">Inicio</a>
             {% endif %}
           </li>
-
           {# Mostrar el menú Usuarios solo si el rol tiene permiso #}
           {% user_can 'usuarios' 'view' as puede_ver_usuarios %}
           {% if puede_ver_usuarios %}
@@ -58,6 +57,14 @@
           <li class="nav-item">
             <a class="nav-link {% if request.resolver_match.app_name == 'reuniones' %}active{% endif %}"
               href="{% url 'reuniones:lista_reuniones' %}">Reuniones</a>
+          </li>
+                    <li class="nav-item">
+            <a class="nav-link {% if request.resolver_match.url_name == 'lista_publicaciones' %}active{% endif %}" 
+              href="{% url 'lista_publicaciones' %}">Foro</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link {% if request.resolver_match.url_name in 'lista_talleres detalle_taller crear_taller' %}active{% endif %}" 
+              href="{% url 'lista_talleres' %}">Talleres</a>
           </li>
           {% endif %}
 

@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h1>Talleres disponibles</h1>
+
+{% if messages %}
+    {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+    {% endfor %}
+{% endif %}
+
+<a href="{% url 'crear_taller' %}" class="btn btn-primary mb-3">Crear Nuevo Taller</a>
+
+<div class="list-group">
+    {% for taller in talleres %}
+        <a href="{% url 'detalle_taller' taller.id %}" class="list-group-item list-group-item-action">
+            <div class="d-flex w-100 justify-content-between">
+                <h5 class="mb-1">{{ taller.nombre }}</h5>
+                <small>Cupos disponibles: {{ taller.cupos_disponibles }} / {{ taller.cupos_totales }}</small>
+            </div>
+            <p class="mb-1">{{ taller.descripcion|truncatewords:30 }}</p>
+        </a>
+    {% empty %}
+        <p>No hay talleres disponibles por el momento.</p>
+    {% endfor %}
+</div>
+
+{% endblock %}

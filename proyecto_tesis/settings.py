@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     "votaciones",
     'rest_framework',
     'rest_framework.authtoken',
+    'foro',
 ]
 
 MIDDLEWARE = [
@@ -87,14 +88,15 @@ WSGI_APPLICATION = 'proyecto_tesis.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 
+# settings.py
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.mysql',  #  mysql
-        'NAME': 'bzoz7e9wdt3kamxy2j30',              # la BD
-        'USER': 'ujhnpfdgghpjqek2',                  # el usuario
-        'PASSWORD': 't5BUpTHuksZxFVnV2HEr',
-        'HOST': 'bzoz7e9wdt3kamxy2j30-mysql.services.clever-cloud.com',                   # 'localhost'
-        'PORT': '3306',                         #Colocar el puerto
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': 'prueba',       # La BD que creaste en phpMyAdmin
+        'USER': 'root',          # El usuario por defecto de XAMPP
+        'PASSWORD': '',          # La contraseña por defecto de XAMPP es vacía
+        'HOST': '127.0.0.1',     # O 'localhost'
+        'PORT': '3306',
     }
 }
 
@@ -154,3 +156,8 @@ EMAIL_USE_TLS = True
 EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER')  # Defínelas en el entorno
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD')  # Lo mismo aquí
 DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL')
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+# Limitar tamaño máximo de subida (opcional, útil para reducir broken pipe)
+DATA_UPLOAD_MAX_MEMORY_SIZE = 52428800  # 50 MB
+FILE_UPLOAD_MAX_MEMORY_SIZE = 52428800  # 50 MB
