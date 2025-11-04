@@ -1,18 +1,5 @@
 # foro/views.py
-<<<<<<< HEAD
-from django.shortcuts import render, redirect
-from django.contrib.auth.decorators import login_required
-from .models import Publicacion, ArchivoAdjunto
-from .forms import PublicacionForm
 
-@login_required
-def lista_publicaciones(request):
-    publicaciones = Publicacion.objects.all().prefetch_related('adjuntos')
-    
-    form_con_error_data = request.session.pop('form_con_error_data', None)
-    form_errors = request.session.pop('form_errors', None)
-    
-=======
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
@@ -38,13 +25,16 @@ from rest_framework import status
 @login_required
 def lista_publicaciones(request):
     """Listado y formulario web para crear publicaciones."""
-    publicaciones = Publicacion.objects.all().prefetch_related("adjuntos")
+    publicaciones = (
+        Publicacion.objects.all()
+        .prefetch_related("adjuntos")
+        .order_by("-fecha_creacion")
+    )
 
     # Restaurar estado del form si hubo errores en POST previo
     form_con_error_data = request.session.pop("form_con_error_data", None)
     form_errors = request.session.pop("form_errors", None)
 
->>>>>>> 75e549b (api de taller y foro)
     if form_con_error_data:
         form = PublicacionForm(form_con_error_data)
         if form_errors:
@@ -53,60 +43,25 @@ def lista_publicaciones(request):
         form = PublicacionForm()
 
     context = {
-<<<<<<< HEAD
-        'publicaciones': publicaciones,
-        'form': form,
-        'form_errors_manual': form_errors
-    }
-    return render(request, 'foro/lista_publicaciones.html', context)
-=======
         "publicaciones": publicaciones,
         "form": form,
         "form_errors_manual": form_errors,
     }
     return render(request, "foro/lista_publicaciones.html", context)
->>>>>>> 75e549b (api de taller y foro)
 
 
 @login_required
 def crear_publicacion(request):
-<<<<<<< HEAD
-    if request.method != 'POST':
-        return redirect('lista_publicaciones')
-
-    print("\n--- [DEPURACIÓN: CREAR_PUBLICACIÓN] ---")
-    print("request.POST:", request.POST)
-    print("request.FILES:", request.FILES)
-
-    form = PublicacionForm(request.POST)
-
-=======
     """Crea publicación desde el form de la vista anterior (maneja adjuntos)."""
     if request.method != "POST":
         return redirect("lista_publicaciones")
 
     form = PublicacionForm(request.POST)
->>>>>>> 75e549b (api de taller y foro)
     if form.is_valid():
         publicacion = form.save(commit=False)
         publicacion.autor = request.user
         publicacion.save()
 
-<<<<<<< HEAD
-        # Archivos subidos (videos, imágenes, audios, etc.)
-        files_list = request.FILES.getlist('archivos')
-        for f in files_list:
-            print(f"Guardando archivo: {f.name}")
-            ArchivoAdjunto.objects.create(publicacion=publicacion, archivo=f)
-
-        return redirect('lista_publicaciones')
-    
-    else:
-        print("Errores del formulario:", form.errors.as_json())
-        request.session['form_con_error_data'] = request.POST
-        request.session['form_errors'] = form.errors.as_json()
-        return redirect('lista_publicaciones')
-=======
         # Adjuntos subidos con <input name="archivos" multiple>
         for f in request.FILES.getlist("archivos"):
             ArchivoAdjunto.objects.create(publicacion=publicacion, archivo=f)
@@ -127,7 +82,7 @@ def foro_web(request):
     publicaciones = (
         Publicacion.objects
         .select_related("autor")
-        .prefetch_related("comentarios__autor")
+        .prefetch_related("comentarios__autor", "adjuntos")
         .order_by("-fecha_creacion")
     )
     return render(request, "foro/foro_web.html", {"publicaciones": publicaciones})
@@ -188,7 +143,7 @@ def _adjunto_to_dict(adj: ArchivoAdjunto) -> dict:
         "id": adj.id,
         "url": adj.archivo.url,                 # FileField/Storage
         "tipo_archivo": tipo,
-        "nombre": getattr(adj, "nombre", None)
+        "nombre": getattr(adj, "nombre", None),
     }
 
 
@@ -198,7 +153,7 @@ def _comentario_to_dict(c: Comentario) -> dict:
         "autor_username": c.autor.username,
         "contenido": c.contenido,
         "fecha_creacion": c.fecha_creacion,
-        "parent": c.parent_id
+        "parent": c.parent_id,
     }
 
 
@@ -209,7 +164,7 @@ def _publicacion_to_dict(p: Publicacion, incluir_comentarios: bool = False) -> d
         "contenido": p.contenido,
         "fecha_creacion": p.fecha_creacion,
         "adjuntos": [_adjunto_to_dict(a) for a in p.adjuntos.all()],
-        "comentarios": []
+        "comentarios": [],
     }
     if incluir_comentarios:
         qs = p.comentarios.select_related("autor").order_by("fecha_creacion")
@@ -219,7 +174,7 @@ def _publicacion_to_dict(p: Publicacion, incluir_comentarios: bool = False) -> d
 
 @api_view(["GET"])
 @authentication_classes([TokenAuthentication, SessionAuthentication])
-@permission_classes([AllowAny])   # Si prefieres, cámbialo a IsAuthenticated
+@permission_classes([AllowAny])   # Cambia a IsAuthenticated si lo requieres
 def api_publicaciones_list(request):
     """GET /foro/api/v1/publicaciones/"""
     qs = (
@@ -248,8 +203,10 @@ def api_publicacion_comentarios(request, pk: int):
 
     # POST: requiere usuario autenticado
     if not request.user.is_authenticated:
-        return Response({"detail": "Authentication credentials were not provided."},
-                        status=status.HTTP_401_UNAUTHORIZED)
+        return Response(
+            {"detail": "Authentication credentials were not provided."},
+            status=status.HTTP_401_UNAUTHORIZED,
+        )
 
     texto = (request.data.get("texto") or "").strip()
     parent_id = request.data.get("parent")
@@ -262,10 +219,9 @@ def api_publicacion_comentarios(request, pk: int):
         parent_obj = get_object_or_404(Comentario, pk=parent_id, publicacion=pub)  # <-- FK
 
     c = Comentario.objects.create(
-        publicacion=pub,     # <-- FK (cámbialo si tu campo tiene otro nombre)
+        publicacion=pub,     # <-- FK (ajusta si tu campo tiene otro nombre)
         autor=request.user,
         contenido=texto,
-        parent=parent_obj
+        parent=parent_obj,
     )
     return Response(_comentario_to_dict(c), status=status.HTTP_201_CREATED)
->>>>>>> 75e549b (api de taller y foro)

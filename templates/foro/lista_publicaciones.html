@@ -3,30 +3,6 @@
 {% block content %}
 <h1>Foro de la Junta de Vecinos</h1>
 
-<<<<<<< HEAD
-<div class="formulario-post">
-    <h2>Nueva Publicación</h2>
-    <form method="POST" action="{% url 'crear_publicacion' %}" enctype="multipart/form-data">
-        {% csrf_token %}
-        <p>
-            <label for="{{ form.contenido.id_for_label }}">Contenido:</label><br>
-            {{ form.contenido }}
-        </p>
-
-        <p>
-            <label for="id_archivos">Adjuntar archivos:</label><br>
-            <input type="file" id="id_archivos" name="archivos" multiple>
-        </p>
-
-        <h4>Grabar un audio</h4>
-        <button type="button" id="start-record" class="btn btn-success">🎙️ Grabar</button>
-        <button type="button" id="stop-record" class="btn btn-danger" disabled>Detener</button>
-        <br><br>
-        <audio id="audio-playback" controls style="display: none;"></audio>
-        <br><br>
-        <button type="submit" class="btn btn-primary">Publicar</button>
-    </form>
-=======
 <!-- Form Nueva Publicación -->
 <div class="formulario-post mb-4">
   <h2>Nueva Publicación</h2>
@@ -51,106 +27,10 @@
 
     <button type="submit" class="btn btn-primary">Publicar</button>
   </form>
->>>>>>> 75e549b (api de taller y foro)
 </div>
 
 <hr>
 
-<<<<<<< HEAD
-<div class="listado-publicaciones">
-    <h2>Publicaciones</h2>
-
-    {% for publicacion in publicaciones %}
-        <article class="post" style="border-bottom:1px solid #eee; margin-bottom:15px; padding-bottom:10px;">
-            <p>
-                <strong>@{{ publicacion.autor.username }}</strong>
-                <small>({{ publicacion.fecha_creacion|date:"d/m/Y H:i" }})</small>
-            </p>
-            <p>{{ publicacion.contenido|linebreaks }}</p>
-
-            {% if publicacion.adjuntos.all %}
-                <p><strong>Archivos Adjuntos:</strong></p>
-                <ul>
-                    {% for adjunto in publicacion.adjuntos.all %}
-                        <li>
-                            {% if adjunto.tipo_archivo == "imagen" %}
-                                <img src="{{ adjunto.archivo.url }}" alt="Imagen" style="max-width:400px; height:auto;" loading="lazy">
-                            {% elif adjunto.tipo_archivo == "audio" %}
-                                <audio controls>
-                                    <source src="{{ adjunto.archivo.url }}">
-                                    Tu navegador no soporta audio.
-                                </audio>
-                            {% elif adjunto.tipo_archivo == "video" %}
-                                <video controls width="400" preload="metadata" loading="lazy">
-                                    <source src="{{ adjunto.archivo.url }}">
-                                    Tu navegador no soporta video.
-                                </video>
-                            {% else %}
-                                <a href="{{ adjunto.archivo.url }}" target="_blank">{{ adjunto.archivo.name }}</a>
-                            {% endif %}
-                        </li>
-                    {% endfor %}
-                </ul>
-            {% endif %}
-        </article>
-    {% empty %}
-        <p>No hay publicaciones todavía. ¡Sé el primero!</p>
-    {% endfor %}
-</div>
-
-<script>
-document.addEventListener('DOMContentLoaded', () => {
-    const startBtn = document.getElementById('start-record');
-    const stopBtn = document.getElementById('stop-record');
-    const audioPlayback = document.getElementById('audio-playback');
-    const fileInput = document.getElementById('id_archivos');
-
-    let mediaRecorder;
-    let audioChunks = [];
-
-    startBtn.addEventListener('click', async () => {
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            mediaRecorder = new MediaRecorder(stream);
-
-            mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
-
-            mediaRecorder.onstop = () => {
-                const blob = new Blob(audioChunks, { type: 'audio/webm' });
-                const url = URL.createObjectURL(blob);
-                audioPlayback.src = url;
-                audioPlayback.style.display = 'block';
-
-                const file = new File([blob], 'grabacion.webm', { type: 'audio/webm' });
-                const dt = new DataTransfer();
-                for (let i = 0; i < fileInput.files.length; i++) dt.items.add(fileInput.files[i]);
-                dt.items.add(file);
-                fileInput.files = dt.files;
-
-                audioChunks = [];
-            };
-
-            mediaRecorder.start();
-            startBtn.disabled = true;
-            stopBtn.disabled = false;
-            audioPlayback.style.display = 'none';
-        } catch (err) {
-            console.error('Error al acceder al micrófono:', err);
-            alert('No se pudo acceder al micrófono.');
-        }
-    });
-
-    stopBtn.addEventListener('click', () => {
-        if(mediaRecorder){
-            mediaRecorder.stop();
-            startBtn.disabled = false;
-            stopBtn.disabled = true;
-        }
-    });
-});
-</script>
-
-=======
 <!-- Listado de Publicaciones -->
 <div class="listado-publicaciones">
   <h2>Publicaciones</h2>
@@ -218,7 +98,11 @@ document.addEventListener('DOMContentLoaded', () => {
         hx-target="#comentarios-wrapper-{{ publicacion.id }}"
         hx-swap="outerHTML"
       >
-      
+        {% csrf_token %}
+        <div class="input-group my-2">
+          <input type="text" class="form-control" name="contenido" placeholder="Escribe un comentario...">
+          <button class="btn btn-primary" type="submit">Enviar</button>
+        </div>
       </form>
     </article>
   {% empty %}
@@ -298,5 +182,4 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 </script>
->>>>>>> 75e549b (api de taller y foro)
 {% endblock %}

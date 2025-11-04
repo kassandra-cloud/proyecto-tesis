@@ -1,21 +1,18 @@
 # foro/forms.py
 from django import forms
-<<<<<<< HEAD
 from .models import Publicacion
-=======
 from .models import Publicacion, Comentario
 
->>>>>>> 75e549b (api de taller y foro)
 
 class PublicacionForm(forms.ModelForm):
     class Meta:
         model = Publicacion
-<<<<<<< HEAD
+
         fields = ['contenido']
         widgets = {
             'contenido': forms.Textarea(attrs={'rows': 3, 'placeholder': 'Escribe tu publicación aquí...'}),
         }
-=======
+
         fields = ["contenido"]
         widgets = {
             "contenido": forms.Textarea(attrs={
@@ -65,4 +62,4 @@ class ComentarioCreateForm(forms.ModelForm):
         if commit:
             comentario.save()
         return comentario
->>>>>>> 75e549b (api de taller y foro)
+

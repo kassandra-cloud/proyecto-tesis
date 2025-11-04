@@ -1,17 +1,4 @@
-<<<<<<< HEAD
-from django.urls import path
-from . import views
-from django.conf import settings
-from django.conf.urls.static import static
 
-urlpatterns = [
-    path('', views.lista_publicaciones, name='lista_publicaciones'),
-    path('crear/', views.crear_publicacion, name='crear_publicacion'),
-]
-
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
-=======
 # foro/urls.py
 from django.urls import path
 from . import views
@@ -32,4 +19,3 @@ urlpatterns = [
     # POST /foro/api/v1/publicaciones/<id>/comentarios/
     path("api/v1/publicaciones/<int:pk>/comentarios/", views.api_publicacion_comentarios, name="api_publicacion_comentarios"),
 ]
->>>>>>> 75e549b (api de taller y foro)
