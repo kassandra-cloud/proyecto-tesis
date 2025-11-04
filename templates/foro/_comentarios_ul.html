@@ -1,0 +1,66 @@
+{# templates/foro/_comentarios.html #}
+<div id="comentarios-wrapper-{{ publicacion.id }}">
+  <ul class="list-unstyled mb-3" id="comentarios-list-{{ publicacion.id }}">
+    {# Comentarios de primer nivel #}
+    {% for c in comentarios %}
+      {% if not c.parent %}
+        <li class="mb-3">
+          <div class="small text-muted">
+            <strong>@{{ c.autor.username }}</strong> · {{ c.fecha_creacion|date:"d/m/Y H:i" }}
+          </div>
+          <div class="mb-1">{{ c.contenido|linebreaksbr }}</div>
+
+          <a href="#" class="text-decoration-none small" data-reply="{{ c.id }}">Responder</a>
+
+          {# Formulario para responder a este comentario #}
+          <form id="reply-form-{{ c.id }}"
+                method="POST"
+                action="{% url 'comentar' publicacion.id %}"
+                style="display:none"
+                hx-post="{% url 'comentar' publicacion.id %}"
+                hx-target="#comentarios-wrapper-{{ publicacion.id }}"
+                hx-swap="outerHTML">
+            {% csrf_token %}
+            <input type="hidden" name="parent" value="{{ c.id }}">
+            <div class="input-group mt-2">
+              <textarea name="contenido" class="form-control" rows="1" placeholder="Responder…"></textarea>
+              <button class="btn btn-outline-primary" type="submit">Enviar</button>
+            </div>
+          </form>
+
+          {# Respuestas (segundo nivel) #}
+          <ul class="list-unstyled ms-4 mt-2">
+            {% for r in comentarios %}
+              {% if r.parent_id == c.id %}
+                <li class="mb-2">
+                  <div class="small text-muted">
+                    <strong>@{{ r.autor.username }}</strong> · {{ r.fecha_creacion|date:"d/m/Y H:i" }}
+                  </div>
+                  <div class="mb-1">{{ r.contenido|linebreaksbr }}</div>
+                  <a href="#" class="text-decoration-none small" data-reply="{{ r.id }}">Responder</a>
+
+                  <form id="reply-form-{{ r.id }}"
+                        method="POST"
+                        action="{% url 'comentar' publicacion.id %}"
+                        style="display:none"
+                        hx-post="{% url 'comentar' publicacion.id %}"
+                        hx-target="#comentarios-wrapper-{{ publicacion.id }}"
+                        hx-swap="outerHTML">
+                    {% csrf_token %}
+                    <input type="hidden" name="parent" value="{{ r.id }}">
+                    <div class="input-group mt-2">
+                      <textarea name="contenido" class="form-control" rows="1" placeholder="Responder…"></textarea>
+                      <button class="btn btn-outline-primary" type="submit">Enviar</button>
+                    </div>
+                  </form>
+                </li>
+              {% endif %}
+            {% endfor %}
+          </ul>
+        </li>
+      {% endif %}
+    {% empty %}
+      <li class="text-muted">Sé el primero en comentar.</li>
+    {% endfor %}
+  </ul>
+</div>

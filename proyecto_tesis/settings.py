@@ -11,11 +11,19 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 """
 
 from pathlib import Path
+<<<<<<< HEAD
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
+=======
+from dotenv import load_dotenv 
+# Build paths inside the project like this: BASE_DIR / 'subdir'.
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+load_dotenv()  
+>>>>>>> 75e549b (api de taller y foro)
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
@@ -25,6 +33,7 @@ SECRET_KEY = 'django-insecure-6lu+0m4s29g@q0lve!eckhba1r1+xe8w*$d%84re_1*0b_p0u=
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
+<<<<<<< HEAD
 ALLOWED_HOSTS = [
     "192.168.0.106",
     "localhost",
@@ -33,6 +42,9 @@ ALLOWED_HOSTS = [
     # Si pruebas desde teléfono real en tu Wi-Fi, agrega la IP de tu PC, ej.:
     # "192.168.1.50",
 ]
+=======
+ALLOWED_HOSTS = ["10.0.2.2", "127.0.0.1", "localhost", "192.168.0.106"]
+>>>>>>> 75e549b (api de taller y foro)
 
 # Application definition
 
@@ -52,6 +64,10 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework.authtoken',
     'foro',
+<<<<<<< HEAD
+=======
+    "django_filters",
+>>>>>>> 75e549b (api de taller y foro)
 ]
 
 MIDDLEWARE = [
@@ -89,6 +105,7 @@ WSGI_APPLICATION = 'proyecto_tesis.wsgi.application'
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 
 # settings.py
+<<<<<<< HEAD
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
@@ -97,6 +114,21 @@ DATABASES = {
         'PASSWORD': '',          # La contraseña por defecto de XAMPP es vacía
         'HOST': '127.0.0.1',     # O 'localhost'
         'PORT': '3306',
+=======
+import os
+DATABASES = {
+    "default": {
+        "ENGINE": "django.db.backends.mysql",
+        "NAME": os.getenv("MYSQL_DATABASE", "prueba"),
+        "USER": os.getenv("MYSQL_USER", "django_user"),
+        "PASSWORD": os.getenv("MYSQL_PASSWORD", ""),
+        "HOST": os.getenv("MYSQL_HOST", "127.0.0.1"),  # prueba también "localhost" si fuera necesario
+        "PORT": os.getenv("MYSQL_PORT", "3306"),
+        "OPTIONS": {
+            "charset": "utf8mb4",
+            "init_command": "SET sql_mode='STRICT_TRANS_TABLES'",
+        },
+>>>>>>> 75e549b (api de taller y foro)
     }
 }
 
@@ -160,4 +192,15 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 # Limitar tamaño máximo de subida (opcional, útil para reducir broken pipe)
 DATA_UPLOAD_MAX_MEMORY_SIZE = 52428800  # 50 MB
+<<<<<<< HEAD
 FILE_UPLOAD_MAX_MEMORY_SIZE = 52428800  # 50 MB
+=======
+FILE_UPLOAD_MAX_MEMORY_SIZE = 52428800  # 50 MB
+
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        "rest_framework.authentication.TokenAuthentication",
+        "rest_framework.authentication.SessionAuthentication",
+    )
+}
+>>>>>>> 75e549b (api de taller y foro)
