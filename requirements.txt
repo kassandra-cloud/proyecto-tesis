@@ -7,7 +7,8 @@ charset-normalizer==3.4.3
 cryptography==45.0.6
 cssselect2==0.8.0
 defusedxml==0.7.1
-Django==5.0.8
+Django==5.2.8
+django-filter==25.2
 django-widget-tweaks==1.5.0
 djangorestframework==3.16.1
 fonttools==4.59.2
@@ -23,6 +24,7 @@ pyhanko-certvalidator==0.28.0
 PyMySQL==1.1.1
 pypdf==6.0.0
 python-bidi==0.6.6
+python-dotenv==1.2.1
 PyYAML==6.0.2
 reportlab==3.6.13
 requests==2.32.5
