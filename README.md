@@ -2,19 +2,6 @@
 
 Este repositorio contiene el código fuente del backend para el proyecto de tesis "Automatización administrativa en junta de vecinos 'Villa vista al mar'". El sistema está desarrollado en Django y provee una API REST para ser consumida por una plataforma web de administración y una aplicación móvil para los vecinos.
 
-## 🚀 Avances Recientes (Tu Trabajo)
-
-En esta última fase de desarrollo, se han implementado las siguientes funcionalidades clave en la plataforma web:
-
-1.  **Módulo de Votaciones Completo:**
-    * **Creación Dinámica:** La directiva (roles de Presidente y Tesorero) ahora puede crear nuevas votaciones especificando la pregunta, fecha/hora de cierre y opciones de voto personalizadas.
-    * **Previsualización para la Directiva:** Se implementó una vista de monitoreo que permite a la directiva ver los resultados de las votaciones en tiempo real mediante barras de progreso, sin tener que esperar al cierre.
-    * **Gestión Administrativa:** Se añadieron controles para que el Presidente pueda cerrar manualmente una votación en curso, editar su fecha de cierre o eliminarla si fue creada por error (solo si aún está abierta).
-    * **Historial Inmutable:** Las votaciones ya cerradas no pueden ser eliminadas, garantizando un registro histórico transparente de las decisiones.
-
-2.  **Mejora en Módulo de Reuniones:**
-    * **Previsualización de Actas:** En la página de "Detalle de Reunión", ahora se muestra directamente el contenido del acta si esta ya ha sido redactada, facilitando su consulta rápida sin necesidad de exportarla.
-
 ---
 
 ## ⚙️ Cómo Empezar a Trabajar en el Proyecto
