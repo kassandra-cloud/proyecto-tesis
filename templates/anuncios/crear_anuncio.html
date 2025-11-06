@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+
+{% block content %}
+{% if anuncio %}
+    <h1>Editar Anuncio</h1>
+    <p>Estás editando un anuncio existente.</p>
+{% else %}
+    <h1>Crear Nuevo Anuncio</h1>
+    <p>Este mensaje se enviará como una notificación a los vecinos en la aplicación móvil.</p>
+{% endif %}
+
+
+<form method="post" novalidate>
+    {% csrf_token %}
+    
+    <div class="mb-3">
+        {{ form.titulo.label_tag }}
+        {{ form.titulo }}
+        {% if form.titulo.errors %}
+            <div class="invalid-feedback d-block">{{ form.titulo.errors.0 }}</div>
+        {% endif %}
+    </div>
+    
+    <div class="mb-3">
+        {{ form.contenido.label_tag }}
+        {{ form.contenido }}
+        {% if form.contenido.errors %}
+            <div class="invalid-feedback d-block">{{ form.contenido.errors.0 }}</div>
+        {% endif %}
+    </div>
+    
+    <button type="submit" class="btn btn-success">
+        {% if anuncio %}
+            Guardar Cambios
+        {% else %}
+            Enviar Anuncio
+        {% endif %}
+    </button>
+    <a href="{% url 'anuncios:lista_anuncios' %}" class="btn btn-secondary">Cancelar</a>
+</form>
+
+{% endblock %}

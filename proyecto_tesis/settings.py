@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     "talleres",
     "votaciones",
     "foro",
+    "anuncios",
 
     # Terceros
     "widget_tweaks",

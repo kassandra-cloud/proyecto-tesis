@@ -1,114 +1,178 @@
-:root{
-  --brand-primary:  #1199D6; /* azul */
-  --brand-teal:     #13A3B0; /* teal */
-  --brand-secondary:#7F2D2F; /* vino */
-  --brand-secondary-600:#8F3A3C; /* vino aclarado para cabeceras */
-  --brand-accent:   #2DB84A; /* verde */
-  --brand-yellow:   #F2C74F; /* sol */
-  --brand-brown:    #3B2C25; /* montañas */
-  --brand-gray:     #7E8288; /* camino */
-  --brand-bg:       #F4FAFE; /* fondo muy suave */
+/* Hacemos que la barra superior original (navbar) sea un poco más oscura */
+.top-navbar {
+    background-color: #007bff; /* O el color azul que tenías */
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
-/* Fondo general con leve degradado y respiración */
-body{
-  background: radial-gradient(1200px 600px at 20% -10%, #EAF6FD 0%, transparent 60%),
-              radial-gradient(1200px 600px at 120% 20%, #E7F8F9 0%, transparent 60%),
-              var(--brand-bg) !important;
+/* * Contenedor principal que se divide en 2 columnas:
+ * 1. .main-sidebar (Barra lateral)
+ * 2. .main-content (Contenido principal)
+*/
+.page-container {
+    display: flex;
+    min-height: calc(100vh - 70px); /* Alto completo menos el navbar */
 }
 
-/* NAVBAR: elegante, con blur y sombra */
-.navbar{
-  background: linear-gradient(90deg, var(--brand-primary), var(--brand-teal)) !important;
-  color:#fff !important;
-  backdrop-filter: saturate(120%) blur(2px);
-  box-shadow: 0 4px 16px rgba(0,0,0,.08);
-}
-.navbar .navbar-brand,
-.navbar .nav-link{ color:#fff !important; opacity:.95 }
-.navbar .nav-link:hover{ opacity:1 }
-
-/* CONTENEDOR: tarjeta elevada */
-.card-elevated{
-  border: 0 !important;
-  border-radius: 18px !important;
-  box-shadow: 0 12px 30px rgba(17,153,214,.12);
-  background: #ffffffd9; /* leve transparencia */
-  backdrop-filter: blur(2px);
+/* --- 1. Barra Lateral (Sidebar) --- */
+.main-sidebar {
+    width: 250px; /* Ancho fijo */
+    flex-shrink: 0; /* Evita que se encoja */
+    background-color: #ffffff; /* Fondo blanco */
+    border-right: 1px solid #e9ecef; /* Borde sutil */
+    padding: 20px;
 }
 
-/* Título de página */
-.page-title{
-  font-weight: 800;
-  letter-spacing: .2px;
-  color: #0C2E3C; /* texto más sofisticado que negro puro */
+.sidebar-nav {
+    list-style: none;
+    padding-left: 0;
+    margin: 0;
 }
 
-/* Botón “Nuevo” estilo pill */
-.btn-brand{
-  background: var(--brand-secondary) !important;
-  border-color: var(--brand-secondary) !important;
-  color:#fff !important;
-  border-radius: 12px !important;
-  padding: .5rem 1rem !important;
-  box-shadow: 0 6px 16px rgba(127,45,47,.25);
-}
-.btn-brand:hover{ filter: brightness(.95) }
-
-/* Botones secundarios */
-.btn-outline-secondary{
-  border-color: var(--brand-gray) !important;
-  color: #23323A !important;
-}
-.btn-outline-danger{
-  border-radius: 10px !important;
+.sidebar-nav .nav-item {
+    margin-bottom: 5px;
 }
 
-/* Tabla: header vino elegante, filas con zebra suave y hover */
-.table-brand thead th{
-  background: var(--brand-secondary-600) !important;
-  color:#fff !important;
-  font-weight: 700 !important;
-  border: none !important;
-}
-.table-brand{
-  --row-zebra: rgba(17,153,214,.06);
-  --row-hover: rgba(17,153,214,.12);
-  border-collapse: separate;
-  border-spacing: 0 10px;  /* filas separadas, “chips” */
-}
-.table-brand tbody tr{
-  background: #fff;
-  box-shadow: 0 4px 18px rgba(0,0,0,.04);
-}
-.table-brand tbody tr:hover{ background: var(--row-hover) }
-.table-brand tbody tr td{
-  border-top: none !important;
-  border-bottom: none !important;
-}
-.table-brand tbody tr td:first-child{ border-radius: 12px 0 0 12px; }
-.table-brand tbody tr td:last-child{ border-radius: 0 12px 12px 0; }
-
-/* Definicion por roles */
-.badge-role.presidente { background: #7F2D2F; color:#fff; } /* vino */
-.badge-role.secretaria { background: #13A3B0; color:#fff; } /* teal */
-.badge-role.tesorero   { background: #F2C74F; color:#222; } /* amarillo */
-.badge-role.suplente   { background: #7E8288; color:#fff; } /* gris */
-.badge-role.vecino     { background: #2DB84A; color:#fff; } /* verde */
-
-/* Focus accesible */
-.form-control:focus, .form-select:focus{
-  border-color: var(--brand-primary) !important;
-  box-shadow: 0 0 0 .2rem rgba(17,153,214,.25) !important;
+.sidebar-nav .nav-link {
+    color: #555; /* Texto de link oscuro/gris */
+    font-size: 1.0em;
+    padding: 10px 15px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    text-decoration: none;
+    transition: background-color 0.2s, color 0.2s;
+    font-weight: 500;
 }
 
-/* Pequeño pulido de paginación */
-.page-link{ color: var(--brand-primary) }
-.page-item.active .page-link{
-  background: var(--brand-primary); border-color: var(--brand-primary);
+.sidebar-nav .nav-link .icon {
+    margin-right: 15px;
+    width: 25px; /* Alinea los iconos y el texto */
+    text-align: center;
+    font-size: 1.1em;
+    color: #888;
 }
-/* --- FIX de superposición del dropdown --- */
-.navbar{ position: relative; z-index: 1100; }      /* navbar por encima de cards/tablas */
-.dropdown-menu{ z-index: 2000 !important; }        /* menú por encima de todo */
 
-.card, .card-elevated, .table-responsive{ position: relative; z-index: 1; } /* garantizan orden correcto */
+.sidebar-nav .nav-link:hover {
+    background-color: #f0f2f5; /* Hover gris claro */
+    color: #000;
+}
+.sidebar-nav .nav-link:hover .icon {
+    color: #007bff;
+}
+
+/* Link Activo (azul) */
+.sidebar-nav .nav-link.active {
+    background: #e7f0ff; /* Fondo azul claro */
+    color: #0056b3; /* Texto azul oscuro */
+    font-weight: 600;
+}
+.sidebar-nav .nav-link.active .icon {
+    color: #0056b3;
+}
+
+
+/* --- 2. Contenedor del Contenido (Derecha) --- */
+.main-content {
+    flex-grow: 1; /* Ocupa el resto del espacio */
+    padding: 30px;
+    background-color: #f8f9fa; /* Fondo gris claro para el área de contenido */
+    overflow-y: auto; /* Permite scroll */
+}
+
+/* * Ajustes para tu navbar superior original
+ * (Le damos la clase 'top-navbar' en el HTML)
+*/
+.top-navbar .navbar-brand span {
+    color: #ffffff !important; /* Asegura texto blanco */
+}
+.top-navbar .nav-link {
+    color: #ffffff !important; /* Texto de usuario blanco */
+}
+
+/* ---------------------------------------------
+ESTILOS PARA LA BARRA LATERAL (OFFCANVAS)
+---------------------------------------------
+*/
+
+/* --- 1. La Barra Superior (Navbar) --- */
+.top-navbar {
+    /* Mantenemos el color azul de tu navbar original */
+    background-color: #0d6efd; 
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+/* Asegura que el texto sea blanco */
+.top-navbar .navbar-brand span {
+    color: #ffffff !important; 
+}
+.top-navbar .nav-link { 
+    color: #ffffff !important; 
+}
+/* Estilo del botón "hamburguesa" (para que sea blanco) */
+.top-navbar .navbar-toggler {
+    color: rgba(255,255,255,0.7);
+    border-color: rgba(255,255,255,0.3);
+}
+.top-navbar .navbar-toggler-icon {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%28255, 255, 255, 0.7%29' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
+}
+
+
+/* --- 2. La Barra Lateral (Offcanvas) --- */
+.sidebar-offcanvas {
+    width: 260px;
+    background-color: #232a3b; /* Color oscuro de tu imagen */
+    color: #ecf0f1;
+}
+
+.sidebar-offcanvas .offcanvas-header {
+    border-bottom: 1px solid #343a4b;
+}
+.sidebar-offcanvas .offcanvas-title {
+    color: #fff;
+    font-weight: 500;
+}
+/* Botón 'X' para cerrar (blanco) */
+.sidebar-offcanvas .btn-close {
+    filter: invert(1) grayscale(100) brightness(200); 
+}
+
+/* --- 3. Links de Navegación (Dentro de la barra) --- */
+.sidebar-nav {
+    list-style: none;
+    padding-left: 0;
+    margin: 0;
+}
+.sidebar-nav .nav-item { 
+    margin-bottom: 6px; 
+}
+.sidebar-nav .nav-link {
+    color: #aeb9c4;
+    font-size: 1.0em;
+    padding: 12px 15px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    text-decoration: none;
+    transition: background-color 0.2s, color 0.2s;
+    font-weight: 500;
+}
+.sidebar-nav .nav-link .icon {
+    margin-right: 15px;
+    width: 25px;
+    text-align: center;
+    font-size: 1.1em;
+}
+.sidebar-nav .nav-link:hover {
+    background-color: #344059;
+    color: #ffffff;
+}
+.sidebar-nav .nav-link.active {
+    background: #2563eb; /* Color azul activo */
+    color: #ffffff;
+    box-shadow: 0 4px 10px rgba(37, 99, 235, 0.3);
+}
+/* --- 4. Contenido Principal --- */
+.main-content {
+    background-color: #f8f9fa; /* Fondo gris claro */
+    min-height: calc(100vh - 70px); /* Alto completo menos el navbar */
+}

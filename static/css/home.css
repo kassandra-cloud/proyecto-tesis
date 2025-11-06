@@ -1,0 +1,76 @@
+.dashboard-card {
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    padding: 20px;
+    text-align: center;
+    transition: transform 0.2s;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+.dashboard-card:hover { transform: translateY(-5px); }
+.dashboard-card .icon { font-size: 3em; margin-bottom: 10px; }
+.dashboard-card h3 { font-size: 2.5em; margin-bottom: 5px; }
+.dashboard-card p { font-size: 1.1em; color: #666; margin: 0; }
+
+/* Colores específicos de la imagen */
+.card-vecinos .icon { color: #663399; }
+.card-reuniones .icon { color: #8A2BE2; }
+.card-publicaciones .icon { color: #FFD700; }
+.card-votaciones .icon { color: #32CD32; }
+.card-talleres .icon { color: #FF6347; }
+
+.activity-section {
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    padding: 25px;
+    margin-bottom: 30px;
+    height: 100%;
+}
+.activity-section h4 {
+    color: #007bff;
+    margin-bottom: 20px;
+    border-bottom: 1px solid #e9ecef;
+    padding-bottom: 10px;
+}
+.activity-item {
+    margin-bottom: 15px;
+    border-left: 3px solid #007bff;
+    padding-left: 10px;
+}
+.activity-item strong { display: block; color: #333; }
+.activity-item small { color: #666; }
+.activity-item .icon { color: #007bff; margin-right: 8px; }
+
+.action-button {
+    background-color: #007bff;
+    color: white;
+    border-radius: 8px;
+    padding: 20px;
+    text-align: center;
+    transition: background-color 0.2s;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-decoration: none;
+}
+.action-button:hover { background-color: #0056b3; color: white; }
+.action-button .icon { font-size: 2.5em; margin-bottom: 10px; color: white; }
+.action-button h5 { font-size: 1.2em; color: white; margin: 0; }
+
+/* Colores de los botones de acción */
+.btn-anuncio { background-color: #17a2b8; }
+.btn-reunion { background-color: #28a745; }
+.btn-votacion { background-color: #6f42c1; }
+.btn-usuarios { background-color: #ffc107; }
+
+.btn-anuncio:hover { background-color: #138496; }
+.btn-reunion:hover { background-color: #218838; }
+.btn-votacion:hover { background-color: #5a28a3; }
+.btn-usuarios:hover { background-color: #e0a800; }

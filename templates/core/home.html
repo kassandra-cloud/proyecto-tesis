@@ -1,6 +1,154 @@
-{% extends "base.html" %}
-{% block title %}Inicio - Proyecto de Tesis{% endblock %}
+{% extends 'base.html' %}
+{% load static %}
+
 {% block content %}
-  <h1>{{ titulo }}</h1>
-  <p>Bienvenido 👋</p>
+
+<link rel="stylesheet" href="{% static 'css/home.css' %}">
+
+<div class="container-fluid mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Panel Administrativo - Villa vista al mar</h1>
+        <p class="lead">Bienvenido/a, {{ nombre_usuario }}</p>
+    </div>
+
+    {# TOP CARDS #}
+    <div class="row mb-5">
+        <div class="col-md-6 col-lg-2 mb-4">
+            <div class="dashboard-card card-vecinos">
+                <i class="fas fa-users icon"></i>
+                <h3>{{ total_vecinos_registrados }}</h3>
+                <p>Vecinos Registrados</p>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-2 mb-4">
+            <div class="dashboard-card card-reuniones">
+                <i class="fas fa-calendar-alt icon"></i>
+                <h3>{{ reuniones_pendientes_mes }}</h3>
+                <p>Reuniones (Mes)</p>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-3 mb-4">
+            <div class="dashboard-card card-publicaciones">
+                <i class="fas fa-comments icon"></i>
+                <h3>{{ nuevas_publicaciones_24h }}</h3>
+                <p>Nuevas Publicaciones (24h)</p>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-2 mb-4">
+            <div class="dashboard-card card-votaciones">
+                <i class="fas fa-vote-yea icon"></i>
+                <h3>{{ votaciones_activas }}</h3>
+                <p>Votaciones Activas</p>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-3 mb-4">
+            <div class="dashboard-card card-talleres">
+                <i class="fas fa-chalkboard-teacher icon"></i>
+                <h3>{{ talleres_con_cupos }}</h3>
+                <p>Talleres con Cupos</p>
+            </div>
+        </div>
+    </div>
+
+    {# SECCIONES CENTRALES #}
+    <div class="row mb-5">
+        <div class="col-lg-6 mb-4">
+            <div class="activity-section">
+                <h4>Última Actividad en el Foro</h4>
+                {% if ultimas_publicaciones_foro %}
+                    {% for publicacion in ultimas_publicaciones_foro %}
+                        <div class="activity-item">
+                            <i class="fas fa-bullhorn icon"></i> <strong>{{ publicacion.autor.username }} publicó:</strong>
+                            <small>{{ publicacion.contenido|truncatechars:50 }}</small>
+                            <small><i>Hace {{ publicacion.fecha_creacion|timesince }}</i></small>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <p>No hay publicaciones recientes en el foro.</p>
+                {% endif %}
+                <a href="{% url 'lista_publicaciones' %}" class="btn btn-link mt-3">Ver / Moderar Foro</a>
+            </div>
+        </div>
+        <div class="col-lg-6 mb-4">
+            <div class="activity-section">
+                <h4>Próximas Reuniones</h4>
+                {% if proximas_reuniones %}
+                    {% for reunion in proximas_reuniones %}
+                        <div class="activity-item">
+                            <i class="fas fa-calendar-check icon"></i> <strong>{{ reunion.titulo }}</strong>
+                            <small>{{ reunion.fecha|date:"d M, H:i" }}</small>
+                            <a href="{% url 'reuniones:detalle_reunion' reunion.id %}" class="btn btn-link btn-sm">Ver Detalles</a>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <p>No hay reuniones próximas programadas.</p>
+                {% endif %}
+                <a href="{% url 'reuniones:lista_reuniones' %}" class="btn btn-link mt-3">Ver Todas las Reuniones</a>
+            </div>
+        </div>
+    </div>
+
+    {# SECCIONES INFERIORES #}
+    <div class="row mb-5">
+        <div class="col-lg-6 mb-4">
+            <div class="activity-section">
+                <h4>Estado Votaciones y Talleres</h4>
+                <h5 class="mt-4">Votaciones Activas:</h5>
+                {% if votaciones_activas_list %}
+                    {% for votacion in votaciones_activas_list %}
+                        <div class="activity-item">
+                            <i class="fas fa-poll icon"></i> <strong>{{ votacion.pregunta }}</strong>
+                            <small>Cierra {{ votacion.fecha_cierre|date:"d M" }} - <a href="{% url 'votaciones:detalle_votacion' votacion.id %}">Gestionar Votación</a></small>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <p>No hay votaciones activas.</p>
+                {% endif %}
+
+                <h5 class="mt-4">Talleres con Cupos Disponibles:</h5>
+                {% if talleres_con_cupos_list %}
+                    {% for taller in talleres_con_cupos_list %}
+                        <div class="activity-item">
+                            <i class="fas fa-chalkboard icon"></i> <strong>{{ taller.nombre }}</strong>
+                            <small>Cupos: {{ taller.cupos_disponibles }} / {{ taller.cupos_totales }} - <a href="{% url 'detalle_taller' taller.id %}">Ver Inscritos</a></small>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <p>No hay talleres con cupos disponibles.</p>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="col-lg-6 mb-4">
+            <div class="row h-100">
+                <div class="col-6 mb-4">
+                    <!-- CORRECCIÓN APLICADA AQUÍ -->
+                    <a href="{% url 'anuncios:crear_anuncio' %}" class="action-button btn-anuncio"> 
+                        <i class="fas fa-bullhorn icon"></i>
+                        <h5>Crear Anuncio</h5>
+                    </a>
+                </div>
+                <div class="col-6 mb-4">
+                    <a href="{% url 'reuniones:crear_reunion' %}" class="action-button btn-reunion">
+                        <i class="fas fa-calendar-plus icon"></i>
+                        <h5>Programar Reunión</h5>
+                    </a>
+                </div>
+                <div class="col-6 mb-4">
+                    <a href="{% url 'votaciones:crear_votacion' %}" class="action-button btn-votacion">
+                        <i class="fas fa-plus-square icon"></i>
+                        <h5>Crear Votación</h5>
+                    </a>
+                </div>
+                <div class="col-6 mb-4">
+                    <a href="{% url 'lista_usuarios' %}" class="action-button btn-usuarios">
+                        <i class="fas fa-user-friends icon"></i>
+                        <h5>Gestionar Usuarios</h5>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
 {% endblock %}

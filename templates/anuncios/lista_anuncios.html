@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h1>Anuncios de la Directiva</h1>
+
+{% if messages %}
+    {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+    {% endfor %}
+{% endif %}
+
+{% if user.is_authenticated %}
+    <a href="{% url 'anuncios:crear_anuncio' %}" class="btn btn-primary mb-3">
+        <i class="fas fa-plus"></i> Crear Nuevo Anuncio
+    </a>
+{% endif %}
+
+<div class="list-group">
+    {% for anuncio in anuncios %}
+        <div class="list-group-item list-group-item-action flex-column align-items-start mb-3">
+            <div class="d-flex w-100 justify-content-between">
+                <h5 class="mb-1">{{ anuncio.titulo }}</h5>
+                <small>{{ anuncio.fecha_creacion|date:"d M, Y" }}</small>
+            </div>
+            <p class="mb-1">{{ anuncio.contenido|linebreaks }}</p>
+            <small>Enviado por: <strong>@{{ anuncio.autor.username }}</strong></small>
+
+            {% if user.is_authenticated %}
+            <div class="mt-2">
+                <a href="{% url 'anuncios:editar_anuncio' anuncio.pk %}" class="btn btn-warning btn-sm">
+                    <i class="fas fa-edit"></i> Editar
+                </a>
+                <a href="{% url 'anuncios:eliminar_anuncio' anuncio.pk %}" class="btn btn-danger btn-sm">
+                    <i class="fas fa-trash"></i> Eliminar
+                </a>
+            </div>
+            {% endif %}
+            </div>
+    {% empty %}
+        <p>No hay anuncios publicados todavía.</p>
+    {% endfor %}
+</div>
+
+{% endblock %}

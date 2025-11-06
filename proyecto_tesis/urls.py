@@ -28,6 +28,7 @@ urlpatterns = [
     path("talleres/", include("talleres.urls")),
     path("votaciones/", include("votaciones.urls")),
     path('foro/', include('foro.urls')),
+    path('anuncios/', include('anuncios.urls', namespace='anuncios')),
 ]
 
 # esto es para que los archivos subidos (MEDIA) funcionen

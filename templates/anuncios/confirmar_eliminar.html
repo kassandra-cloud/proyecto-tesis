@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+
+{% block content %}
+    <h1>¿Estás seguro que deseas eliminar este anuncio?</h1>
+    <hr>
+    
+    <div class="alert alert-danger">
+        <p>Estás a punto de eliminar permanentemente el anuncio:</p>
+        <h4 class="alert-heading">"{{ anuncio.titulo }}"</h4>
+        <p class="mb-0">Esta acción no se puede deshacer.</p>
+    </div>
+
+    <form method="POST">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-danger">Sí, eliminar permanentemente</button>
+        <a href="{% url 'anuncios:lista_anuncios' %}" class="btn btn-secondary">No, cancelar</a>
+    </form>
+{% endblock %}
