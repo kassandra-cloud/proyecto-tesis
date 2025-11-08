@@ -54,6 +54,13 @@ ROLE_MATRIX: Dict[str, Dict[str, List[str]]] = {
         "edit":   [PRESIDENTE],
         "manage_reservas": [PRESIDENTE, SECRETARIA, SUPLENTE], 
     },
+    "reservas": {
+        "view_own":   [PRESIDENTE, SECRETARIA, TESORERO, SUPLENTE, VECINO],
+        "create":     [PRESIDENTE, SECRETARIA, TESORERO, SUPLENTE, VECINO],
+        "cancel_own": [PRESIDENTE, SECRETARIA, TESORERO, SUPLENTE, VECINO],
+        
+        "manage_all": [PRESIDENTE, SECRETARIA, SUPLENTE], 
+    },    
     "notas": {
         "admin":  [PRESIDENTE],
     },

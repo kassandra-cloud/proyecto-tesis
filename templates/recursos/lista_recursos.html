@@ -6,13 +6,23 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h1 class="h4 m-0">{{ titulo }}</h1>
-    {% user_can 'recursos' 'create' as puede_crear_recurso %}
-    {% if puede_crear_recurso %}
-    <a class="btn btn-dark" href="{% url 'recursos:crear_recurso' %}">
-        <span class="me-1">+</span> Nuevo Recurso
-    </a>
-    {% endif %}
-</div>
+    
+    <div class="d-flex gap-2">
+        {% user_can 'reservas' 'manage_all' as puede_gestionar_reservas %}
+        {% if puede_gestionar_reservas %}
+        <a class="btn btn-primary" href="{% url 'recursos:gestionar_reservas' %}">
+            <i class="fas fa-calendar-check me-1"></i> Ver Solicitudes
+        </a>
+        {% endif %}
+
+        {% user_can 'recursos' 'create' as puede_crear_recurso %}
+        {% if puede_crear_recurso %}
+        <a class="btn btn-dark" href="{% url 'recursos:crear_recurso' %}">
+            <span class="me-1">+</span> Nuevo Recurso
+        </a>
+        {% endif %}
+    </div>
+    </div>
 
 {# ===== CARD 1: RECURSOS DISPONIBLES (ACTIVOS) ===== #}
 <div class="card shadow-sm mb-4">
