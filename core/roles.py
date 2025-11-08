@@ -41,12 +41,18 @@ ROLE_MATRIX: Dict[str, Dict[str, List[str]]] = {
     "votaciones": {
         "view":   [PRESIDENTE, SECRETARIA, TESORERO, SUPLENTE,VECINO],
         "create": [PRESIDENTE, TESORERO],
-        "edit":   [PRESIDENTE],  # <-- CORREGIDO: Solo Presidente
+        "edit":   [PRESIDENTE],  
         "close":  [PRESIDENTE, TESORERO],
-        "delete": [PRESIDENTE],  # <-- CORREGIDO: Solo Presidente
+        "delete": [PRESIDENTE],  
         "preview":[PRESIDENTE, SECRETARIA, TESORERO, SUPLENTE],
         "vote":   [],
         "results":[PRESIDENTE, SECRETARIA, TESORERO, SUPLENTE],
+    },
+    "recursos": {
+        "view":   [PRESIDENTE, SECRETARIA, TESORERO, SUPLENTE,VECINO],
+        "create": [PRESIDENTE],
+        "edit":   [PRESIDENTE],
+        "manage_reservas": [PRESIDENTE, SECRETARIA, SUPLENTE], 
     },
     "notas": {
         "admin":  [PRESIDENTE],

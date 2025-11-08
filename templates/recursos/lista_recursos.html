@@ -1,0 +1,108 @@
+{% extends 'base.html' %}
+{% load can %}
+
+{% block title %}{{ titulo }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h4 m-0">{{ titulo }}</h1>
+    {% user_can 'recursos' 'create' as puede_crear_recurso %}
+    {% if puede_crear_recurso %}
+    <a class="btn btn-dark" href="{% url 'recursos:crear_recurso' %}">
+        <span class="me-1">+</span> Nuevo Recurso
+    </a>
+    {% endif %}
+</div>
+
+{# ===== CARD 1: RECURSOS DISPONIBLES (ACTIVOS) ===== #}
+<div class="card shadow-sm mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span class="fw-semibold">Recursos Disponibles</span>
+      <span class="badge text-bg-secondary">{{ recursos_activos|length }} disponibles</span>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Nombre del Recurso</th>
+                        <th>Descripción</th>
+                        <th class="text-end">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for recurso in recursos_activos %}
+                    <tr>
+                        <td>{{ recurso.nombre }}</td>
+                        <td class="text-muted">{{ recurso.descripcion|truncatewords:20|default:"-" }}</td>
+                        <td class="text-end text-nowrap">
+                            {% user_can 'recursos' 'edit' as puede_editar %}
+                            {% if puede_editar %}
+                            <a href="{% url 'recursos:editar_recurso' recurso.pk %}" class="btn btn-sm btn-outline-secondary">Editar</a>
+                            
+                            <form action="{% url 'recursos:deshabilitar_recurso' recurso.pk %}" method="post" class="d-inline ms-1">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-outline-danger"
+                                        onclick="return confirm('¿Deshabilitar el recurso “{{ recurso.nombre }}”? Los vecinos no podrán reservarlo.');">
+                                  Deshabilitar
+                                </button>
+                            </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="3" class="text-center text-muted py-4">No hay recursos disponibles.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+{# ===== CARD 2: RECURSOS NO DISPONIBLES (INACTIVOS) ===== #}
+<div class="card shadow-sm">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span class="fw-semibold">Recursos No Disponibles (Historial)</span>
+      <span class="badge text-bg-secondary">{{ recursos_inactivos|length }}</span>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Nombre del Recurso</th>
+                        <th>Descripción</th>
+                        <th class="text-end">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for recurso in recursos_inactivos %}
+                    <tr>
+                        <td>{{ recurso.nombre }}</td>
+                        <td class="text-muted">{{ recurso.descripcion|truncatewords:20|default:"-" }}</td>
+                        <td class="text-end text-nowrap">
+                            {% user_can 'recursos' 'edit' as puede_editar %}
+                            {% if puede_editar %}
+                            <form action="{% url 'recursos:restaurar_recurso' recurso.pk %}" method="post" class="d-inline">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-success"
+                                        onclick="return confirm('¿Restaurar el recurso “{{ recurso.nombre }}”? Volverá a estar disponible para reservas.');">
+                                  Restaurar
+                                </button>
+                            </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="3" class="text-center text-muted py-4">No hay recursos deshabilitados.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
