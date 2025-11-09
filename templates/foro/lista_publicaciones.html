@@ -1,124 +1,140 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<h1>Foro de la Junta de Vecinos</h1>
 
-<!-- Form Nueva Publicación -->
-<div class="formulario-post mb-4">
-  <h2>Nueva Publicación</h2>
-  <form method="POST" action="{% url 'crear_publicacion' %}" enctype="multipart/form-data">
-    {% csrf_token %}
-    <p>
-      <label for="{{ form.contenido.id_for_label }}">Contenido:</label><br>
-      {{ form.contenido }}
-    </p>
+<div class="row justify-content-center">
+    <div class="col-lg-9"> <h1>Foro de la Junta de Vecinos</h1>
+        <hr>
 
-    <p>
-      <label for="id_archivos">Adjuntar archivos:</label><br>
-      <input type="file" id="id_archivos" name="archivos" multiple>
-    </p>
+        <div class="listado-publicaciones">
+            <h2>Publicaciones</h2>
 
-    <h4>Grabar un audio</h4>
-    <button type="button" id="start-record" class="btn btn-success">🎙️ Grabar</button>
-    <button type="button" id="stop-record" class="btn btn-danger" disabled>Detener</button>
-    <br><br>
-    <audio id="audio-playback" controls style="display: none;"></audio>
-    <br><br>
+            {% for publicacion in publicaciones %}
+                <div class="card shadow-sm mb-4" id="pub-{{ publicacion.id }}">
+                    <div class="card-body pb-0">
+                        <article class="post">
+                            <p class="mb-1">
+                                <strong>@{{ publicacion.autor.username }}</strong>
+                                <small class="text-muted">({{ publicacion.fecha_creacion|date:"d/m/Y H:i" }})</small>
+                            </p>
+                            <p>{{ publicacion.contenido|linebreaks }}</p>
 
-    <button type="submit" class="btn btn-primary">Publicar</button>
-  </form>
-</div>
+                            {% if publicacion.adjuntos.all %}
+                                <p class="fw-semibold">Archivos Adjuntos:</p>
+                                <ul class="mb-3 list-unstyled">
+                                    {% for adjunto in publicacion.adjuntos.all %}
+                                        <li class="mb-2">
+                                            {% if adjunto.tipo_archivo == "imagen" %}
+                                                <img src="{{ adjunto.archivo.url }}" alt="Imagen" 
+                                                     style="max-width: 100%; height: auto; border-radius: 8px; max-height: 500px;" 
+                                                     loading="lazy">
+                                            {% elif adjunto.tipo_archivo == "audio" %}
+                                                <audio controls class="w-100">
+                                                    <source src="{{ adjunto.archivo.url }}">
+                                                </audio>
+                                            {% elif adjunto.tipo_archivo == "video" %}
+                                                <video controls width="100%" style="max-width: 400px;" preload="metadata" loading="lazy">
+                                                    <source src="{{ adjunto.archivo.url }}">
+                                                </video>
+                                            {% else %}
+                                                <a href="{{ adjunto.archivo.url }}" target="_blank">{{ adjunto.archivo.name }}</a>
+                                            {% endif %}
+                                        </li>
+                                    {% endfor %}
+                                </ul>
+                            {% endif %}
 
-<hr>
+                            <div class="d-flex align-items-center mb-2">
+                                <h5 class="mb-0 h6">Comentarios</h5>
+                                <span class="badge bg-secondary ms-2"
+                                      id="badge-count-{{ publicacion.id }}"
+                                      hx-get="{% url 'comentarios_partial' publicacion.id %}"
+                                      hx-trigger="load, every 3s"
+                                      hx-swap="none"
+                                      hx-on::after-on-load="this.textContent = (document.querySelector('#comentarios-list-{{ publicacion.id }}')?.childElementCount || 0)">
+                                  {{ publicacion.comentarios.count }}
+                                </span>
+                            </div>
 
-<!-- Listado de Publicaciones -->
-<div class="listado-publicaciones">
-  <h2>Publicaciones</h2>
+                            <div id="comentarios-wrapper-{{ publicacion.id }}"
+                                 hx-get="{% url 'comentarios_partial' publicacion.id %}"
+                                 hx-trigger="load, every 3s"
+                                 hx-target="#comentarios-wrapper-{{ publicacion.id }}"
+                                 hx-swap="outerHTML">
+                                {% include "foro/_comentarios_ul.html" with publicacion=publicacion comentarios=publicacion.comentarios.all %}
+                            </div>
+                        </article>
+                    </div> <div class="card-footer bg-light">
+                        <form
+                          hx-post="{% url 'comentar' publicacion.id %}"
+                          hx-target="#comentarios-wrapper-{{ publicacion.id }}"
+                          hx-swap="outerHTML"
+                        >
+                            {% csrf_token %}
+                            <div class="input-group">
+                                <input type="text" class="form-control" name="contenido" placeholder="Escribe un comentario...">
+                                <button class="btn btn-primary" type="submit">Enviar</button>
+                            </div>
+                        </form>
+                    </div>
+                </div> {% empty %}
+                <div class="card shadow-sm">
+                    <div class="card-body text-center text-muted">
+                        No hay publicaciones todavía. ¡Sé el primero!
+                    </div>
+                </div>
+            {% endfor %}
+        </div> </div> </div> <a href="#" class="fab" data-bs-toggle="modal" data-bs-target="#modalNuevaPublicacion">
+    <i class="fas fa-plus"></i>
+</a>
 
-  {% for publicacion in publicaciones %}
-    <article id="pub-{{ publicacion.id }}" class="post" style="border-bottom:1px solid #eee; margin-bottom:20px; padding-bottom:16px;">
-      <p class="mb-1">
-        <strong>@{{ publicacion.autor.username }}</strong>
-        <small class="text-muted">({{ publicacion.fecha_creacion|date:"d/m/Y H:i" }})</small>
-      </p>
-      <p>{{ publicacion.contenido|linebreaks }}</p>
+<div class="modal fade" id="modalNuevaPublicacion" tabindex="-1" aria-labelledby="modalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            
+            <form method="POST" action="{% url 'crear_publicacion' %}" enctype="multipart/form-data">
+                {% csrf_token %}
+                
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalLabel">Nueva Publicación</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
 
-      {% if publicacion.adjuntos.all %}
-        <p class="fw-semibold">Archivos Adjuntos:</p>
-        <ul class="mb-3">
-          {% for adjunto in publicacion.adjuntos.all %}
-            <li class="mb-2">
-              {% if adjunto.tipo_archivo == "imagen" %}
-                <img src="{{ adjunto.archivo.url }}" alt="Imagen" style="max-width:400px; height:auto;" loading="lazy">
-              {% elif adjunto.tipo_archivo == "audio" %}
-                <audio controls>
-                  <source src="{{ adjunto.archivo.url }}">
-                  Tu navegador no soporta audio.
-                </audio>
-              {% elif adjunto.tipo_archivo == "video" %}
-                <video controls width="400" preload="metadata" loading="lazy">
-                  <source src="{{ adjunto.archivo.url }}">
-                </video>
-              {% else %}
-                <a href="{{ adjunto.archivo.url }}" target="_blank">{{ adjunto.archivo.name }}</a>
-              {% endif %}
-            </li>
-          {% endfor %}
-        </ul>
-      {% endif %}
+                <div class="modal-body">
+                    {{ form.contenido }}
 
-      <hr class="my-3">
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <label for="id_archivos" class="form-label small">Adjuntar archivos:</label>
+                            <input type="file" id="id_archivos" name="archivos" multiple class="form-control form-control-sm">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small">Grabar un audio:</label>
+                            <div>
+                                <button type="button" id="start-record" class="btn btn-sm btn-success">🎙️ Grabar</button>
+                                <button type="button" id="stop-record" class="btn btn-sm btn-danger" disabled>Detener</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <audio id="audio-playback" controls class="mt-3" style="display: none; width: 100%;"></audio>
+                </div>
 
-      <!-- Encabezado Comentarios (contador) -->
-      <div class="d-flex align-items-center mb-2">
-        <h5 class="mb-0">Comentarios</h5>
-        <span class="badge bg-secondary ms-2"
-              id="badge-count-{{ publicacion.id }}"
-              hx-get="{% url 'comentarios_partial' publicacion.id %}"
-              hx-trigger="load, every 3s"
-              hx-swap="none"
-              hx-on::after-on-load="this.textContent = (document.querySelector('#comentarios-list-{{ publicacion.id }}')?.childElementCount || 0)">
-          {{ publicacion.comentarios.count }}
-        </span>
-      </div>
-
-      <!-- LISTA en tiempo real (parcial) -->
-      <div id="comentarios-wrapper-{{ publicacion.id }}"
-           hx-get="{% url 'comentarios_partial' publicacion.id %}"
-           hx-trigger="load, every 3s"
-           hx-target="#comentarios-wrapper-{{ publicacion.id }}"
-           hx-swap="outerHTML">
-        {# Render inicial del parcial #}
-        {% include "foro/_comentarios_ul.html" with publicacion=publicacion comentarios=publicacion.comentarios.all %}
-      </div>
-
-      <!-- Formulario nuevo comentario (HTMX) -->
-      <form
-        hx-post="{% url 'comentar' publicacion.id %}"
-        hx-target="#comentarios-wrapper-{{ publicacion.id }}"
-        hx-swap="outerHTML"
-      >
-        {% csrf_token %}
-        <div class="input-group my-2">
-          <input type="text" class="form-control" name="contenido" placeholder="Escribe un comentario...">
-          <button class="btn btn-primary" type="submit">Enviar</button>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Publicar</button>
+                </div>
+            </form>
+            
         </div>
-      </form>
-    </article>
-  {% empty %}
-    <p>No hay publicaciones todavía. ¡Sé el primero!</p>
-  {% endfor %}
+    </div>
 </div>
-
-<!-- CSRF para HTMX -->
 <script>
   document.addEventListener("htmx:configRequest", (e) => {
     const token = document.querySelector('[name=csrfmiddlewaretoken]')?.value;
     if (token) e.detail.headers['X-CSRFToken'] = token;
   });
 </script>
-
-<!-- “Responder”: mostrar/ocultar forms de respuesta -->
 <script>
   document.addEventListener('click', function (e) {
     const btn = e.target.closest('[data-reply]');
@@ -129,8 +145,6 @@
     if (form) form.style.display = (form.style.display === 'none' || !form.style.display) ? 'block' : 'none';
   });
 </script>
-
-<!-- Grabación de audio -->
 <script>
 document.addEventListener('DOMContentLoaded', () => {
   const startBtn = document.getElementById('start-record');
@@ -145,24 +159,19 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       mediaRecorder = new MediaRecorder(stream);
-
       mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
-
       mediaRecorder.onstop = () => {
         const blob = new Blob(audioChunks, { type: 'audio/webm' });
         const url = URL.createObjectURL(blob);
         audioPlayback.src = url;
         audioPlayback.style.display = 'block';
-
         const file = new File([blob], 'grabacion.webm', { type: 'audio/webm' });
         const dt = new DataTransfer();
         for (let i = 0; i < fileInput.files.length; i++) dt.items.add(fileInput.files[i]);
         dt.items.add(file);
         fileInput.files = dt.files;
-
         audioChunks = [];
       };
-
       mediaRecorder.start();
       startBtn.disabled = true;
       stopBtn.disabled = false;

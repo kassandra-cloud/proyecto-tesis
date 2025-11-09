@@ -19,33 +19,32 @@
 
 <body>
 
-  <nav class="navbar top-navbar">
+  <nav class="navbar navbar-expand top-navbar position-relative">
     <div class="container-fluid">
       
       <button class="btn btn-outline-light" type="button" data-bs-toggle="offcanvas" data-bs-target="#sidebarOffcanvas" aria-controls="sidebarOffcanvas">
         <i class="fas fa-bars"></i> </button>
 
-      <a class="navbar-brand d-flex align-items-center" href="{% url 'home' %}">
-        <img src="{% static 'img/logo2.jpeg' %}" alt="Logo Junta de Vecinos" class="me-2"
+      <a class="navbar-brand d-flex align-items-center position-absolute start-50 translate-middle-x" href="{% url 'home' %}">
+        <img src="{% static 'img/logo3.png' %}" alt="Logo Junta de Vecinos" class="me-2"
           style="height:40px; width:auto;">
         <span class="fw-semibold text-white">Junta de vecinos “Villa vista al mar”</span>
       </a>
 
-      <ul class="navbar-nav ms-auto align-items-lg-center">
+      <ul class="navbar-nav ms-auto">
         {% if user.is_authenticated %}
         <li class="nav-item dropdown ms-lg-3">
-          <a class="nav-link dropdown-toggle" href="#" id="userMenu" role="button" data-bs-toggle="dropdown"
-            aria-expanded="false">
-            {{ user.username }}
+
+          <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" id="userMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <div class="text-center" style="line-height: 1;">
+                <span class="d-block">{{ user.username }}</span>
+                {% if user.perfil %}
+                    <small class="text-white" style="font-size: 0.75em; opacity: 0.8;">Sesión iniciada • {{ user.perfil.get_rol_display }}</small>
+                {% endif %}
+            </div>
           </a>
+          
           <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userMenu">
-            <li class="dropdown-item-text small">
-              Sesión iniciada
-              {% if user.perfil %}
-              • <span class="badge bg-secondary">{{ user.perfil.get_rol_display }}</span>
-              {% endif %}
-            </li>
-            <li><hr class="dropdown-divider"></li>
             <li class="px-3 py-2">
               <form method="post" action="{% url 'logout' %}">
                 {% csrf_token %}

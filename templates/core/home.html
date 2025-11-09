@@ -13,42 +13,69 @@
 
     {# TOP CARDS #}
     <div class="row mb-5">
+        
         <div class="col-md-6 col-lg-2 mb-4">
-            <div class="dashboard-card card-vecinos">
-                <i class="fas fa-users icon"></i>
-                <h3>{{ total_vecinos_registrados }}</h3>
-                <p>Vecinos Registrados</p>
-            </div>
+            <a href="{% url 'lista_usuarios' %}" class="dashboard-card-link">
+                <div class="dashboard-card card-vecinos">
+                    <i class="fas fa-users icon"></i>
+                    <h3>{{ total_vecinos_registrados }}</h3>
+                    <p>Vecinos Registrados</p>
+                </div>
+            </a>
         </div>
+        
         <div class="col-md-6 col-lg-2 mb-4">
-            <div class="dashboard-card card-reuniones">
-                <i class="fas fa-calendar-alt icon"></i>
-                <h3>{{ reuniones_pendientes_mes }}</h3>
-                <p>Reuniones (Mes)</p>
-            </div>
+            <a href="{% url 'reuniones:lista_reuniones' %}" class="dashboard-card-link">
+                <div class="dashboard-card card-reuniones">
+                    <i class="fas fa-calendar-alt icon"></i>
+                    <h3>{{ reuniones_pendientes_mes }}</h3>
+                    <p>Reuniones (Mes)</p>
+                </div>
+            </a>
         </div>
-        <div class="col-md-6 col-lg-3 mb-4">
-            <div class="dashboard-card card-publicaciones">
-                <i class="fas fa-comments icon"></i>
-                <h3>{{ nuevas_publicaciones_24h }}</h3>
-                <p>Nuevas Publicaciones (24h)</p>
-            </div>
-        </div>
+        
         <div class="col-md-6 col-lg-2 mb-4">
-            <div class="dashboard-card card-votaciones">
-                <i class="fas fa-vote-yea icon"></i>
-                <h3>{{ votaciones_activas }}</h3>
-                <p>Votaciones Activas</p>
-            </div>
+            <a href="{% url 'lista_publicaciones' %}" class="dashboard-card-link">
+                <div class="dashboard-card card-publicaciones">
+                    <i class="fas fa-comments icon"></i>
+                    <h3>{{ nuevas_publicaciones_24h }}</h3>
+                    <p>Nuevas Publicaciones (24h)</p>
+                </div>
+            </a>
         </div>
-        <div class="col-md-6 col-lg-3 mb-4">
-            <div class="dashboard-card card-talleres">
-                <i class="fas fa-chalkboard-teacher icon"></i>
-                <h3>{{ talleres_con_cupos }}</h3>
-                <p>Talleres con Cupos</p>
-            </div>
+        
+        <div class="col-md-6 col-lg-2 mb-4">
+            <a href="{% url 'votaciones:lista_votaciones' %}" class="dashboard-card-link">
+                <div class="dashboard-card card-votaciones">
+                    <i class="fas fa-vote-yea icon"></i>
+                    <h3>{{ votaciones_activas }}</h3>
+                    <p>Votaciones Activas</p>
+                </div>
+            </a>
         </div>
+        
+        <div class="col-md-6 col-lg-2 mb-4">
+            <a href="{% url 'lista_talleres' %}" class="dashboard-card-link">
+                <div class="dashboard-card card-talleres">
+                    <i class="fas fa-chalkboard-teacher icon"></i>
+                    <h3>{{ talleres_con_cupos }}</h3>
+                    <p>Talleres con Cupos</p>
+                </div>
+            </a>
+        </div>
+        
+        <div class="col-md-6 col-lg-2 mb-4">
+            <a href="{% url 'recursos:gestionar_reservas' %}" class="dashboard-card-link">
+                <div class="dashboard-card card-reuniones">
+                    <i class="fas fa-calendar-check icon"></i>
+                    <h3>{{ solicitudes_pendientes }}</h3>
+                    <p>Solicitudes Pendientes</p>
+                </div>
+            </a>
+        </div>
+        
     </div>
+    {# FIN TOP CARDS #}
 
     {# SECCIONES CENTRALES #}
     <div class="row mb-5">
@@ -146,6 +173,12 @@
                         <h5>Gestionar Usuarios</h5>
                     </a>
                 </div>
+                <div class="col-6 mb-4">
+                    <a href="{% url 'recursos:lista_recursos' %}" class="action-button btn-anuncio"> {# Reutilizamos el color 'anuncio' #}
+                        <i class="fas fa-calendar-check icon"></i>
+                        <h5>Revisar Recursos</h5>
+                    </a>
+                </div>                
             </div>
         </div>
     </div>

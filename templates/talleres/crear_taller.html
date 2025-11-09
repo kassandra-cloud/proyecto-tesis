@@ -2,29 +2,38 @@
 
 {% block content %}
 
-{% if taller %}
-    <h1>Editar Taller: {{ taller.nombre }}</h1>
-{% else %}
-    <h1>Crear Nuevo Taller</h1>
-{% endif %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
 
-<form method="post" novalidate>
-    {% csrf_token %}
-    
-    {% for field in form %}
-        <div class="mb-3">
-            {{ field.label_tag }}
-            {{ field }}
-            {% if field.errors %}
-                <div class="invalid-feedback d-block">
-                    {{ field.errors.0 }}
-                </div>
-            {% endif %}
-        </div>
-    {% endfor %}
-    
-    <button type="submit" class="btn btn-success">Guardar Cambios</button>
-    <a href="{% url 'lista_talleres' %}" class="btn btn-secondary">Cancelar</a>
-</form>
+        <div class="card shadow-sm">
+            <div class="card-body">
 
-{% endblock %}
+                {% if taller %}
+                    <h1 class="h4 text-center">Editar Taller: {{ taller.nombre }}</h1>
+                {% else %}
+                    <h1 class="h4">Crear Nuevo Taller</h1>
+                {% endif %}
+                <hr>
+
+                <form method="post" novalidate>
+                    {% csrf_token %}
+                    
+                    {% for field in form %}
+                        <div class="mb-3">
+                            {{ field.label_tag }}
+                            {{ field }}
+                            {% if field.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ field.errors.0 }}
+                                </div>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                    
+                    <div class="d-flex gap-2 mt-4">
+                        <button type="submit" class="btn btn-success">Guardar Cambios</button>
+                        <a href="{% url 'lista_talleres' %}" class="btn btn-outline-secondary">Cancelar</a>
+                    </div>
+                </form>
+
+            </div> </div> </div> </div> {% endblock %}

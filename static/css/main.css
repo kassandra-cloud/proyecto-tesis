@@ -176,3 +176,25 @@ ESTILOS PARA LA BARRA LATERAL (OFFCANVAS)
     background-color: #f8f9fa; /* Fondo gris claro */
     min-height: calc(100vh - 70px); /* Alto completo menos el navbar */
 }
+/* --- Estilos para el Botón Flotante (FAB) --- */
+.fab {
+  position: fixed;
+  bottom: 30px;
+  right: 30px;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background-color: #0d6efd; /* Azul primario de tu navbar */
+  color: white;
+  font-size: 24px;
+  line-height: 58px; /* Ajustado para centrar el icono */
+  text-align: center;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+  z-index: 1040; /* Nivel de superposición */
+  transition: transform 0.2s ease;
+}
+
+.fab:hover {
+  transform: scale(1.05);
+  color: white;
+}

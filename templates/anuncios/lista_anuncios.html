@@ -1,44 +1,82 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<h1>Anuncios de la Directiva</h1>
 
-{% if messages %}
-    {% for message in messages %}
-        <div class="alert alert-{{ message.tags }}">{{ message }}</div>
-    {% endfor %}
-{% endif %}
+<div class="row justify-content-center">
+    <div class="col-lg-7">
 
-{% if user.is_authenticated %}
-    <a href="{% url 'anuncios:crear_anuncio' %}" class="btn btn-primary mb-3">
-        <i class="fas fa-plus"></i> Crear Nuevo Anuncio
-    </a>
-{% endif %}
+        <h1 class="text-center">Anuncios de la Directiva</h1>
+        <hr class="mb-4">
 
-<div class="list-group">
-    {% for anuncio in anuncios %}
-        <div class="list-group-item list-group-item-action flex-column align-items-start mb-3">
-            <div class="d-flex w-100 justify-content-between">
-                <h5 class="mb-1">{{ anuncio.titulo }}</h5>
-                <small>{{ anuncio.fecha_creacion|date:"d M, Y" }}</small>
-            </div>
-            <p class="mb-1">{{ anuncio.contenido|linebreaks }}</p>
-            <small>Enviado por: <strong>@{{ anuncio.autor.username }}</strong></small>
+        <div class="listado-anuncios">
+            {% for anuncio in anuncios %}
+                <div class="card shadow-sm mb-3">
+                    <div class="card-body">
+                        <div class="d-flex w-100 justify-content-between mb-1">
+                            <h5 class="card-title mb-0">{{ anuncio.titulo }}</h5>
+                            <small class="text-muted">{{ anuncio.fecha_creacion|date:"d M, Y" }}</small>
+                        </div>
+                        <p class="card-text">{{ anuncio.contenido|linebreaks }}</p>
+                        
+                        <div class="d-flex justify-content-between align-items-center">
+                            <small class="text-muted">Enviado por: <strong>@{{ anuncio.autor.username }}</strong></small>
+                            
+                            <div>
+                                <a href="{% url 'anuncios:editar_anuncio' anuncio.pk %}" class="btn btn-warning btn-sm">
+                                    <i class="fas fa-edit"></i> Editar
+                                </a>
+                                <a href="{% url 'anuncios:eliminar_anuncio' anuncio.pk %}" class="btn btn-danger btn-sm">
+                                    <i class="fas fa-trash"></i> Eliminar
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% empty %}
+                <div class="card shadow-sm">
+                    <div class="card-body text-center text-muted">
+                        No hay anuncios publicados todavía.
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
 
-            {% if user.is_authenticated %}
-            <div class="mt-2">
-                <a href="{% url 'anuncios:editar_anuncio' anuncio.pk %}" class="btn btn-warning btn-sm">
-                    <i class="fas fa-edit"></i> Editar
-                </a>
-                <a href="{% url 'anuncios:eliminar_anuncio' anuncio.pk %}" class="btn btn-danger btn-sm">
-                    <i class="fas fa-trash"></i> Eliminar
-                </a>
-            </div>
-            {% endif %}
-            </div>
-    {% empty %}
-        <p>No hay anuncios publicados todavía.</p>
-    {% endfor %}
+    </div> </div> <a href="#" class="fab" data-bs-toggle="modal" data-bs-target="#modalCrearAnuncio">
+    <i class="fas fa-plus"></i>
+</a>
+
+<div class="modal fade" id="modalCrearAnuncio" tabindex="-1" aria-labelledby="modalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            
+            <form method="post" action="{% url 'anuncios:crear_anuncio' %}" novalidate>
+                {% csrf_token %}
+                
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalLabel">Crear Nuevo Anuncio</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+
+                <div class="modal-body">
+                    <p class="text-muted small">Este mensaje se enviará como una notificación a los vecinos en la aplicación móvil.</p>
+                    <div class="mb-3">
+                        {{ form.titulo.label_tag }}
+                        {{ form.titulo }}
+                    </div>
+                    <div class="mb-3">
+                        {{ form.contenido.label_tag }}
+                        {{ form.contenido }}
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Enviar Anuncio</button>
+                </div>
+            </form>
+            
+        </div>
+    </div>
 </div>
 
 {% endblock %}

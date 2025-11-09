@@ -9,12 +9,15 @@ from .forms import TallerForm
 def lista_talleres(request):
     """
     Muestra todos los talleres. 
-    (Esta era la función que faltaba)
     """
     talleres = Taller.objects.all()
-    
+
+    # --- LÍNEAS AÑADIDAS ---
+    form = TallerForm() # Formulario vacío para el modal
+
     context = {
         'talleres': talleres,
+        'form': form, # Pasamos el form al template
     }
     return render(request, 'talleres/lista_talleres.html', context)
 

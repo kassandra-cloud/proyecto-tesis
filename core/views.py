@@ -9,6 +9,7 @@ from django.utils import timezone
 from django.db.models import Count, F
 from datetime import timedelta
 import calendar
+from recursos.models import Reserva
 
 def home(request):
     return render(request, "core/home.html", {"titulo": "Proyecto de Tesis funcionando"})
@@ -56,6 +57,11 @@ def home(request):
         cupos_totales__gt=F('num_inscritos') # Filtramos donde cupos > inscritos
     ).count()
 
+    # Tarjeta 6: Solicitudes de Recursos Pendientes (NUEVA)
+    solicitudes_pendientes = Reserva.objects.filter(
+        estado=Reserva.Estado.PENDIENTE
+    ).count()
+
     # --- 2. Secciones de Actividad ---
     
     # Actividad en el Foro (3 publicaciones más recientes)
@@ -87,12 +93,14 @@ def home(request):
         'nuevas_publicaciones_24h': nuevas_publicaciones_24h,
         'votaciones_activas': votaciones_activas,
         'talleres_con_cupos': talleres_con_cupos,
+        
 
         # Datos para las secciones
         'ultimas_publicaciones_foro': ultimas_publicaciones_foro,
         'proximas_reuniones': proximas_reuniones,
         'votaciones_activas_list': votaciones_activas_list,
         'talleres_con_cupos_list': talleres_con_cupos_list,
+        'solicitudes_pendientes': solicitudes_pendientes,
     }
     
     # Renderizamos tu plantilla original 'core/home.html' con el nuevo contexto

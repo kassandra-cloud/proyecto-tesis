@@ -11,7 +11,7 @@
     justify-content: center;
     align-items: center;
 }
-.dashboard-card:hover { transform: translateY(-5px); }
+
 .dashboard-card .icon { font-size: 3em; margin-bottom: 10px; }
 .dashboard-card h3 { font-size: 2.5em; margin-bottom: 5px; }
 .dashboard-card p { font-size: 1.1em; color: #666; margin: 0; }
@@ -74,3 +74,21 @@
 .btn-reunion:hover { background-color: #218838; }
 .btn-votacion:hover { background-color: #5a28a3; }
 .btn-usuarios:hover { background-color: #e0a800; }
+
+/* --- INICIO CÓDIGO AÑADIDO --- */
+
+/* 1. Estilo para el enlace que envuelve la tarjeta */
+a.dashboard-card-link {
+    text-decoration: none; /* Quita el subrayado azul */
+    color: inherit;        /* Hereda el color de texto normal */
+}
+
+a.dashboard-card-link:hover {
+    color: inherit; /* Mantiene el color de texto al pasar el mouse */
+}
+
+/* 2. Aplicamos el efecto de "levantar" al 'hover' del enlace */
+a.dashboard-card-link:hover .dashboard-card {
+    transform: translateY(-5px);
+}
+/* --- FIN CÓDIGO AÑADIDO --- */

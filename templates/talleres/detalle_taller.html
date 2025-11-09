@@ -1,26 +1,68 @@
 {% extends 'base.html' %}
 
 {% block content %}
-    
-    <h1>{{ taller.nombre }}</h1>
-    <p>{{ taller.descripcion }}</p>
-    <hr>
-    <h3>Información del Taller</h3>
-    <ul class="list-group">
-        <li class="list-group-item">Cupos Totales: {{ taller.cupos_totales }}</li>
-        <li class="list-group-item">Inscritos: {{ taller.inscritos_count }}</li>
-        <li class="list-group-item">Cupos Disponibles: <span class="badge bg-success rounded-pill">{{ taller.cupos_disponibles }}</span></li>
-    </ul>
 
-    <hr>
-    <h3 class="mt-4">Lista de Vecinos Inscritos</h3>
-    <table class="table table-striped">
-        </table>
+<div class="row justify-content-center">
+    <div class="col-lg-9"> <div class="card shadow-sm">
+            <div class="card-body">
 
-    <div class="mt-4">
-        <a href="{% url 'lista_talleres' %}" class="btn btn-primary">Volver a la lista</a>
-        <a href="{% url 'editar_taller' taller.id %}" class="btn btn-warning">Editar Taller</a>
-        <a href="{% url 'eliminar_taller' taller.id %}" class="btn btn-danger">Eliminar Taller</a>
-    </div>
-    
-{% endblock %}
+                <h1 class="h4 text-center">{{ taller.nombre }}</h1>
+                <p class="text-muted text-center">{{ taller.descripcion }}</p>
+                <hr>
+
+                <h3 class="h5 mt-4 text-center">Información del Taller</h3>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item d-flex justify-content-between align-items-center ps-0">
+                        Cupos Totales:
+                        <span class="badge bg-secondary rounded-pill">{{ taller.cupos_totales }}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center ps-0">
+                        Inscritos:
+                        <span class="badge bg-primary rounded-pill">{{ taller.inscritos_count }}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center ps-0">
+                        Cupos Disponibles:
+                        {% if taller.cupos_disponibles > 0 %}
+                            <span class="badge bg-success rounded-pill">{{ taller.cupos_disponibles }}</span>
+                        {% else %}
+                            <span class="badge bg-danger rounded-pill">0</span>
+                        {% endif %}
+                    </li>
+                </ul>
+
+                <hr>
+
+                <h3 class="h5 mt-4 text-center">Lista de Vecinos Inscritos</h3>
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Vecino (Username)</th>
+                                <th>RUT</th>
+                                <th>Fecha de Inscripción</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for inscrito in inscritos %}
+                                <tr>
+                                    <td>{{ inscrito.vecino.username }}</td>
+                                    <td>{{ inscrito.vecino.perfil.rut|default:"N/A" }}</td>
+                                    <td>{{ inscrito.fecha_inscripcion|date:"d M, Y H:i" }}</td>
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="3" class="text-center text-muted py-3">
+                                        Aún no hay vecinos inscritos en este taller.
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+            </div> <div class="card-footer bg-light d-flex gap-2">
+                <a href="{% url 'lista_talleres' %}" class="btn btn-outline-secondary">← Volver a la lista</a>
+                <a href="{% url 'editar_taller' taller.id %}" class="btn btn-warning">Editar Taller</a>
+                <a href="{% url 'eliminar_taller' taller.id %}" class="btn btn-danger">Eliminar Taller</a>
+            </div>
+        </div> </div> </div> {% endblock %}

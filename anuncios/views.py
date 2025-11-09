@@ -11,10 +11,13 @@ def lista_anuncios(request):
     Muestra todos los anuncios enviados.
     """
     anuncios = Anuncio.objects.all()
-    
+
+    # --- LÍNEA AÑADIDA ---
+    form = AnuncioForm() # Formulario vacío para el modal de "Crear"
+
     context = {
         'anuncios': anuncios,
-        # Pasamos 'user.is_authenticated' automáticamente a la plantilla
+        'form': form, # --- LÍNEA AÑADIDA ---
     }
     return render(request, 'anuncios/lista_anuncios.html', context)
 
