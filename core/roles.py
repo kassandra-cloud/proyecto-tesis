@@ -64,4 +64,7 @@ ROLE_MATRIX: Dict[str, Dict[str, List[str]]] = {
     "notas": {
         "admin":  [PRESIDENTE],
     },
+    "foro": {
+        "moderar": [PRESIDENTE, SECRETARIA, TESORERO, SUPLENTE],
+    },
 }

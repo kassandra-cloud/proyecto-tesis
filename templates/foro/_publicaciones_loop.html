@@ -1,0 +1,104 @@
+{% load can %}
+
+{% for publicacion in publicaciones %}
+    <div class="card shadow-sm mb-4" id="pub-{{ publicacion.id }}">
+        <div class="card-body pb-0">
+            <article class="post">
+                <p class="mb-1 d-flex justify-content-between align-items-center">
+                    <span>
+                        <strong>@{{ publicacion.autor.username }}</strong>
+                        <small class="text-muted">({{ publicacion.fecha_creacion|date:"d/m/Y H:i" }})</small>
+                    </span>
+                    
+                    {% user_can 'foro' 'moderar' as puede_moderar %}
+                    {% if puede_moderar %}
+                        <form class="m-0"
+                              hx-post="{% url 'alternar_publicacion' publicacion.id %}"
+                              hx-target=".listado-publicaciones" 
+                              hx-swap="innerHTML">
+                            {% csrf_token %}
+                            {% if publicacion.visible %}
+                                <button type="submit" class="btn btn-sm btn-outline-warning">Ocultar Publicación</button>
+                            {% else %}
+                                <button type="submit" class="btn btn-sm btn-outline-success">Mostrar Publicación</button>
+                            {% endif %}
+                        </form>
+                    {% endif %}
+                    </p>
+                
+                {% if not publicacion.visible %}
+                    <div class="alert alert-warning small p-2">
+                      Esta publicación está oculta para los vecinos.
+                    </div>
+                {% endif %}
+                
+                <p>{{ publicacion.contenido|linebreaks }}</p>
+
+                {% if publicacion.adjuntos.all %}
+                    <p class="fw-semibold">Archivos Adjuntos:</p>
+                    <ul class="mb-3 list-unstyled">
+                        {% for adjunto in publicacion.adjuntos.all %}
+                            <li class="mb-2">
+                                {% if adjunto.tipo_archivo == "imagen" %}
+                                    <img src="{{ adjunto.archivo.url }}" alt="Imagen" 
+                                         style="max-width: 100%; height: auto; border-radius: 8px; max-height: 500px;" 
+                                         loading="lazy">
+                                {% elif adjunto.tipo_archivo == "audio" %}
+                                    <audio controls class="w-100">
+                                        <source src="{{ adjunto.archivo.url }}">
+                                    </audio>
+                                {% elif adjunto.tipo_archivo == "video" %}
+                                    <video controls width="100%" style="max-width: 400px;" preload="metadata" loading="lazy">
+                                        <source src="{{ adjunto.archivo.url }}">
+                                    </video>
+                                {% else %}
+                                    <a href="{{ adjunto.archivo.url }}" target="_blank">{{ adjunto.archivo.name }}</a>
+                                {% endif %}
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+
+                <div class="d-flex align-items-center mb-2">
+                    <h5 class="mb-0 h6">Comentarios</h5>
+                    <span class="badge bg-secondary ms-2"
+                          id="badge-count-{{ publicacion.id }}"
+                          hx-get="{% url 'comentarios_partial' publicacion.id %}"
+                          hx-trigger="load"
+                          hx-swap="none"
+                          hx-on::after-on-load="this.textContent = (document.querySelector('#comentarios-list-{{ publicacion.id }}')?.childElementCount || 0)">
+                      {{ publicacion.comentarios.count }}
+                    </span>
+                </div>
+
+                <div id="comentarios-wrapper-{{ publicacion.id }}"
+                     hx-get="{% url 'comentarios_partial' publicacion.id %}"
+                     hx-trigger="load"
+                     hx-target="#comentarios-wrapper-{{ publicacion.id }}"
+                     hx-swap="outerHTML">
+                    {% include "foro/_comentarios_ul.html" with publicacion=publicacion comentarios=publicacion.comentarios.all %}
+                </div>
+            </article>
+        </div> <div class="card-footer bg-light">
+            <form
+              method="POST"
+              action="{% url 'comentar' publicacion.id %}"
+              hx-post="{% url 'comentar' publicacion.id %}"
+              hx-target="#comentarios-wrapper-{{ publicacion.id }}"
+              hx-swap="outerHTML"
+            >
+                {% csrf_token %}
+                <div class="input-group">
+                    <textarea class="form-control" name="contenido" rows="2" placeholder="Escribe un comentario..."></textarea>
+                    <button class="btn btn-primary" type="submit">Enviar</button>
+                </div>
+            </form>
+        </div>
+    </div> 
+{% empty %}
+    <div class="card shadow-sm">
+        <div class="card-body text-center text-muted">
+            No hay publicaciones todavía. ¡Sé el primero!
+        </div>
+    </div>
+{% endfor %}

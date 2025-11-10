@@ -1,90 +1,20 @@
 {% extends 'base.html' %}
+{% load can %}
 
 {% block content %}
 
 <div class="row justify-content-center">
-    <div class="col-lg-9"> <h1>Foro de la Junta de Vecinos</h1>
+    <div class="col-lg-9"> <h1 class="text-center">Foro de la Junta de Vecinos</h1>
         <hr>
 
+        <h2 class="text-center">Publicaciones</h2>
         <div class="listado-publicaciones">
-            <h2>Publicaciones</h2>
+            {% include "foro/_publicaciones_loop.html" %}
+        </div>
+    </div>
+</div> 
 
-            {% for publicacion in publicaciones %}
-                <div class="card shadow-sm mb-4" id="pub-{{ publicacion.id }}">
-                    <div class="card-body pb-0">
-                        <article class="post">
-                            <p class="mb-1">
-                                <strong>@{{ publicacion.autor.username }}</strong>
-                                <small class="text-muted">({{ publicacion.fecha_creacion|date:"d/m/Y H:i" }})</small>
-                            </p>
-                            <p>{{ publicacion.contenido|linebreaks }}</p>
-
-                            {% if publicacion.adjuntos.all %}
-                                <p class="fw-semibold">Archivos Adjuntos:</p>
-                                <ul class="mb-3 list-unstyled">
-                                    {% for adjunto in publicacion.adjuntos.all %}
-                                        <li class="mb-2">
-                                            {% if adjunto.tipo_archivo == "imagen" %}
-                                                <img src="{{ adjunto.archivo.url }}" alt="Imagen" 
-                                                     style="max-width: 100%; height: auto; border-radius: 8px; max-height: 500px;" 
-                                                     loading="lazy">
-                                            {% elif adjunto.tipo_archivo == "audio" %}
-                                                <audio controls class="w-100">
-                                                    <source src="{{ adjunto.archivo.url }}">
-                                                </audio>
-                                            {% elif adjunto.tipo_archivo == "video" %}
-                                                <video controls width="100%" style="max-width: 400px;" preload="metadata" loading="lazy">
-                                                    <source src="{{ adjunto.archivo.url }}">
-                                                </video>
-                                            {% else %}
-                                                <a href="{{ adjunto.archivo.url }}" target="_blank">{{ adjunto.archivo.name }}</a>
-                                            {% endif %}
-                                        </li>
-                                    {% endfor %}
-                                </ul>
-                            {% endif %}
-
-                            <div class="d-flex align-items-center mb-2">
-                                <h5 class="mb-0 h6">Comentarios</h5>
-                                <span class="badge bg-secondary ms-2"
-                                      id="badge-count-{{ publicacion.id }}"
-                                      hx-get="{% url 'comentarios_partial' publicacion.id %}"
-                                      hx-trigger="load, every 3s"
-                                      hx-swap="none"
-                                      hx-on::after-on-load="this.textContent = (document.querySelector('#comentarios-list-{{ publicacion.id }}')?.childElementCount || 0)">
-                                  {{ publicacion.comentarios.count }}
-                                </span>
-                            </div>
-
-                            <div id="comentarios-wrapper-{{ publicacion.id }}"
-                                 hx-get="{% url 'comentarios_partial' publicacion.id %}"
-                                 hx-trigger="load, every 3s"
-                                 hx-target="#comentarios-wrapper-{{ publicacion.id }}"
-                                 hx-swap="outerHTML">
-                                {% include "foro/_comentarios_ul.html" with publicacion=publicacion comentarios=publicacion.comentarios.all %}
-                            </div>
-                        </article>
-                    </div> <div class="card-footer bg-light">
-                        <form
-                          hx-post="{% url 'comentar' publicacion.id %}"
-                          hx-target="#comentarios-wrapper-{{ publicacion.id }}"
-                          hx-swap="outerHTML"
-                        >
-                            {% csrf_token %}
-                            <div class="input-group">
-                                <input type="text" class="form-control" name="contenido" placeholder="Escribe un comentario...">
-                                <button class="btn btn-primary" type="submit">Enviar</button>
-                            </div>
-                        </form>
-                    </div>
-                </div> {% empty %}
-                <div class="card shadow-sm">
-                    <div class="card-body text-center text-muted">
-                        No hay publicaciones todavía. ¡Sé el primero!
-                    </div>
-                </div>
-            {% endfor %}
-        </div> </div> </div> <a href="#" class="fab" data-bs-toggle="modal" data-bs-target="#modalNuevaPublicacion">
+<a href="#" class="fab" data-bs-toggle="modal" data-bs-target="#modalNuevaPublicacion">
     <i class="fas fa-plus"></i>
 </a>
 

@@ -20,7 +20,7 @@
 
   function actualizarDV() {
     const cuerpo = rutCuerpo.value.replace(/\D/g, ""); // solo dígitos
-    if (cuerpo.length >= 7 && cuerpo.length <= 9) {
+    if (cuerpo.length >= 7 && cuerpo.length <= 8) {
       rutDv.value = dvMod11(cuerpo);
     } else {
       rutDv.value = "";

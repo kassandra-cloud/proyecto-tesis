@@ -1,16 +1,42 @@
-{# templates/foro/_comentarios.html #}
+{% load can %}
+
+{# templates/foro/_comentarios_ul.html #}
 <div id="comentarios-wrapper-{{ publicacion.id }}">
   <ul class="list-unstyled mb-3" id="comentarios-list-{{ publicacion.id }}">
-    {# Comentarios de primer nivel #}
+    
+    {# Comentarios de primer nivel (variable 'c') #}
     {% for c in comentarios %}
       {% if not c.parent %}
         <li class="mb-3">
           <div class="small text-muted">
             <strong>@{{ c.autor.username }}</strong> · {{ c.fecha_creacion|date:"d/m/Y H:i" }}
           </div>
-          <div class="mb-1">{{ c.contenido|linebreaksbr }}</div>
+          
+          <div class="mb-1">
+             {{ c.contenido|linebreaksbr }}
+             {% if not c.visible %}
+                <span class="badge bg-warning text-dark ms-2">Oculto</span>
+             {% endif %}
+          </div>
 
-          <a href="#" class="text-decoration-none small" data-reply="{{ c.id }}">Responder</a>
+          <div class="d-flex gap-2 align-items-center">
+              <a href="#" class="text-decoration-none small" data-reply="{{ c.id }}">Responder</a>
+              
+              {% user_can 'foro' 'moderar' as puede_moderar %}
+
+              {% if c.visible and request.user == c.autor or c.visible and puede_moderar %}
+              <form class="m-0" 
+                    hx-post="{% url 'eliminar_comentario' c.id %}"
+                    hx-target="#comentarios-wrapper-{{ publicacion.id }}"
+                    hx-swap="outerHTML"
+                    hx-confirm="¿Seguro que quieres eliminar este comentario?">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-link text-danger p-0 m-0" style="font-size: 0.8em;">
+                    Eliminar
+                  </button>
+              </form>
+              {% endif %}
+          </div>
 
           {# Formulario para responder a este comentario #}
           <form id="reply-form-{{ c.id }}"
@@ -21,14 +47,14 @@
                 hx-target="#comentarios-wrapper-{{ publicacion.id }}"
                 hx-swap="outerHTML">
             {% csrf_token %}
-            <input type="hidden" name="parent" value="{{ c.id }}">
+            <input type="hidden" name="parent_id" value="{{ c.id }}">
             <div class="input-group mt-2">
               <textarea name="contenido" class="form-control" rows="1" placeholder="Responder…"></textarea>
               <button class="btn btn-outline-primary" type="submit">Enviar</button>
             </div>
           </form>
 
-          {# Respuestas (segundo nivel) #}
+          {# Respuestas (segundo nivel - variable 'r') #}
           <ul class="list-unstyled ms-4 mt-2">
             {% for r in comentarios %}
               {% if r.parent_id == c.id %}
@@ -36,8 +62,30 @@
                   <div class="small text-muted">
                     <strong>@{{ r.autor.username }}</strong> · {{ r.fecha_creacion|date:"d/m/Y H:i" }}
                   </div>
-                  <div class="mb-1">{{ r.contenido|linebreaksbr }}</div>
-                  <a href="#" class="text-decoration-none small" data-reply="{{ r.id }}">Responder</a>
+                  
+                  <div class="mb-1">
+                    {{ r.contenido|linebreaksbr }}
+                    {% if not r.visible %}
+                        <span class="badge bg-warning text-dark ms-2">Oculto</span>
+                    {% endif %}
+                  </div>
+
+                  <div class="d-flex gap-2 align-items-center">
+                      <a href="#" class="text-decoration-none small" data-reply="{{ r.id }}">Responder</a>
+                      
+                      {% if r.visible and request.user == r.autor or r.visible and puede_moderar %}
+                      <form class="m-0" 
+                            hx-post="{% url 'eliminar_comentario' r.id %}"
+                            hx-target="#comentarios-wrapper-{{ publicacion.id }}"
+                            hx-swap="outerHTML"
+                            hx-confirm="¿Seguro que quieres eliminar este comentario?">
+                          {% csrf_token %}
+                          <button type="submit" class="btn btn-link text-danger p-0 m-0" style="font-size: 0.8em;">
+                            Eliminar
+                          </button>
+                      </form>
+                      {% endif %}
+                  </div>
 
                   <form id="reply-form-{{ r.id }}"
                         method="POST"
@@ -47,7 +95,7 @@
                         hx-target="#comentarios-wrapper-{{ publicacion.id }}"
                         hx-swap="outerHTML">
                     {% csrf_token %}
-                    <input type="hidden" name="parent" value="{{ r.id }}">
+                    <input type="hidden" name="parent_id" value="{{ r.id }}">
                     <div class="input-group mt-2">
                       <textarea name="contenido" class="form-control" rows="1" placeholder="Responder…"></textarea>
                       <button class="btn btn-outline-primary" type="submit">Enviar</button>

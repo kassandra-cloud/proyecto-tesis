@@ -96,8 +96,22 @@
                   {% if request.user.pk != u.pk and not u.is_superuser %}
                     <form action="{% url 'deshabilitar' u.pk %}" method="post" class="m-0 w-100">
                       {% csrf_token %}
-                      <button type="submit" class="btn btn-sm btn-outline-danger w-100"
-                              onclick="return confirm('¿Deshabilitar a {{ u.username }}?');">
+                      <button type="button" class="btn btn-sm btn-outline-danger w-100" 
+                              onclick="event.preventDefault(); const form = this.closest('form'); 
+                                      Swal.fire({
+                                        title: '¿Deshabilitar a {{ u.username }}?',
+                                        text: 'El usuario no podrá iniciar sesión.',
+                                        icon: 'warning',
+                                        showCancelButton: true,
+                                        confirmButtonColor: '#d33',
+                                        cancelButtonColor: '#6c757d',
+                                        confirmButtonText: 'Sí, deshabilitar',
+                                        cancelButtonText: 'Cancelar'
+                                      }).then((result) => {
+                                        if (result.isConfirmed) {
+                                          form.submit();
+                                        }
+                                      })">
                         Deshabilitar
                       </button>
                     </form>
@@ -171,8 +185,22 @@
                 <div class="col-6 d-grid">
                   <form action="{% url 'restaurar' u.pk %}" method="post" class="m-0 w-100">
                     {% csrf_token %}
-                    <button type="submit" class="btn btn-sm btn-success w-100"
-                            onclick="return confirm('¿Restaurar a {{ u.username }}?');">
+                    <button type="button" class="btn btn-sm btn-success w-100"
+                            onclick="event.preventDefault(); const form = this.closest('form');
+                                    Swal.fire({
+                                      title: '¿Restaurar a {{ u.username }}?',
+                                      text: 'El usuario podrá volver a iniciar sesión.',
+                                      icon: 'question',
+                                      showCancelButton: true,
+                                      confirmButtonColor: '#198754',
+                                      cancelButtonColor: '#6c757d',
+                                      confirmButtonText: 'Sí, restaurar',
+                                      cancelButtonText: 'Cancelar'
+                                    }).then((result) => {
+                                      if (result.isConfirmed) {
+                                        form.submit();
+                                      }
+                                    })">
                       Restaurar
                     </button>
                   </form>

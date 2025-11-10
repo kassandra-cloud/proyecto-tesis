@@ -64,7 +64,6 @@
   </nav>
 
   <div class="offcanvas offcanvas-start sidebar-offcanvas" tabindex="-1" id="sidebarOffcanvas" aria-labelledby="sidebarLabel">
-    
     <div class="offcanvas-header">
       <h5 class="offcanvas-title" id="sidebarLabel">Menú de Navegación</h5>
       <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
@@ -144,23 +143,45 @@
   <main class="main-content">
     <div class="container py-4">
       
-      {% if messages %}
-      <div class="container-fluid mb-3">
-        {% for m in messages %}
-        <div class="alert {% if m.tags == 'error' %}alert-danger{% else %}alert-{{ m.tags|default:'secondary' }}{% endif %} 
-                     alert-dismissible fade show mb-2" role="alert">
-          {{ m }}
-          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
-        </div>
-        {% endfor %}
-      </div>
-      {% endif %}
-      
       {% block content %}{% endblock %}
     </div>
-  </main>
+</main>
 
+  <script src="https://unpkg.com/htmx.org@1.9.10" integrity="sha384-D1Kt99CQMDuVetoL1lrYwg5t+9QdHe7NLX/SoJYkXDFfX37iInKRy5xLSi8nO7UC" crossorigin="anonymous"></script>
+
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  
   {% block extra_js %}{% endblock %}
-</body>
 
+  {% if messages %}
+  <script>
+    // Espera a que la página cargue
+    document.addEventListener('DOMContentLoaded', function() {
+      
+      // Configura el estilo del "Toast" de SweetAlert
+      const Toast = Swal.mixin({
+        toast: true,
+        position: 'top-end', // Arriba a la derecha
+        showConfirmButton: false,
+        timer: 3500, // Duración de 3.5 segundos
+        timerProgressBar: true,
+        didOpen: (toast) => {
+          toast.addEventListener('mouseenter', Swal.stopTimer);
+          toast.addEventListener('mouseleave', Swal.resumeTimer);
+        }
+      });
+
+      // Itera sobre los mensajes que envió Django
+      {% for m in messages %}
+        Toast.fire({
+          // Asigna un ícono según la "etiqueta" del mensaje
+          icon: '{% if m.tags == "error" %}error{% elif m.tags == "success" %}success{% elif m.tags == "warning" %}warning{% else %}info{% endif %}',
+          // Muestra el texto del mensaje
+          title: '{{ m|escapejs }}'
+        });
+      {% endfor %}
+    });
+  </script>
+  {% endif %}
+  </body>
 </html>

@@ -10,6 +10,8 @@ urlpatterns = [
     path("foro-web/", views.foro_web, name="foro_web"),
     path("<int:publicacion_id>/comentar/", views.comentar, name="comentar"),
     path("<int:publicacion_id>/comentarios/partial/", views.comentarios_partial, name="comentarios_partial"),
+    path("publicacion/<int:pk>/alternar/", views.alternar_publicacion, name="alternar_publicacion"),
+    path("comentario/<int:pk>/eliminar/", views.eliminar_comentario, name="eliminar_comentario"),
 
     # ---------------- API (COINCIDE CON ANDROID) ----------------
     # GET /foro/api/v1/publicaciones/

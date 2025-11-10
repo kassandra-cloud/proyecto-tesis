@@ -9,6 +9,8 @@ class Publicacion(models.Model):
     contenido = models.TextField()
     fecha_creacion = models.DateTimeField(auto_now_add=True)
 
+    visible = models.BooleanField(default=True, db_index=True)
+
     def __str__(self):
         return f'Publicación de {self.autor.username}'
 
@@ -40,6 +42,8 @@ class Comentario(models.Model):
     contenido = models.TextField()
     parent = models.ForeignKey("self", null=True, blank=True, on_delete=models.CASCADE, related_name="respuestas")
     fecha_creacion = models.DateTimeField(auto_now_add=True)
+
+    visible = models.BooleanField(default=True, db_index=True)
 
     class Meta:
         ordering = ["fecha_creacion"]

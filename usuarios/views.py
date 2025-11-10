@@ -96,7 +96,7 @@ def lista_usuarios(request):
     next_dir = "desc" if dir_ == "asc" else "asc"
 
     # Base query con perfil asociado
-    base = User.objects.select_related("perfil")
+    base = User.objects.select_related("perfil").filter(is_superuser=False)
     base = _aplicar_busqueda(base, q)
     base = _aplicar_orden(base, sort, dir_)
 
