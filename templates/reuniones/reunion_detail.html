@@ -5,48 +5,276 @@
 
 {% block content %}
 <div class="card shadow-sm">
-    <div class="card-header">
-        <h1 class="h4 mb-0">{{ reunion.titulo }}</h1>
-    </div>
-    <div class="card-body">
-        <p><strong>Tipo:</strong> {{ reunion.tipo }}</p>
-        <p><strong>Fecha y Hora:</strong> {{ reunion.fecha|date:"d/m/Y H:i" }} hrs</p>
+  <div class="card-header">
+    <h1 class="h4 mb-0">{{ reunion.titulo }}</h1>
+  </div>
 
-        <h5 class="mt-4">Tabla de Contenidos (Temas a tratar)</h5>
-        <div class="p-3 bg-light rounded border">
-            {{ reunion.tabla|linebreaks }}
-        </div>
-        
-        {% if reunion.acta and reunion.acta.contenido %}
-        <h5 class="mt-4">Contenido del Acta (Previsualización)</h5>
+  <div class="card-body">
+    <p><strong>Tipo:</strong> {{ reunion.tipo }}</p>
+    <p><strong>Fecha y Hora:</strong> {{ reunion.fecha|date:"d/m/Y H:i" }} hrs</p>
+
+    <h5 class="mt-4">Tabla de Contenidos (Temas a tratar)</h5>
+    <div class="p-3 bg-light rounded border">
+      {{ reunion.tabla|linebreaks }}
+    </div>
+
+    {% user_can 'actas' 'edit' as puede_editar_acta %}
+    <h5 class="mt-4">Contenido del Acta (Previsualización)</h5>
+
+    {% if puede_editar_acta %}
+      <!-- Controles de Transcripción -->
+      <div class="d-flex align-items-center gap-2 mb-2">
+        <button id="btnStartSTT" class="btn btn-danger">🎙️ Iniciar Transcripción</button>
+        <button id="btnStopSTT"  class="btn btn-outline-secondary" disabled>⏹️ Detener</button>
+        <span id="sttStatus" class="text-muted">Micrófono inactivo</span>
+      </div>
+      <div class="form-text mb-2">
+        <strong>Parcial:</strong> <span id="sttPartial" style="opacity:.8"></span>
+      </div>
+
+      <!-- Textarea: prioriza BORRADOR; si no hay, usa contenido del acta -->
+      <textarea id="contenido_acta" class="form-control" rows="12"
+        placeholder="Aquí aparecerá la transcripción en vivo y puedes editar antes de guardar.">{% if reunion.acta %}{% if reunion.acta.transcripcion_borrador %}{{ reunion.acta.transcripcion_borrador }}{% else %}{{ reunion.acta.contenido }}{% endif %}{% endif %}</textarea>
+
+      <!-- BOTONES: Guardar + Limpiar -->
+      <div class="d-flex align-items-center gap-2 mt-2">
+        <button id="btnGuardarSolo" class="btn btn-success">Guardar</button>
+        <button id="btnLimpiar" class="btn btn-outline-danger">Limpiar</button>
+        <span id="saveStatus" class="text-muted small ms-2"></span>
+      </div>
+
+    {% else %}
+      {% if reunion.acta and reunion.acta.contenido %}
         <div class="p-3 bg-white rounded border" style="white-space: pre-wrap;">
-            {{ reunion.acta.contenido|linebreaks }}
+          {{ reunion.acta.contenido|linebreaks }}
         </div>
-        {% else %}
-        <div class="alert alert-info mt-4">
-            Aún no se ha redactado el acta para esta reunión.
-        </div>
-        {% endif %}
+      {% else %}
+        <div class="alert alert-info">Aún no se ha redactado el acta para esta reunión.</div>
+      {% endif %}
+    {% endif %}
 
-        <hr>
-        <div class="d-flex gap-2">
-            <a href="{% url 'reuniones:lista_reuniones' %}" class="btn btn-secondary">← Volver a la lista</a>
+    <hr>
+    <div class="d-flex gap-2">
+      <a href="{% url 'reuniones:lista_reuniones' %}" class="btn btn-secondary">← Volver a la lista</a>
 
-            {% user_can 'reuniones' 'asistencia' as puede_pasar_lista %}
-            {% if puede_pasar_lista %}
-            <a href="{% url 'reuniones:lista_asistencia' reunion.pk %}" class="btn btn-primary">Registrar Asistencia</a>
-            {% endif %}
-            {% user_can 'actas' 'edit' as puede_editar_acta %}
-            {% if puede_editar_acta %}
-            <a href="{% url 'reuniones:editar_acta' reunion.pk %}" class="btn btn-info">Editar Acta</a>
-            {% endif %}
-            {% if reunion.acta %} {# Mostramos el botón solo si existe un acta #}
-            <a href="{% url 'reuniones:exportar_acta_pdf' reunion.pk %}" class="btn btn-success">Exportar a PDF</a>
-            {% endif %}
-        </div>
+      {% user_can 'reuniones' 'asistencia' as puede_pasar_lista %}
+      {% if puede_pasar_lista %}
+        <a href="{% url 'reuniones:lista_asistencia' reunion.pk %}" class="btn btn-primary">Registrar Asistencia</a>
+      {% endif %}
+
+      {% if puede_editar_acta %}
+        <a href="{% url 'reuniones:editar_acta' reunion.pk %}" class="btn btn-info">Editar Acta</a>
+      {% endif %}
+
+      {% if reunion.acta %}
+        <a href="{% url 'reuniones:exportar_acta_pdf' reunion.pk %}" class="btn btn-success">Exportar a PDF</a>
+      {% endif %}
     </div>
-    <div class="card-footer text-muted small">
-        Reunión creada por {{ reunion.creada_por.username }} el {{ reunion.creada_el|date:"d/m/Y" }}
-    </div>
+  </div>
+
+  <div class="card-footer text-muted small">
+    Reunión creada por {{ reunion.creada_por.username }} el {{ reunion.creada_el|date:"d/m/Y" }}
+  </div>
 </div>
+
+{% if puede_editar_acta %}
+<!-- === SCRIPT STT + GUARDAR + LIMPIAR === -->
+<script>
+(function(){
+  const reunionId  = "{{ reunion.id }}";
+  const saveUrl    = "{% url 'reuniones:guardar_borrador_acta' reunion.pk %}";
+  const approveUrl = "{% url 'reuniones:aprobar_borrador_acta' reunion.pk %}";
+
+  const $      = (id)=>document.getElementById(id);
+  const ta     = $('contenido_acta');
+  const status = $('saveStatus');
+
+  // ---------- Utilidades ----------
+  function getCSRF(){
+    const el = document.querySelector('input[name=csrfmiddlewaretoken]');
+    if (el) return el.value;
+    const m = document.cookie.match(/csrftoken=([^;]+)/);
+    return m ? m[1] : '';
+  }
+  function setOk(msg){ status.classList.remove('text-danger'); status.classList.add('text-success'); status.textContent = msg; }
+  function setErr(msg){ status.classList.remove('text-success'); status.classList.add('text-danger'); status.textContent = msg; }
+
+  // ---------- Guardado ----------
+  async function guardarBorrador(){
+    const resp = await fetch(saveUrl, {
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-CSRFToken':getCSRF()},
+      body: JSON.stringify({contenido: ta.value})
+    });
+    if (!resp.ok) throw new Error('Error al guardar borrador');
+    const data = await resp.json();
+    if (!data.ok) throw new Error('No se pudo guardar');
+    return data;
+  }
+  async function aprobarBorrador(){
+    const resp = await fetch(approveUrl, { method:'POST', headers:{'X-CSRFToken':getCSRF()} });
+    if (!resp.ok) throw new Error('Error al confirmar guardado');
+  }
+  async function guardarSolo(){
+    try{
+      if (typeof stopSTT === 'function') { await stopSTT(); } // asegura flush de audio
+      await guardarBorrador();   // guarda textarea en transcripcion_borrador
+      await aprobarBorrador();   // copia a acta.contenido (aparecerá en Editar Acta)
+      setOk('Guardado correctamente');
+    }catch(err){
+      console.error(err);
+      setErr(err?.message || 'Error al guardar');
+    }
+  }
+  $('btnGuardarSolo')?.addEventListener('click', (e)=>{ e.preventDefault(); guardarSolo(); });
+
+  // ---------- Limpiar ----------
+  function limpiarContenidoUI(){
+    ta.value = '';
+    const parcial = $('sttPartial');
+    if (parcial) parcial.textContent = '';
+    status.classList.remove('text-success','text-danger');
+    status.textContent = '';
+  }
+  $('btnLimpiar')?.addEventListener('click', async (e)=>{
+    e.preventDefault();
+    if (!confirm('¿Seguro que deseas limpiar el contenido actual?')) return;
+
+    // Opción A: limpiar solo en la interfaz (NO toca la BD)
+    limpiarContenidoUI();
+
+    // --- Opción B: limpiar y guardar vacío en BD (descomenta si lo quieres) ---
+    /*
+    try{
+      if (typeof stopSTT === 'function') { await stopSTT(); }
+      ta.value = '';
+      await guardarBorrador();
+      await aprobarBorrador();
+      setOk('Contenido limpiado y guardado');
+    }catch(err){
+      console.error(err);
+      setErr('No se pudo limpiar/guardar');
+    }
+    */
+  });
+
+  // ---------- STT por WebSocket ----------
+  let ws=null, mediaStream=null, audioCtx=null, processor=null;
+  let autosaveTimer=null, lastFinalText="";
+
+  function setStatus(t){ const el=$('sttStatus'); if(el) el.textContent=t; }
+
+  function downsampleTo16kInt16(float32, inRate){
+    const outRate=16000;
+    if(inRate===outRate){
+      const buf=new ArrayBuffer(float32.length*2), view=new DataView(buf);
+      for(let i=0,off=0;i<float32.length;i++,off+=2){
+        let s=Math.max(-1,Math.min(1,float32[i]));
+        view.setInt16(off, s<0?s*0x8000:s*0x7fff, true);
+      }
+      return buf;
+    }
+    const ratio=inRate/outRate, newLen=Math.round(float32.length/ratio);
+    const out=new Int16Array(newLen); let i=0,j=0;
+    while(i<newLen){
+      const nextJ=Math.round((i+1)*ratio); let sum=0,c=0;
+      while(j<nextJ && j<float32.length){ sum+=float32[j++]; c++; }
+      const s=Math.max(-1,Math.min(1,sum/(c||1)));
+      out[i++]= s<0 ? s*0x8000 : s*0x7fff;
+    }
+    return out.buffer;
+  }
+
+  async function startSTT(){
+    try{
+      if (ws && ws.readyState===WebSocket.OPEN) return;
+      const scheme = location.protocol==='https:' ? 'wss' : 'ws';
+      ws = new WebSocket(`${scheme}://${location.host}/ws/transcribir/${reunionId}/`);
+      ws.binaryType = 'arraybuffer';
+
+      ws.onopen = async ()=>{
+        setStatus('🎧 Escuchando…');
+        $('btnStartSTT').disabled = true;
+        $('btnStopSTT').disabled  = false;
+
+        mediaStream = await navigator.mediaDevices.getUserMedia({audio:true});
+        audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+        if (audioCtx.state==='suspended') await audioCtx.resume();
+
+        const source = audioCtx.createMediaStreamSource(mediaStream);
+        processor = audioCtx.createScriptProcessor(2048,1,1);
+        processor.onaudioprocess = (e)=>{
+          if (!ws || ws.readyState!==WebSocket.OPEN) return;
+          const chan = e.inputBuffer.getChannelData(0);
+          ws.send(downsampleTo16kInt16(chan, audioCtx.sampleRate));
+        };
+        source.connect(processor);
+        const nullGain = audioCtx.createGain(); nullGain.gain.value=0;
+        processor.connect(nullGain); nullGain.connect(audioCtx.destination);
+
+        // autosave cada 12s mientras está abierto
+        autosaveTimer = setInterval(async ()=>{ try{ await guardarBorrador(); }catch(_){ } }, 12000);
+      };
+
+      ws.onmessage = (evt)=>{
+        const data = JSON.parse(evt.data);
+        if (data.type==='partial'){
+          const el=$('sttPartial'); if(el) el.textContent=data.text;
+        }else if (data.type==='final'){
+          const txt=(data.text||'').trim();
+          if(!txt || txt===lastFinalText) return;
+          lastFinalText=txt;
+          ta.value = (ta.value ? ta.value.trim()+' ' : '') + txt;
+          const el=$('sttPartial'); if(el) el.textContent='';
+        }else if (data.type==='status'){ setStatus(data.msg); }
+      };
+
+      ws.onerror = (e)=>{ console.error('WS error',e); setStatus('Error de WebSocket'); };
+      ws.onclose = ()=>{
+        setStatus('Micrófono inactivo');
+        $('btnStartSTT').disabled=false; $('btnStopSTT').disabled=true;
+        if (autosaveTimer){ clearInterval(autosaveTimer); autosaveTimer=null; }
+        guardarBorrador().catch(()=>{});
+      };
+    }catch(err){
+      console.error(err);
+      setStatus('Error micrófono/WS');
+      $('btnStartSTT').disabled=false; $('btnStopSTT').disabled=true;
+      if (autosaveTimer){ clearInterval(autosaveTimer); autosaveTimer=null; }
+      guardarBorrador().catch(()=>{});
+      alert((err && (err.name||err.message)) || err);
+    }
+  }
+
+  async function stopSTT(){
+    try{
+      if (processor){ processor.disconnect(); processor=null; }
+      if (audioCtx){ await audioCtx.close(); audioCtx=null; }
+      if (mediaStream){ mediaStream.getTracks().forEach(t=>t.stop()); mediaStream=null; }
+      if (ws && ws.readyState===WebSocket.OPEN){ ws.close(); }
+    } finally {
+      $('btnStartSTT').disabled=false; $('btnStopSTT').disabled=true;
+      setStatus('Micrófono inactivo');
+      if (autosaveTimer){ clearInterval(autosaveTimer); autosaveTimer=null; }
+      guardarBorrador().catch(()=>{});
+    }
+  }
+
+  // Botones STT
+  $('btnStartSTT')?.addEventListener('click', startSTT);
+  $('btnStopSTT')?.addEventListener('click', stopSTT);
+
+  // Guarda al salir de la página (último recurso)
+  window.addEventListener('beforeunload', ()=>{
+    if (autosaveTimer){ clearInterval(autosaveTimer); autosaveTimer=null; }
+    try{
+      if (navigator.sendBeacon){
+        const blob = new Blob([JSON.stringify({contenido: ta.value})], {type:'application/json'});
+        navigator.sendBeacon(saveUrl, blob);
+      }
+    }catch(_){}
+  });
+})();
+</script>
+{% endif %}
 {% endblock %}

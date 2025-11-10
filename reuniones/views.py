@@ -12,7 +12,9 @@ from django.contrib.auth import get_user_model
 from django.contrib import messages
 from django.views.decorators.http import require_POST
 from .models import Reunion, Acta
-
+from django.utils import timezone
+from django.http import JsonResponse, HttpResponseBadRequest
+import json
 User = get_user_model()
 
 
@@ -198,3 +200,31 @@ def rechazar_acta(request, pk):
     if next_url:
         return redirect(next_url)
     return redirect("reuniones:detalle_reunion", pk=pk)
+
+@login_required
+@permission_required('actas.edit', raise_exception=True)  # ajusta al permiso que ya usas
+@require_POST
+def guardar_borrador_acta(request, pk):
+    reunion = get_object_or_404(Reunion, pk=pk)
+    acta, _ = Acta.objects.get_or_create(reunion=reunion)
+    try:
+        data = json.loads(request.body.decode('utf-8') or '{}')
+    except Exception:
+        return HttpResponseBadRequest("JSON inválido")
+    acta.transcripcion_borrador = data.get('contenido', '')
+    acta.transcripcion_estado = 'BORRADOR'
+    acta.save(update_fields=['transcripcion_borrador','transcripcion_estado','transcripcion_actualizado'])
+    return JsonResponse({'ok': True, 'updated': acta.transcripcion_actualizado.isoformat()})
+
+@login_required
+@permission_required('actas.edit', raise_exception=True)
+@require_POST
+def aprobar_borrador_acta(request, pk):
+    reunion = get_object_or_404(Reunion, pk=pk)
+    acta = get_object_or_404(Acta, reunion=reunion)
+    acta.contenido = acta.transcripcion_borrador
+    acta.transcripcion_estado = 'APROBADA'
+    acta.aprobado_por = request.user
+    acta.aprobado_en = timezone.now()
+    acta.save()
+    return redirect('reuniones:detalle_reunion', pk=reunion.pk)

@@ -19,11 +19,23 @@ class Reunion(models.Model):
 
 class Acta(models.Model):
     reunion = models.OneToOneField(Reunion, on_delete=models.CASCADE, primary_key=True)
-    contenido = models.TextField(verbose_name="Contenido del Acta")
+    contenido = models.TextField(blank=True, default='')
     aprobada = models.BooleanField(default=False)
     
     def __str__(self):
         return f"Acta de la reunión: {self.reunion.titulo}"
+    transcripcion_borrador    = models.TextField(blank=True, default='')
+    transcripcion_estado      = models.CharField(
+        max_length=20,
+        choices=[('BORRADOR','Borrador'), ('APROBADA','Aprobada')],
+        default='BORRADOR'
+    )
+    transcripcion_actualizado = models.DateTimeField(auto_now=True)
+    aprobado_por              = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='actas_aprobadas'
+    )
+    aprobado_en               = models.DateTimeField(null=True, blank=True)
 
 class Asistencia(models.Model):
     reunion = models.ForeignKey(Reunion, on_delete=models.CASCADE, related_name="asistentes")

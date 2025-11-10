@@ -25,7 +25,7 @@ ALLOWED_HOSTS = [
     "127.0.0.1",
     "localhost",
     "10.0.2.2",
-    "192.168.0.106",   # IP de tu PC en la red (ajústala si cambia)
+    "192.168.0.100",   # IP de tu PC en la red (ajústala si cambia)
 ]
 
 # Si usas login vía sesión desde Android/web, conviene permitir CSRF
@@ -33,13 +33,14 @@ CSRF_TRUSTED_ORIGINS = [
     "http://127.0.0.1",
     "http://localhost",
     "http://10.0.2.2",
-    "http://192.168.0.106",
+    "http://192.168.0.100:8000",
 ]
 
 # -----------------------------------------------------------------------------
 # Apps
 # -----------------------------------------------------------------------------
 INSTALLED_APPS = [
+    "daphne",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -62,6 +63,8 @@ INSTALLED_APPS = [
     "rest_framework",
     "rest_framework.authtoken",
     "django_filters",
+    "channels",
+    
     
 ]
 
@@ -99,7 +102,9 @@ TEMPLATES = [
     },
 ]
 
+ASGI_APPLICATION = "proyecto_tesis.asgi.application"
 WSGI_APPLICATION = "proyecto_tesis.wsgi.application"
+
 
 # -----------------------------------------------------------------------------
 # Base de datos (MySQL via .env)
@@ -196,4 +201,9 @@ DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER)
 # -----------------------------------------------------------------------------
 # Clave primaria por defecto
 # -----------------------------------------------------------------------------
+# --- Channels (capa en memoria para desarrollo) ---
+CHANNEL_LAYERS = {
+    "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
+}
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+VOSK_MODEL_PATH = Path(r"C:\Users\kassandra\OneDrive\Escritorio\proyecto-tesis\vosk-model-small-es-0.42")
