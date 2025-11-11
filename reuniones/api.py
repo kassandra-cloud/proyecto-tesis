@@ -18,6 +18,21 @@ class ReunionViewSet(viewsets.ReadOnlyModelViewSet):
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ["titulo", "tabla", "tipo"]
     ordering_fields = ["fecha", "titulo"]
+    def get_queryset(self):
+        qs = super().get_queryset()
+        estado = self.request.query_params.get("estado")
+        if not estado:
+            return qs
+
+        now = timezone.now()
+        # si SOLO tienes fecha (inicio), replicamos la lógica del serializer:
+        if estado == "programada":
+            return qs.filter(fecha__gt=now)
+        if estado == "en_curso":
+            return qs.filter(fecha__lte=now, fecha__gte=now - timedelta(hours=2))
+        if estado == "realizada":
+            return qs.filter(fecha__lt=now - timedelta(hours=2))
+        return qs
 
 class ActaViewSet(viewsets.ReadOnlyModelViewSet):
     """

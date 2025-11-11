@@ -54,7 +54,7 @@
     {% endif %}
 
     <hr>
-    <div class="d-flex gap-2">
+    <div class="d-flex flex-wrap gap-2">
       <a href="{% url 'reuniones:lista_reuniones' %}" class="btn btn-secondary">← Volver a la lista</a>
 
       {% user_can 'reuniones' 'asistencia' as puede_pasar_lista %}
@@ -68,6 +68,10 @@
 
       {% if reunion.acta %}
         <a href="{% url 'reuniones:exportar_acta_pdf' reunion.pk %}" class="btn btn-success">Exportar a PDF</a>
+        <!-- NUEVO: botón para abrir el modal de envío -->
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalEnviarActa">
+          Enviar por correo
+        </button>
       {% endif %}
     </div>
   </div>
@@ -76,6 +80,72 @@
     Reunión creada por {{ reunion.creada_por.username }} el {{ reunion.creada_el|date:"d/m/Y" }}
   </div>
 </div>
+
+{% if reunion.acta %}
+<!-- ===========================
+     Modal: Enviar Acta por correo (con lista de usuarios)
+     =========================== -->
+<div class="modal fade" id="modalEnviarActa" tabindex="-1" aria-labelledby="modalEnviarActaLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <form id="formEnviarActa" method="post">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title" id="modalEnviarActaLabel">Enviar Acta por correo</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+
+        <div class="modal-body">
+          <!-- Barra superior: buscar + seleccionar todo -->
+          <div class="d-flex flex-wrap align-items-center gap-3 mb-3">
+            <div class="flex-grow-1">
+              <input type="text" id="filtroCorreos" class="form-control" placeholder="Buscar por nombre o correo…">
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="chkSelectAll">
+              <label class="form-check-label" for="chkSelectAll">Seleccionar todos</label>
+            </div>
+          </div>
+
+          <!-- Lista de usuarios con email -->
+          <div id="listaCorreos" class="border rounded p-2" style="max-height: 320px; overflow: auto;">
+            {% for u in destinatarios %}
+              {% if u.email %}
+              <div class="form-check py-1 item-email"
+                   data-name="{{ u.get_full_name|default:u.username|lower }}"
+                   data-email="{{ u.email|lower }}">
+                <input class="form-check-input chk-email" type="checkbox" value="{{ u.email }}" id="u{{ u.id }}">
+                <label class="form-check-label" for="u{{ u.id }}">
+                  {{ u.get_full_name|default:u.username }}
+                  <small class="text-muted">&lt;{{ u.email }}&gt;</small>
+                </label>
+              </div>
+              {% endif %}
+            {% empty %}
+              <div class="text-muted">No hay usuarios con correo cargados.</div>
+            {% endfor %}
+          </div>
+
+          <!-- Correos adicionales opcionales -->
+          <div class="mt-3">
+            <label for="inputCorreosExtra" class="form-label">Correos adicionales (opcional)</label>
+            <input id="inputCorreosExtra" name="correos" type="text" class="form-control"
+                   placeholder="ej: extra1@mail.com, extra2@mail.com">
+            <small class="text-muted">Puedes escribir varios correos separados por coma.</small>
+          </div>
+
+          <div id="sendStatus" class="small mt-2 text-muted"></div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary" id="btnEnviarCorreo">Enviar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
 
 {% if puede_editar_acta %}
 <!-- === SCRIPT STT + GUARDAR + LIMPIAR === -->
@@ -117,9 +187,9 @@
   }
   async function guardarSolo(){
     try{
-      if (typeof stopSTT === 'function') { await stopSTT(); } // asegura flush de audio
-      await guardarBorrador();   // guarda textarea en transcripcion_borrador
-      await aprobarBorrador();   // copia a acta.contenido (aparecerá en Editar Acta)
+      if (typeof stopSTT === 'function') { await stopSTT(); }
+      await guardarBorrador();
+      await aprobarBorrador();
       setOk('Guardado correctamente');
     }catch(err){
       console.error(err);
@@ -139,23 +209,7 @@
   $('btnLimpiar')?.addEventListener('click', async (e)=>{
     e.preventDefault();
     if (!confirm('¿Seguro que deseas limpiar el contenido actual?')) return;
-
-    // Opción A: limpiar solo en la interfaz (NO toca la BD)
     limpiarContenidoUI();
-
-    // --- Opción B: limpiar y guardar vacío en BD (descomenta si lo quieres) ---
-    /*
-    try{
-      if (typeof stopSTT === 'function') { await stopSTT(); }
-      ta.value = '';
-      await guardarBorrador();
-      await aprobarBorrador();
-      setOk('Contenido limpiado y guardado');
-    }catch(err){
-      console.error(err);
-      setErr('No se pudo limpiar/guardar');
-    }
-    */
   });
 
   // ---------- STT por WebSocket ----------
@@ -212,7 +266,6 @@
         const nullGain = audioCtx.createGain(); nullGain.gain.value=0;
         processor.connect(nullGain); nullGain.connect(audioCtx.destination);
 
-        // autosave cada 12s mientras está abierto
         autosaveTimer = setInterval(async ()=>{ try{ await guardarBorrador(); }catch(_){ } }, 12000);
       };
 
@@ -264,7 +317,7 @@
   $('btnStartSTT')?.addEventListener('click', startSTT);
   $('btnStopSTT')?.addEventListener('click', stopSTT);
 
-  // Guarda al salir de la página (último recurso)
+  // Guarda al salir
   window.addEventListener('beforeunload', ()=>{
     if (autosaveTimer){ clearInterval(autosaveTimer); autosaveTimer=null; }
     try{
@@ -273,6 +326,119 @@
         navigator.sendBeacon(saveUrl, blob);
       }
     }catch(_){}
+  });
+})();
+</script>
+{% endif %}
+
+{% if reunion.acta %}
+<!-- === SCRIPT: Enviar acta por correo (checkboxes + buscar + seleccionar todo) === -->
+<script>
+(function(){
+  const form = document.getElementById('formEnviarActa');
+  if (!form) return;
+
+  function getCSRF(){
+    const el = document.querySelector('#formEnviarActa input[name=csrfmiddlewaretoken]');
+    if (el) return el.value;
+    const m = document.cookie.match(/csrftoken=([^;]+)/);
+    return m ? m[1] : '';
+  }
+
+  const statusEl = document.getElementById('sendStatus');
+  function setSend(msg, ok=true){
+    statusEl.classList.toggle('text-danger', !ok);
+    statusEl.classList.toggle('text-success', ok);
+    statusEl.textContent = msg;
+  }
+
+  // --- Buscar en la lista ---
+  const filtro = document.getElementById('filtroCorreos');
+  const items  = Array.from(document.querySelectorAll('#listaCorreos .item-email'));
+  filtro?.addEventListener('input', function(){
+    const q = (this.value || '').trim().toLowerCase();
+    if (!q){
+      items.forEach(it => it.style.display = '');
+      return;
+    }
+    items.forEach(it => {
+      const hay = it.dataset.name.includes(q) || it.dataset.email.includes(q);
+      it.style.display = hay ? '' : 'none';
+    });
+  });
+
+  // --- Seleccionar todo visible ---
+  const chkAll = document.getElementById('chkSelectAll');
+  chkAll?.addEventListener('change', function(){
+    const visibles = items.filter(it => it.style.display !== 'none');
+    visibles.forEach(it => {
+      const cb = it.querySelector('.chk-email');
+      if (cb) cb.checked = chkAll.checked;
+    });
+  });
+
+  // --- Enviar ---
+  form.addEventListener('submit', async function(e){
+    e.preventDefault();
+    setSend('Enviando…', true);
+
+    // 1) Correos de checkboxes marcados
+    const marcados = Array
+      .from(document.querySelectorAll('.chk-email:checked'))
+      .map(cb => (cb.value || '').trim())
+      .filter(Boolean);
+
+    // 2) Correos adicionales (separados por coma)
+    const extrasStr = (document.getElementById('inputCorreosExtra')?.value || '').trim();
+    const extras = extrasStr
+      ? extrasStr.split(',').map(s => s.trim()).filter(Boolean)
+      : [];
+
+    const todos = [...new Set([...marcados, ...extras])]; // únicos
+
+    if (todos.length === 0){
+      setSend('Selecciona al menos un correo (o escribe uno adicional).', false);
+      return;
+    }
+
+    const fd = new FormData();
+    todos.forEach(c => fd.append('correos[]', c)); // la vista soporta 'correos[]'
+
+    try{
+      const resp = await fetch("{% url 'reuniones:enviar_acta_pdf_por_correo' reunion.pk %}", {
+        method: 'POST',
+        headers: { 'X-CSRFToken': getCSRF() },
+        body: fd
+      });
+
+      if (!resp.ok){
+        const txt = await resp.text();
+        setSend('Error: ' + (txt || 'No se pudo enviar'), false);
+        return;
+      }
+
+      const data = await resp.json();
+      if (data.ok){
+        setSend('¡Acta enviada correctamente!', true);
+        setTimeout(()=>{
+          const modalEl = document.getElementById('modalEnviarActa');
+          if (modalEl && window.bootstrap){
+            const modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+            modal.hide();
+          }
+          setSend('');
+          form.reset();
+          document.querySelectorAll('.chk-email').forEach(cb => cb.checked = false);
+          const chkAll = document.getElementById('chkSelectAll');
+          if (chkAll) chkAll.checked = false;
+        }, 900);
+      }else{
+        setSend(data.mensaje || 'No se pudo enviar', false);
+      }
+    }catch(err){
+      console.error(err);
+      setSend('Error inesperado al enviar', false);
+    }
   });
 })();
 </script>

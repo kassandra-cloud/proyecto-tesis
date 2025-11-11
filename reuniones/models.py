@@ -48,3 +48,11 @@ class Asistencia(models.Model):
     def __str__(self):
         estado = "Presente" if self.presente else "Ausente"
         return f"{self.vecino.username} - {self.reunion.titulo} ({estado})"
+    
+class ActaEmailLog(models.Model):
+    acta = models.ForeignKey("Acta", on_delete=models.CASCADE, related_name="emails_enviados")
+    destinatarios = models.TextField()  # guarda la lista como string
+    enviado_por = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL)
+    fecha_envio = models.DateTimeField(auto_now_add=True)
+    ok = models.BooleanField(default=True)
+    error = models.TextField(blank=True) 

@@ -2,6 +2,8 @@
 from rest_framework import serializers
 from .models import Reunion, Acta
 from .models import Asistencia 
+from django.utils import timezone
+from datetime import timedelta
 class ReunionSerializer(serializers.ModelSerializer):
     asistentes_count = serializers.IntegerField(source='asistentes.count', read_only=True)
 
@@ -10,6 +12,23 @@ class ReunionSerializer(serializers.ModelSerializer):
         fields = [
             "id", "fecha", "tipo", "titulo", "tabla", "creada_el", "asistentes_count"
         ]
+        def get_estado(self, obj):
+            """
+            Si solo tienes fecha de inicio:
+            - programada: now < fecha
+            - en_curso: fecha <= now <= fecha + 2h
+            - realizada: now > fecha + 2h
+            """
+            now = timezone.now()
+            if not obj.fecha:
+                return "realizada"
+            inicio = obj.fecha
+            fin = inicio + timedelta(hours=2)  # si tienes obj.fecha_fin, úsalo en vez de esto
+            if inicio > now:
+                return "programada"
+            if inicio <= now <= fin:
+                return "en_curso"
+            return "realizada"
 
 class ActaSerializer(serializers.ModelSerializer):
     # Acta usa OneToOne(primary_key=True) con Reunion → el ID del acta == ID de la reunión
