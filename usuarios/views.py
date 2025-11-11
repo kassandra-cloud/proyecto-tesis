@@ -263,3 +263,32 @@ def restaurar_usuario(request, pk):
         usuario.save(update_fields=["is_active"])
         messages.success(request, f"Usuario “{usuario.username}” restaurado.")
     return redirect("lista_usuarios")
+
+@login_required
+def api_usuarios_by_role(request):
+    """
+    Devuelve JSON con usuarios activos (con email) filtrados por rol del Perfil.
+    GET /usuarios/api/usuarios/by-role/?role=vecino
+    role = "ALL" o vacío -> todos.
+    """
+    role = (request.GET.get("role") or "").strip()
+    qs = (
+        User.objects.filter(is_active=True)
+        .exclude(email__isnull=True)
+        .exclude(email__exact="")
+        .exclude(is_superuser=True)  # mantiene tu criterio actual
+        .select_related("perfil")
+        .order_by("first_name", "last_name", "email")
+    )
+    if role and role.upper() != "ALL":
+        qs = qs.filter(perfil__rol=role)
+
+    data = [
+        {
+            "id": u.id,
+            "name": (u.get_full_name() or u.username).strip(),
+            "email": u.email,
+        }
+        for u in qs
+    ]
+    return JsonResponse({"results": data})

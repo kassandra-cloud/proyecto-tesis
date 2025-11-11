@@ -15,7 +15,7 @@ from django.contrib.auth import get_user_model
 from .models import Reunion, Asistencia, Acta
 from .forms import ReunionForm, ActaForm
 from core.authz import role_required
-
+from core.models import Perfil
 import json
 
 User = get_user_model()
@@ -72,7 +72,8 @@ def reunion_detail(request, pk):
 
     context = {
         "reunion": reunion,
-        "destinatarios": destinatarios,   # <<< NUEVO
+        "destinatarios": destinatarios,   
+        "roles": Perfil.Roles.choices,
     }
     return render(request, "reuniones/reunion_detail.html", context)
 @login_required

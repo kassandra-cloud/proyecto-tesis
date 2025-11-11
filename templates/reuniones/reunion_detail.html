@@ -68,7 +68,7 @@
 
       {% if reunion.acta %}
         <a href="{% url 'reuniones:exportar_acta_pdf' reunion.pk %}" class="btn btn-success">Exportar a PDF</a>
-        <!-- NUEVO: botón para abrir el modal de envío -->
+        <!-- Botón modal envío -->
         <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalEnviarActa">
           Enviar por correo
         </button>
@@ -83,7 +83,7 @@
 
 {% if reunion.acta %}
 <!-- ===========================
-     Modal: Enviar Acta por correo (con lista de usuarios)
+     Modal: Enviar Acta por correo (con filtro por Rol)
      =========================== -->
 <div class="modal fade" id="modalEnviarActa" tabindex="-1" aria-labelledby="modalEnviarActaLabel" aria-hidden="true">
   <div class="modal-dialog modal-lg">
@@ -96,12 +96,22 @@
         </div>
 
         <div class="modal-body">
-          <!-- Barra superior: buscar + seleccionar todo -->
-          <div class="d-flex flex-wrap align-items-center gap-3 mb-3">
+          <!-- Barra superior: Rol + buscar + seleccionar todo -->
+          <div class="d-flex flex-wrap align-items-end gap-3 mb-3">
+            <div>
+              <label for="roleFilter" class="form-label mb-1"><strong>Rol</strong></label>
+              <select id="roleFilter" class="form-select form-select-sm" style="min-width: 220px;">
+                <option value="ALL">Todos los roles</option>
+                {% for value,label in roles %}
+                  <option value="{{ value }}">{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
             <div class="flex-grow-1">
+              <label for="filtroCorreos" class="form-label mb-1">Buscar</label>
               <input type="text" id="filtroCorreos" class="form-control" placeholder="Buscar por nombre o correo…">
             </div>
-            <div class="form-check">
+            <div class="form-check ms-auto">
               <input class="form-check-input" type="checkbox" id="chkSelectAll">
               <label class="form-check-label" for="chkSelectAll">Seleccionar todos</label>
             </div>
@@ -150,6 +160,7 @@
 {% if puede_editar_acta %}
 <!-- === SCRIPT STT + GUARDAR + LIMPIAR === -->
 <script>
+/* (tu script STT y guardado – SIN CAMBIOS) */
 (function(){
   const reunionId  = "{{ reunion.id }}";
   const saveUrl    = "{% url 'reuniones:guardar_borrador_acta' reunion.pk %}";
@@ -159,7 +170,6 @@
   const ta     = $('contenido_acta');
   const status = $('saveStatus');
 
-  // ---------- Utilidades ----------
   function getCSRF(){
     const el = document.querySelector('input[name=csrfmiddlewaretoken]');
     if (el) return el.value;
@@ -169,7 +179,6 @@
   function setOk(msg){ status.classList.remove('text-danger'); status.classList.add('text-success'); status.textContent = msg; }
   function setErr(msg){ status.classList.remove('text-success'); status.classList.add('text-danger'); status.textContent = msg; }
 
-  // ---------- Guardado ----------
   async function guardarBorrador(){
     const resp = await fetch(saveUrl, {
       method:'POST',
@@ -198,7 +207,6 @@
   }
   $('btnGuardarSolo')?.addEventListener('click', (e)=>{ e.preventDefault(); guardarSolo(); });
 
-  // ---------- Limpiar ----------
   function limpiarContenidoUI(){
     ta.value = '';
     const parcial = $('sttPartial');
@@ -212,7 +220,6 @@
     limpiarContenidoUI();
   });
 
-  // ---------- STT por WebSocket ----------
   let ws=null, mediaStream=null, audioCtx=null, processor=null;
   let autosaveTimer=null, lastFinalText="";
 
@@ -313,11 +320,9 @@
     }
   }
 
-  // Botones STT
   $('btnStartSTT')?.addEventListener('click', startSTT);
   $('btnStopSTT')?.addEventListener('click', stopSTT);
 
-  // Guarda al salir
   window.addEventListener('beforeunload', ()=>{
     if (autosaveTimer){ clearInterval(autosaveTimer); autosaveTimer=null; }
     try{
@@ -332,11 +337,17 @@
 {% endif %}
 
 {% if reunion.acta %}
-<!-- === SCRIPT: Enviar acta por correo (checkboxes + buscar + seleccionar todo) === -->
+<!-- === SCRIPT: Enviar acta por correo (roles + checkboxes + buscar + seleccionar todo) === -->
 <script>
 (function(){
   const form = document.getElementById('formEnviarActa');
   if (!form) return;
+
+  const roleSelect   = document.getElementById('roleFilter');
+  const lista        = document.getElementById('listaCorreos');
+  const filtro       = document.getElementById('filtroCorreos');
+  const chkAll       = document.getElementById('chkSelectAll');
+  const statusEl     = document.getElementById('sendStatus');
 
   function getCSRF(){
     const el = document.querySelector('#formEnviarActa input[name=csrfmiddlewaretoken]');
@@ -344,79 +355,101 @@
     const m = document.cookie.match(/csrftoken=([^;]+)/);
     return m ? m[1] : '';
   }
-
-  const statusEl = document.getElementById('sendStatus');
   function setSend(msg, ok=true){
     statusEl.classList.toggle('text-danger', !ok);
     statusEl.classList.toggle('text-success', ok);
     statusEl.textContent = msg;
   }
 
-  // --- Buscar en la lista ---
-  const filtro = document.getElementById('filtroCorreos');
-  const items  = Array.from(document.querySelectorAll('#listaCorreos .item-email'));
-  filtro?.addEventListener('input', function(){
-    const q = (this.value || '').trim().toLowerCase();
-    if (!q){
-      items.forEach(it => it.style.display = '');
+  function renderList(items){
+    if (!items.length){
+      lista.innerHTML = '<div class="text-muted p-2">No hay usuarios para este rol.</div>';
       return;
     }
-    items.forEach(it => {
-      const hay = it.dataset.name.includes(q) || it.dataset.email.includes(q);
-      it.style.display = hay ? '' : 'none';
-    });
-  });
+    lista.innerHTML = items.map(u => `
+      <div class="form-check py-1 item-email"
+           data-name="${(u.name||'').toLowerCase()}"
+           data-email="${(u.email||'').toLowerCase()}">
+        <input class="form-check-input chk-email" type="checkbox" value="${u.email}" id="u${u.id}">
+        <label class="form-check-label" for="u${u.id}">
+          ${u.name} <small class="text-muted">&lt;${u.email}&gt;</small>
+        </label>
+      </div>
+    `).join('');
+    // al repintar, resetea "seleccionar todos"
+    if (chkAll) chkAll.checked = false;
+    // reaplica filtro de texto si hay
+    aplicarFiltroTexto();
+  }
 
-  // --- Seleccionar todo visible ---
-  const chkAll = document.getElementById('chkSelectAll');
+  async function cargarPorRol(rol){
+    const url = `{% url 'api_usuarios_by_role' %}?role=${encodeURIComponent(rol)}`;
+    try{
+      const resp = await fetch(url, {credentials:'same-origin'});
+      if (!resp.ok) throw new Error('No se pudo cargar usuarios');
+      const data = await resp.json();
+      renderList(data.results || []);
+    }catch(err){
+      console.error(err);
+      lista.innerHTML = '<div class="text-danger p-2">Error cargando usuarios.</div>';
+    }
+  }
+
+  function aplicarFiltroTexto(){
+    const q = (filtro?.value || '').toLowerCase().trim();
+    const items = lista.querySelectorAll('.item-email');
+    items.forEach(div=>{
+      const hay = div.dataset.name.includes(q) || div.dataset.email.includes(q);
+      div.style.display = hay ? '' : 'none';
+    });
+  }
+
+  filtro?.addEventListener('input', aplicarFiltroTexto);
+  roleSelect?.addEventListener('change', ()=> cargarPorRol(roleSelect.value));
+
+  // Carga inicial (opcional: si quieres reemplazar la carga del servidor)
+  // cargarPorRol(roleSelect.value);
+
   chkAll?.addEventListener('change', function(){
-    const visibles = items.filter(it => it.style.display !== 'none');
-    visibles.forEach(it => {
+    const items = Array.from(lista.querySelectorAll('.item-email'))
+                       .filter(it => it.style.display !== 'none');
+    items.forEach(it=>{
       const cb = it.querySelector('.chk-email');
       if (cb) cb.checked = chkAll.checked;
     });
   });
 
-  // --- Enviar ---
   form.addEventListener('submit', async function(e){
     e.preventDefault();
     setSend('Enviando…', true);
 
-    // 1) Correos de checkboxes marcados
-    const marcados = Array
-      .from(document.querySelectorAll('.chk-email:checked'))
-      .map(cb => (cb.value || '').trim())
+    const marcados = Array.from(lista.querySelectorAll('.chk-email:checked'))
+      .map(cb => (cb.value||'').trim())
       .filter(Boolean);
 
-    // 2) Correos adicionales (separados por coma)
     const extrasStr = (document.getElementById('inputCorreosExtra')?.value || '').trim();
-    const extras = extrasStr
-      ? extrasStr.split(',').map(s => s.trim()).filter(Boolean)
-      : [];
+    const extras = extrasStr ? extrasStr.split(',').map(s=>s.trim()).filter(Boolean) : [];
 
-    const todos = [...new Set([...marcados, ...extras])]; // únicos
-
-    if (todos.length === 0){
+    const todos = [...new Set([...marcados, ...extras])];
+    if (!todos.length){
       setSend('Selecciona al menos un correo (o escribe uno adicional).', false);
       return;
     }
 
     const fd = new FormData();
-    todos.forEach(c => fd.append('correos[]', c)); // la vista soporta 'correos[]'
+    todos.forEach(c => fd.append('correos[]', c));
 
     try{
       const resp = await fetch("{% url 'reuniones:enviar_acta_pdf_por_correo' reunion.pk %}", {
-        method: 'POST',
-        headers: { 'X-CSRFToken': getCSRF() },
+        method:'POST',
+        headers:{'X-CSRFToken': getCSRF()},
         body: fd
       });
-
       if (!resp.ok){
         const txt = await resp.text();
         setSend('Error: ' + (txt || 'No se pudo enviar'), false);
         return;
       }
-
       const data = await resp.json();
       if (data.ok){
         setSend('¡Acta enviada correctamente!', true);
@@ -428,8 +461,7 @@
           }
           setSend('');
           form.reset();
-          document.querySelectorAll('.chk-email').forEach(cb => cb.checked = false);
-          const chkAll = document.getElementById('chkSelectAll');
+          lista.querySelectorAll('.chk-email').forEach(cb => cb.checked = false);
           if (chkAll) chkAll.checked = false;
         }, 900);
       }else{

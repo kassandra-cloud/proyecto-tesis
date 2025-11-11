@@ -17,4 +17,5 @@ urlpatterns = [
     path('accounts/reset/done/', auth_views.PasswordResetCompleteView.as_view(), name='password_reset_complete'),
     path("usuarios/<int:pk>/deshabilitar/", u.deshabilitar_usuario, name="deshabilitar"),
     path("usuarios/<int:pk>/restaurar/", u.restaurar_usuario, name="restaurar"),
+    path("api/usuarios/by-role/", views.api_usuarios_by_role, name="api_usuarios_by_role"),
 ]

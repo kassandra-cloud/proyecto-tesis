@@ -1,7 +1,10 @@
-from django.urls import path
+from django.urls import path, include
 from . import views
-
+from rest_framework.routers import DefaultRouter
+from .api import SolicitudReservaViewSet
+from .api import RecursoViewSet, SolicitudReservaViewSet
 app_name = 'recursos'
+
 
 urlpatterns = [
     # --- Vistas de Gestión de RECURSOS ---
@@ -14,4 +17,18 @@ urlpatterns = [
     # --- Vistas de Gestión de RESERVAS ---
     path('solicitudes/', views.gestionar_reservas, name='gestionar_reservas'),
     path('solicitudes/<int:pk>/actualizar/', views.actualizar_estado_reserva, name='actualizar_estado_reserva'),
+
+]
+
+# --- API v1 ---
+from rest_framework.routers import DefaultRouter
+from .api import RecursoViewSet
+
+router = DefaultRouter()
+router.register(r'api/v1/recursos', RecursoViewSet, basename='api-recursos')
+router.register(r'api/v1/solicitudes', SolicitudReservaViewSet, basename='api-solicitudes')
+
+
+urlpatterns += [
+    path('', include(router.urls)),
 ]
