@@ -7,6 +7,7 @@
 <div class="card shadow-sm">
   <div class="card-body">
 
+    <!-- Header con botón crear -->
     <div class="d-flex justify-content-between align-items-center mb-3">
       <h1 class="h4 m-0">{{ titulo }}</h1>
       {% user_can 'reuniones' 'create' as puede_crear_reunion %}
@@ -17,6 +18,19 @@
       {% endif %}
     </div>
 
+    <!-- Tabs de estado -->
+    <ul class="nav nav-tabs mb-3">
+      <li class="nav-item">
+        <a class="nav-link {% if estado != 'realizada' %}active{% endif %}"
+           href="?estado=programada">Programadas</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link {% if estado == 'realizada' %}active{% endif %}"
+           href="?estado=realizada">Realizadas</a>
+      </li>
+    </ul>
+
+    <!-- Tabla -->
     <div class="table-responsive">
       <table class="table align-middle">
         <thead>
@@ -32,18 +46,25 @@
           <tr>
             <td>{{ reunion.titulo }}</td>
             <td>
-                <span class="badge {% if reunion.tipo == 'Extraordinaria' %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
-                    {{ reunion.tipo }}
-                </span>
+              <span class="badge {% if reunion.tipo == 'Extraordinaria' %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
+                {{ reunion.tipo }}
+              </span>
             </td>
             <td>{{ reunion.fecha|date:"d/m/Y H:i" }} hrs</td>
             <td class="text-end">
-              <a href="{% url 'reuniones:detalle_reunion' reunion.pk %}" class="btn btn-sm btn-outline-secondary">Ver Detalles</a>
-              </td>
+              <a href="{% url 'reuniones:detalle_reunion' reunion.pk %}"
+                 class="btn btn-sm btn-outline-secondary">Ver Detalles</a>
+            </td>
           </tr>
           {% empty %}
           <tr>
-            <td colspan="4" class="text-center text-muted py-4">No hay reuniones programadas.</td>
+            <td colspan="4" class="text-center text-muted py-4">
+              {% if estado == 'realizada' %}
+                No hay reuniones realizadas.
+              {% else %}
+                No hay reuniones programadas.
+              {% endif %}
+            </td>
           </tr>
           {% endfor %}
         </tbody>

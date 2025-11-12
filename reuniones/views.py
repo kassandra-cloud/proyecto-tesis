@@ -11,7 +11,7 @@ from django.utils import timezone
 from django.utils.text import slugify
 from django.core.mail import EmailMessage
 from django.contrib.auth import get_user_model
-
+from datetime import timedelta
 from .models import Reunion, Asistencia, Acta
 from .forms import ReunionForm, ActaForm
 from core.authz import role_required
@@ -47,13 +47,27 @@ def _pdf_bytes_desde_xhtml(template_path: str, context: dict) -> bytes:
 @login_required
 @role_required("reuniones", "view")
 def reunion_list(request):
-    reuniones = Reunion.objects.all().order_by('-fecha')
+    estado = request.GET.get("estado", "programada")  # por defecto: programadas
+    now = timezone.now()
+
+    # misma regla que la API: 2 horas = “en curso”
+    if estado == "realizada":
+        qs = Reunion.objects.filter(fecha__lt=now - timedelta(hours=2))
+        titulo = "Reuniones Realizadas"
+    else:  # programada / en_curso
+        qs = Reunion.objects.filter(fecha__gt=now) | Reunion.objects.filter(
+            fecha__lte=now, fecha__gte=now - timedelta(hours=2)
+        )
+        titulo = "Reuniones Programadas"
+
+    reuniones = qs.order_by("-fecha")
+
     context = {
         "reuniones": reuniones,
-        "titulo": "Próximas Reuniones"
+        "estado": estado,
+        "titulo": titulo,
     }
     return render(request, "reuniones/reunion_list.html", context)
-
 
 @login_required
 @role_required("reuniones", "view")
