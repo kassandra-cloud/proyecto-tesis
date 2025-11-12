@@ -43,44 +43,42 @@
                         <th class="text-end">Acciones</th>
                     </tr>
                 </thead>
-                <tbody>
-                    {% for reserva in reservas %}
-                    <tr>
-                        <td class="text-nowrap">
-                            <strong>{{ reserva.vecino.username }}</strong>
-                            <span class="d-block small text-muted">{{ reserva.vecino.perfil.rut|default:"-" }}</span>
-                        </td>
-                        <td>{{ reserva.recurso.nombre }}</td>
-                        <td class="text-nowrap">
-                            {{ reserva.fecha_inicio|date:"d/m/Y H:i" }}
-                            <span class="d-block small text-muted">hasta {{ reserva.fecha_fin|date:"d/m/Y H:i" }}</span>
-                        </td>
-                        <td class="small" style="min-width: 200px;">{{ reserva.motivo|linebreaksbr }}</td>
-                        
-                        <td class="text-end text-nowrap">
+               <tbody>
+                        {% for reserva in reservas %}
+                        <tr>
+                            <td class="text-nowrap">
+                            <strong>{{ reserva.solicitante.username }}</strong>
+                            <span class="d-block small text-muted">{{ reserva.solicitante.perfil.rut|default:"-" }}</span>
+                            </td>
+                            <td>{{ reserva.recurso.nombre }}</td>
+                           <td class="text-nowrap">
+                            {{ reserva.fecha_inicio|date:"d/m/Y" }}
+                                <span class="d-block small text-muted">
+                                    hasta {{ reserva.fecha_fin|date:"d/m/Y" }}
+                                </span>
+                            </td>
+                            <td class="small" style="min-width: 200px;">{{ reserva.motivo|linebreaksbr }}</td>
+
+                            <td class="text-end text-nowrap">
                             {% if reserva.estado == 'PENDIENTE' %}
-                            <form action="{% url 'recursos:actualizar_estado_reserva' reserva.pk %}" method="post" class="d-inline">
+                                <form action="{% url 'recursos:actualizar_estado_reserva' reserva.pk %}" method="post" class="d-inline">
                                 {% csrf_token %}
                                 <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                                <button type="submit" name="accion" value="APROBADA" class="btn btn-sm btn-success">
-                                  Aprobar
-                                </button>
-                                <button type="submit" name="accion" value="RECHAZADA" class="btn btn-sm btn-outline-danger ms-1">
-                                  Rechazar
-                                </button>
-                            </form>
+                                <button type="submit" name="accion" value="APROBADA" class="btn btn-sm btn-success">Aprobar</button>
+                                <button type="submit" name="accion" value="RECHAZADA" class="btn btn-sm btn-outline-danger ms-1">Rechazar</button>
+                                </form>
                             {% else %}
                                 <span class="badge {% if reserva.estado == 'APROBADA' %}bg-success{% else %}bg-danger{% endif %}">
-                                    {{ reserva.get_estado_display }}
+                                {{ reserva.estado|title }}
                                 </span>
                             {% endif %}
-                        </td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="5" class="text-center text-muted py-4">No hay solicitudes en estado "{{ filtro_actual }}".</td>
-                    </tr>
-                    {% endfor %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center text-muted py-4">No hay solicitudes en estado "{{ filtro_actual }}".</td>
+                        </tr>
+                        {% endfor %}
                 </tbody>
             </table>
         </div>

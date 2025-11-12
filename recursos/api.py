@@ -37,40 +37,33 @@ class RecursoViewSet(viewsets.ReadOnlyModelViewSet):
         return qs
 class SolicitudReservaViewSet(viewsets.ModelViewSet):
     """
-    /recursos/api/v1/solicitudes/:
-      GET: por defecto lista las solicitudes del usuario autenticado
-           ?todas=1 -> lista todas (solo SECRETARIA/ADMIN/staff)
-      POST: crea solicitud para el usuario (estado PENDIENTE)
-    /recursos/api/v1/solicitudes/{id}/aprobar/ (POST) -> estado=APROBADA (SECRETARIA/ADMIN)
-    /recursos/api/v1/solicitudes/{id}/rechazar/ (POST) -> estado=RECHAZADA (SECRETARIA/ADMIN)
+    /recursos/api/v1/solicitudes/
+    GET ?mine=true&estado=PENDIENTE|APROBADA|RECHAZADA
+    POST crea solicitud (ya lo tienes)
     """
-    permission_classes = [permissions.IsAuthenticated]
     serializer_class = SolicitudReservaSerializer
+    pagination_class = DefaultPagination
+    permission_classes = [permissions.IsAuthenticated]
     queryset = SolicitudReserva.objects.select_related("recurso", "solicitante")
-
-    def get_serializer_class(self):
-        return CrearSolicitudSerializer if self.action == "create" else SolicitudReservaSerializer
 
     def get_queryset(self):
         qs = super().get_queryset()
-        todas = self.request.query_params.get("todas")
-        if todas and EsAdminOSectretaria().has_permission(self.request, self):
-            return qs
-        return qs.filter(solicitante=self.request.user)
+        # mine=true => solo las del usuario logueado
+        mine = self.request.query_params.get("mine")
+        if mine and mine.lower() in ("1", "true", "yes"):
+            qs = qs.filter(solicitante=self.request.user)
+
+        # filtro de estado opcional
+        estado = self.request.query_params.get("estado")
+        if estado in dict(SolicitudReserva.ESTADOS):
+            qs = qs.filter(estado=estado)
+
+        return qs.order_by("-creado_el")
+
+    def get_serializer_class(self):
+        if self.action == "create":
+            return CrearSolicitudSerializer
+        return SolicitudReservaSerializer
 
     def perform_create(self, serializer):
         serializer.save(solicitante=self.request.user)
-
-    @action(detail=True, methods=["post"], permission_classes=[EsAdminOSectretaria])
-    def aprobar(self, request, pk=None):
-        s = self.get_object()
-        s.estado = "APROBADA"
-        s.save(update_fields=["estado"])
-        return Response(SolicitudReservaSerializer(s).data)
-
-    @action(detail=True, methods=["post"], permission_classes=[EsAdminOSectretaria])
-    def rechazar(self, request, pk=None):
-        s = self.get_object()
-        s.estado = "RECHAZADA"
-        s.save(update_fields=["estado"])
-        return Response(SolicitudReservaSerializer(s).data)

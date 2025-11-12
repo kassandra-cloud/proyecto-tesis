@@ -17,6 +17,8 @@ urlpatterns = [
     # --- Vistas de Gestión de RESERVAS ---
     path('solicitudes/', views.gestionar_reservas, name='gestionar_reservas'),
     path('solicitudes/<int:pk>/actualizar/', views.actualizar_estado_reserva, name='actualizar_estado_reserva'),
+    path('reservas/gestionar/', views.gestionar_reservas, name='gestionar_reservas'),
+    path('reservas/<int:pk>/estado/', views.actualizar_estado_reserva, name='actualizar_estado_reserva'),
 
 ]
 

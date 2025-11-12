@@ -6,7 +6,7 @@ from .models import Recurso, Reserva
 from .forms import RecursoForm
 from django.views.decorators.http import require_POST
 from django.utils import timezone
-
+from .models import Recurso, SolicitudReserva, Reserva
 @login_required
 @role_required("recursos", "view")
 def lista_recursos(request):
@@ -99,61 +99,54 @@ def restaurar_recurso(request, pk):
 @login_required
 @role_required("reservas", "manage_all")
 def gestionar_reservas(request):
-    """
-    Panel para la Directiva: Ver todas las solicitudes y filtrarlas.
-    """
-    # Obtenemos el filtro de la URL (ej: ?estado=PENDIENTE)
-    # Por defecto, mostramos las PENDIENTES
-    filtro_estado = request.GET.get('estado', 'PENDIENTE').upper()
+    # Estados y filtro
+    estados_posibles = SolicitudReserva.ESTADOS
+    filtro_actual = request.GET.get('estado', 'PENDIENTE').upper()
+    if filtro_actual not in dict(estados_posibles):
+        filtro_actual = 'PENDIENTE'
 
-    if filtro_estado not in Reserva.Estado.values:
-        filtro_estado = 'PENDIENTE'
+    # Cargamos SOLICITUDES, pero las exponemos como "reservas" al template
+    qs = (SolicitudReserva.objects
+          .filter(estado=filtro_actual)
+          .select_related('recurso','solicitante','solicitante__perfil')
+          .order_by('fecha_inicio'))
 
-    # Filtramos las reservas según el estado
-    reservas_list = Reserva.objects.filter(
-        estado=filtro_estado
-    ).select_related('recurso', 'vecino', 'vecino__perfil').order_by('fecha_inicio')
-    
-    # Conteo para la insignia en la pestaña
-    conteo_pendientes = Reserva.objects.filter(estado=Reserva.Estado.PENDIENTE).count()
+    conteo_pendientes = SolicitudReserva.objects.filter(estado="PENDIENTE").count()
 
-    context = {
-        'reservas': reservas_list,
-        'filtro_actual': filtro_estado,
-        'estados_posibles': Reserva.Estado.choices,
-        'conteo_pendientes': conteo_pendientes,
-        'titulo': 'Gestión de Solicitudes de Reserva'
+    ctx = {
+        "titulo": "Gestión de Solicitudes de Reserva",
+        "estados_posibles": estados_posibles,
+        "filtro_actual": filtro_actual,
+        "conteo_pendientes": conteo_pendientes,
+        "reservas": qs,  # <- mismo nombre que espera el template
     }
-    return render(request, 'recursos/gestionar_reservas.html', context)
-
-
+    return render(request, "recursos/gestionar_reservas.html", ctx)
 @login_required
 @role_required("reservas", "manage_all")
 @require_POST
 def actualizar_estado_reserva(request, pk):
-    """
-    Acción POST para Aprobar o Rechazar una reserva.
-    """
-    reserva = get_object_or_404(Reserva, pk=pk)
-    
-    # El valor del botón 'submit' será 'APROBADA' o 'RECHAZADA'
-    nueva_accion = request.POST.get('accion')
+    # Ahora opera sobre SOLICITUD
+    sol = get_object_or_404(SolicitudReserva, pk=pk)
+    accion = request.POST.get('accion')
 
-    if nueva_accion == 'APROBADA':
-        reserva.estado = Reserva.Estado.APROBADA
-        reserva.save()
-        messages.success(request, f'Reserva de {reserva.recurso.nombre} para {reserva.vecino.username} APROBADA.')
-        
-        # (Aquí irá la lógica de notificación push a la app)
-    
-    elif nueva_accion == 'RECHAZADA':
-        reserva.estado = Reserva.Estado.RECHAZADA
-        reserva.save()
-        messages.warning(request, f'Reserva de {reserva.recurso.nombre} para {reserva.vecino.username} RECHAZADA.')
-        
-        # (Aquí irá la lógica de notificación push a la app)
+    if accion == 'APROBADA':
+        sol.estado = "APROBADA"
+        sol.save(update_fields=["estado"])
+        # Crear la Reserva “espejo”
+        Reserva.objects.create(
+            recurso=sol.recurso,
+            vecino=sol.solicitante,
+            fecha_inicio=sol.fecha_inicio,
+            fecha_fin=sol.fecha_fin,
+            motivo=sol.motivo,
+            estado=Reserva.Estado.APROBADA,
+        )
+        messages.success(request, f"Solicitud #{sol.id} APROBADA. Reserva creada.")
+    elif accion == 'RECHAZADA':
+        sol.estado = "RECHAZADA"
+        sol.save(update_fields=["estado"])
+        messages.warning(request, f"Solicitud #{sol.id} RECHAZADA.")
     else:
-        messages.error(request, 'Acción no válida.')
+        messages.error(request, "Acción no válida.")
 
-    # Redirigir de vuelta a la lista de pendientes (o de donde vino)
     return redirect(request.POST.get('next', 'recursos:gestionar_reservas'))
