@@ -2,8 +2,8 @@ from django.db import models
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.utils import timezone
-from django.db.models import Q
-
+from django.db import models
+from django.db.models import Q, F, UniqueConstraint
 class Recurso(models.Model):
     
     nombre = models.CharField(max_length=100, unique=True, verbose_name="Nombre del Recurso")
@@ -80,10 +80,11 @@ class SolicitudReserva(models.Model):
         ("PENDIENTE", "Pendiente"),
         ("APROBADA", "Aprobada"),
         ("RECHAZADA", "Rechazada"),
+        ("CANCELADA", "Cancelada por Vecino"),
     ]
 
     recurso = models.ForeignKey(
-        Recurso,
+        "Recurso",
         on_delete=models.CASCADE,
         related_name="solicitudes",
     )
@@ -106,30 +107,36 @@ class SolicitudReserva(models.Model):
 
     class Meta:
         ordering = ["-creado_el"]
-        # Índices útiles para búsquedas por recurso/fechas/estado
         indexes = [
             models.Index(fields=["recurso", "fecha_inicio", "fecha_fin"]),
             models.Index(fields=["estado"]),
+            models.Index(fields=["solicitante", "recurso"]),
         ]
-        # Regla a nivel de BD: fecha_fin >= fecha_inicio
         constraints = [
+            # fecha_fin >= fecha_inicio
             models.CheckConstraint(
-                check=models.Q(fecha_fin__gte=models.F("fecha_inicio")),
+                check=Q(fecha_fin__gte=F("fecha_inicio")),
                 name="solicitud_fin_gte_inicio",
-            )
+            ),
+            # **Una PENDIENTE por (solicitante, recurso)**
+            UniqueConstraint(
+                fields=["solicitante", "recurso"],
+                condition=Q(estado="PENDIENTE"),
+                name="uniq_pendiente_por_usuario_y_recurso",
+            ),
         ]
 
     def __str__(self):
         return f"{self.recurso} · {self.solicitante} · {self.estado} ({self.fecha_inicio}→{self.fecha_fin})"
 
-    # Validación de modelo (se ejecuta en .full_clean(); la llamamos en save)
     def clean(self):
         super().clean()
+
+        # 1) Rango válido
         if self.fecha_fin and self.fecha_inicio and self.fecha_fin < self.fecha_inicio:
             raise ValidationError("La fecha de fin no puede ser menor a la fecha de inicio.")
 
-        # (Opcional) Evitar traslape de reservas APROBADAS para el mismo recurso
-        # Solo bloquea si esta solicitud ya está aprobada o se intenta aprobar.
+        # 2) (Opcional) impedir solapamiento de APROBADAS del mismo recurso
         if self.estado == "APROBADA":
             solapadas = (
                 SolicitudReserva.objects
@@ -142,11 +149,29 @@ class SolicitudReserva(models.Model):
                 .exists()
             )
             if solapadas:
-                raise ValidationError("Ya existe una reserva APROBADA que se solapa en esas fechas para este recurso.")
+                raise ValidationError(
+                    "Ya existe una reserva APROBADA que se solapa en esas fechas para este recurso."
+                )
+
+        # 3) **Regla de negocio principal**:
+        #    bloquear segunda solicitud ACTIVA (PENDIENTE o APROBADA vigente) para el mismo recurso y solicitante
+        hoy = timezone.now().date()
+        activa_existente = (
+            SolicitudReserva.objects
+            .filter(
+                solicitante=self.solicitante,
+                recurso=self.recurso,
+                estado__in=["PENDIENTE", "APROBADA"],
+                fecha_fin__gte=hoy,          # vigente
+            )
+            .exclude(pk=self.pk)
+            .exists()
+        )
+        if activa_existente:
+            raise ValidationError("Ya tienes una solicitud activa para este recurso.")
 
     def save(self, *args, **kwargs):
-        # Garantiza que se apliquen las validaciones de clean() también vía admin o API
-        self.full_clean()
+        self.full_clean()  # garantiza validaciones también vía admin o API
         return super().save(*args, **kwargs)
 
     @property
