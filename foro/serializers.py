@@ -6,17 +6,21 @@ User = get_user_model()
 
 
 class ArchivoAdjuntoSerializer(serializers.ModelSerializer):
-    # si quieres exponer la URL absoluta puedes usar SerializerMethodField
-    class Meta:
-        model = ArchivoAdjunto
-        fields = ("id", "archivo", "tipo_archivo", "nombre")
-
     # Alias "url" para que calce con tu app móvil (AdjuntoDto.url)
     url = serializers.SerializerMethodField()
 
+    class Meta:
+        model = ArchivoAdjunto
+        # 👇 Agregamos "url" al tuple de fields
+        fields = ("id", "archivo", "tipo_archivo","url")
+
     def get_url(self, obj):
+        # Si quieres URL absoluta (http://.../media/archivo.png):
+        request = self.context.get("request")
         try:
-            return obj.archivo.url
+            if request and obj.archivo:
+                return request.build_absolute_uri(obj.archivo.url)
+            return obj.archivo.url  # relativa como /media/...
         except Exception:
             return ""
 

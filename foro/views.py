@@ -18,7 +18,8 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.authentication import TokenAuthentication, SessionAuthentication
 from rest_framework.response import Response
 from rest_framework import status
-
+from .serializers import PublicacionSerializer
+from rest_framework.permissions import IsAuthenticatedOrReadOnly
 
 # ------------------------------------------------------------------------------
 #                                   WEB
@@ -260,19 +261,16 @@ def _publicacion_to_dict(p: Publicacion, incluir_comentarios: bool = False) -> d
 
 @api_view(["GET"])
 @authentication_classes([TokenAuthentication, SessionAuthentication])
-@permission_classes([AllowAny])   # Cambia a IsAuthenticated si lo requieres
+@permission_classes([IsAuthenticatedOrReadOnly])
 def api_publicaciones_list(request):
-    """GET /foro/api/v1/publicaciones/"""
     qs = (
-        Publicacion.objects
+        Publicacion.objects.filter(visible=True)
         .select_related("autor")
-        .prefetch_related("adjuntos")
+        .prefetch_related("adjuntos", "comentarios__autor")
         .order_by("-fecha_creacion")
     )
-    data = [_publicacion_to_dict(p, incluir_comentarios=False) for p in qs]
-    return Response(data)
-
-
+    serializer = PublicacionSerializer(qs, many=True, context={"request": request})
+    return Response(serializer.data)
 @api_view(["GET", "POST"])
 @authentication_classes([TokenAuthentication, SessionAuthentication])
 def api_publicacion_comentarios(request, pk: int):

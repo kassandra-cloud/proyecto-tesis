@@ -117,6 +117,11 @@ DATABASES = {
         "PASSWORD": os.getenv("MYSQL_PASSWORD", ""),
         "HOST": os.getenv("MYSQL_HOST", "127.0.0.1"),
         "PORT": os.getenv("MYSQL_PORT", "3306"),
+        "CONN_MAX_AGE": 60,            # reutiliza la conexión hasta 60s
+        "CONN_HEALTH_CHECKS": True,    # Django 5: revisa conexión antes de usarla
+        "OPTIONS": {
+            "connect_timeout": 10,
+        },
         "OPTIONS": {
             "charset": "utf8mb4",
             "init_command": "SET sql_mode='STRICT_TRANS_TABLES'",
