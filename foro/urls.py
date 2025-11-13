@@ -22,4 +22,9 @@ urlpatterns = [
     # GET  /foro/api/v1/publicaciones/<id>/comentarios/
     # POST /foro/api/v1/publicaciones/<id>/comentarios/
     path("api/v1/publicaciones/<int:pk>/comentarios/", views.api_publicacion_comentarios, name="api_publicacion_comentarios"),
+    path(
+            "api/v1/publicaciones/<int:pk>/adjuntos/",
+            views.api_subir_adjunto,
+            name="api_subir_adjunto",
+        ),
 ]

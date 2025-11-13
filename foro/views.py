@@ -20,7 +20,18 @@ from rest_framework.response import Response
 from rest_framework import status
 from .serializers import PublicacionSerializer
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
-
+from .models import Publicacion, ArchivoAdjunto
+from .serializers import ArchivoAdjuntoSerializer
+from rest_framework.decorators import api_view, permission_classes, parser_classes
+from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.response import Response
+from rest_framework import status, permissions
+from rest_framework.decorators import (
+    api_view,
+    permission_classes,
+    authentication_classes,
+    parser_classes,
+)
 # ------------------------------------------------------------------------------
 #                                   WEB
 # ------------------------------------------------------------------------------
@@ -61,7 +72,6 @@ def lista_publicaciones(request):
     }
     return render(request, "foro/lista_publicaciones.html", context)
 
-
 @login_required
 def crear_publicacion(request):
     """Crea publicación (formulario modal). Redirige a la lista."""
@@ -74,8 +84,13 @@ def crear_publicacion(request):
         publicacion.autor = request.user
         publicacion.save()
 
+        # Crear adjuntos con autor = usuario logueado
         for f in request.FILES.getlist("archivos"):
-            ArchivoAdjunto.objects.create(publicacion=publicacion, archivo=f)
+            ArchivoAdjunto.objects.create(
+                publicacion=publicacion,
+                archivo=f,
+                autor=request.user,   # 👈 ESTE ES EL CAMBIO IMPORTANTE
+            )
 
         messages.success(request, "Publicación creada.")
         return redirect("lista_publicaciones")
@@ -85,7 +100,6 @@ def crear_publicacion(request):
     request.session["form_errors"] = form.errors.as_json()
     messages.error(request, "No se pudo crear la publicación.")
     return redirect("lista_publicaciones")
-
 
 @login_required
 def detalle_publicacion(request, pk):
@@ -309,3 +323,38 @@ def api_publicacion_comentarios(request, pk: int):
         parent=parent_obj,
     )
     return Response(_comentario_to_dict(c), status=status.HTTP_201_CREATED)
+@api_view(["POST"])
+@authentication_classes([TokenAuthentication, SessionAuthentication])
+@permission_classes([IsAuthenticated])
+@parser_classes([MultiPartParser, FormParser])
+def api_subir_adjunto(request, pk: int):
+    """
+    Sube un archivo (imagen, audio, video, etc.) asociado a una publicación del foro.
+    Endpoint: POST /foro/api/v1/publicaciones/<pk>/adjuntos/
+    """
+    # 1) Buscar la publicación
+    try:
+        publicacion = Publicacion.objects.get(pk=pk, visible=True)
+    except Publicacion.DoesNotExist:
+        return Response(
+            {"detail": "Publicación no encontrada."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    # 2) Tomar el archivo enviado bajo el nombre "archivo"
+    archivo = request.FILES.get("archivo")
+    if not archivo:
+        return Response(
+            {"detail": "No se envió ningún archivo en el campo 'archivo'."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    # 3) Crear el adjunto
+    adj = ArchivoAdjunto(
+        publicacion=publicacion,
+        autor=request.user,          # 👈 AQUÍ
+        archivo=archivo
+    )
+    adj.save()
+    serializer = ArchivoAdjuntoSerializer(adj, context={"request": request})
+    return Response(serializer.data, status=status.HTTP_201_CREATED)

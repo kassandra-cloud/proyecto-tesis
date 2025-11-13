@@ -15,18 +15,25 @@ class Publicacion(models.Model):
         return f'Publicación de {self.autor.username}'
 
 class ArchivoAdjunto(models.Model):
-    publicacion = models.ForeignKey(Publicacion, on_delete=models.CASCADE, related_name='adjuntos')
+    publicacion = models.ForeignKey(
+        Publicacion,
+        on_delete=models.CASCADE,
+        related_name='adjuntos'
+    )
+    autor = models.ForeignKey(              # 👈 NUEVO
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='adjuntos_foro'
+    )
     archivo = models.FileField(upload_to='archivos/')
+    fecha_creacion = models.DateTimeField(auto_now_add=True)   # 👈 NUEVO
 
     def __str__(self):
         return self.archivo.name
 
-    # ------------------------------
-    # Propiedad para detectar tipo de archivo
-    # ------------------------------
     @property
     def tipo_archivo(self):
-        ext = os.path.splitext(self.archivo.name)[1].lower()  # extensión en minúscula
+        ext = os.path.splitext(self.archivo.name)[1].lower()
         if ext in ['.jpg', '.jpeg', '.png', '.gif']:
             return 'imagen'
         elif ext in ['.mp3', '.wav', '.ogg', '.webm', '.m4a']:

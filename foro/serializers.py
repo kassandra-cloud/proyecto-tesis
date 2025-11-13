@@ -3,28 +3,21 @@ from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from foro.models import Publicacion, Comentario, ArchivoAdjunto  # <-- OJO aquí
 User = get_user_model()
-
-
 class ArchivoAdjuntoSerializer(serializers.ModelSerializer):
-    # Alias "url" para que calce con tu app móvil (AdjuntoDto.url)
+    tipo_archivo = serializers.ReadOnlyField()
     url = serializers.SerializerMethodField()
+    autor = serializers.CharField(source="autor.username", read_only=True)
+    fecha_creacion = serializers.DateTimeField(read_only=True)
 
     class Meta:
         model = ArchivoAdjunto
-        # 👇 Agregamos "url" al tuple de fields
-        fields = ("id", "archivo", "tipo_archivo","url")
+        fields = ("id", "autor", "archivo", "tipo_archivo", "url", "fecha_creacion")
 
     def get_url(self, obj):
-        # Si quieres URL absoluta (http://.../media/archivo.png):
         request = self.context.get("request")
-        try:
-            if request and obj.archivo:
-                return request.build_absolute_uri(obj.archivo.url)
-            return obj.archivo.url  # relativa como /media/...
-        except Exception:
-            return ""
-
-
+        if request is not None:
+            return request.build_absolute_uri(obj.archivo.url)
+        return obj.archivo.url
 class ComentarioSerializer(serializers.ModelSerializer):
     autor_username = serializers.CharField(source="autor.username", read_only=True)
     fecha_creacion = serializers.DateTimeField(read_only=True)
