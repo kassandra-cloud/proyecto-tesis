@@ -29,15 +29,32 @@
                     <strong>{{ opcion.votos }} voto(s) ({{ opcion.porcentaje }}%)</strong>
                 </div>
                 <div class="progress" style="height: 20px;">
-                    {# MUESTRA ERROR PERO ESTA BIEN #}
-                    <div class="progress-bar" role="progressbar" style="width: {{ opcion.porcentaje }}%" aria-valuenow="{{ opcion.porcentaje }}" aria-valuemin="0" aria-valuemax="100"></div>
+                    
+                    {# Comparamos 'opcion.votos' (que SÍ es un número) #}
+                    {% if opcion.votos > 0 %}
+                    <div class="progress-bar 
+                         {% if opcion.texto == 'Apruebo' %}progress-bar-apruebo{% elif opcion.texto == 'Rechazo' %}progress-bar-rechazo{% else %}progress-bar-otro{% endif %}" 
+                         role="progressbar" 
+                         
+                         {# --- INICIO DE LA CORRECCIÓN --- #}
+                         {# Usamos |floatformat:0 para redondear el número (ej. "100%" en vez de "100.0%") #}
+                         style="width: {{ opcion.porcentaje|floatformat:0 }}%;" 
+                         {# --- FIN DE LA CORRECCIÓN --- #}
+
+                         aria-valuenow="{{ opcion.votos }}" 
+                         aria-valuemin="0" 
+                         aria-valuemax="{{ total_votos }}">
+                        
+                        {# Quitamos el texto de adentro para que se vea limpio #}
+                    
+                    </div>
+                    {% endif %}
+
                 </div>
             </div>
-            {% empty %}
-                <p class="text-muted">Aún no se han registrado votos.</p>
             {% endfor %}
 
-        {# CASO 2: Si no es Directiva, muestra un mensaje simple #}
+        {# CASO 2: Si el usuario NO es directiva, muestra mensaje genérico #}
         {% else %}
             <div class="alert alert-secondary">
                 La información detallada de la votación está disponible para la directiva. Los vecinos participan a través de la aplicación móvil.
@@ -62,8 +79,9 @@
     <div class="card-footer d-flex justify-content-between align-items-center">
         <a href="{% url 'votaciones:lista_votaciones' %}" class="btn btn-secondary">← Volver a la lista</a>
         <small class="text-muted">
-            Votación creada por {{ votacion.creada_por.username }}
+            Votación creada por {{ votacion.creado_por.username }} el {{ votacion.fecha_creacion|date:"d/m/Y" }}
         </small>
     </div>
 </div>
+
 {% endblock %}

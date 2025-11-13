@@ -1,0 +1,31 @@
+# -------------------------------------
+# Dependencias Principales del Proyecto
+# -------------------------------------
+
+# Framework principal
+Django
+djangorestframework
+
+# Apps de Django y utilidades
+django-filter
+django-widget-tweaks
+
+# Servidor ASGI (para WebSockets/Channels)
+channels
+daphne
+
+# Base de datos
+PyMySQL
+
+# Utilidades generales
+python-dotenv  # Para leer el archivo .env
+requests       # Para hacer peticiones HTTP
+
+# Reconocimiento de voz
+vosk
+
+# Generación y manejo de PDFs
+pypdf          # Manipulación general de PDF
+xhtml2pdf      # Crear PDF desde HTML
+pyHanko        # Para firmas digitales en PDF
+reportlab      # Dependencia para xhtml2pdf

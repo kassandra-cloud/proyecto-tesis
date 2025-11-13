@@ -112,9 +112,9 @@
                             {% user_can 'foro' 'moderar' as puede_moderar %}
                             
                             {% if c.visible and request.user == c.autor or c.visible and puede_moderar %}
-                            <form class="m-0" method="POST" action="{% url 'eliminar_comentario_web' c.id %}" onsubmit="return confirm('¿Seguro que quieres eliminar este comentario?');">
+                            <form class="m-0" method="POST" action="{% url 'eliminar_comentario_web' c.id %}" onsubmit="return confirm('¿Seguro que quieres Ocultar este comentario?');">
                                 {% csrf_token %}
-                                <button type="submit" class="btn btn-link text-danger p-0 m-0" style="font-size: 0.8em;">Eliminar</button>
+                                <button type="submit" class="btn btn-link text-danger p-0 m-0" style="font-size: 0.8em;">Ocultar</button>
                             </form>
                             {% endif %}
               
@@ -150,9 +150,9 @@
                                 </div>
                                 <div class="d-flex gap-2 align-items-center">
                                     {% if r.visible and request.user == r.autor or r.visible and puede_moderar %}
-                                    <form class="m-0" method="POST" action="{% url 'eliminar_comentario_web' r.id %}" onsubmit="return confirm('¿Seguro que quieres eliminar este comentario?');">
+                                    <form class="m-0" method="POST" action="{% url 'eliminar_comentario_web' r.id %}" onsubmit="return confirm('¿Seguro que quieres Ocultar este comentario?');">
                                         {% csrf_token %}
-                                        <button type="submit" class="btn btn-link text-danger p-0 m-0" style="font-size: 0.8em;">Eliminar</button>
+                                        <button type="submit" class="btn btn-link text-danger p-0 m-0" style="font-size: 0.8em;">Ocultar</button>
                                     </form>
                                     {% endif %}
                                     {% if not r.visible and puede_moderar %}

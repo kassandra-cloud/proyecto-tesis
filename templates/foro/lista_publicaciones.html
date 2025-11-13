@@ -4,10 +4,10 @@
 {% block content %}
 
 <div class="row justify-content-center">
-    <div class="col-lg-9"> <h1>Foro de la Junta de Vecinos</h1>
+    <div class="col-lg-9"> <h1 class="text-center">Foro de la Junta de Vecinos</h1>
         <hr>
 
-        <h2>Publicaciones</h2>
+        <h2 class="text-center">Publicaciones</h2>
         <div class="listado-publicaciones">
             
             {% for publicacion in publicaciones %}
@@ -75,7 +75,7 @@
                             {% endif %}
             
                             <a href="{% url 'detalle_publicacion' publicacion.pk %}" class="btn btn-outline-primary btn-sm mt-3">
-                               Ver / Comentar ({{ publicacion.num_comentarios }})
+                               Ver Comentarios ({{ publicacion.num_comentarios }})
                             </a>
                             
                         </article>
