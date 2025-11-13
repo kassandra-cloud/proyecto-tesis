@@ -66,5 +66,6 @@ ROLE_MATRIX: Dict[str, Dict[str, List[str]]] = {
     },
     "foro": {
         "moderar": [PRESIDENTE, SECRETARIA, TESORERO, SUPLENTE],
+        "delete": [PRESIDENTE, SECRETARIA, TESORERO, SUPLENTE],
     },
 }

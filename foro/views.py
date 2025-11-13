@@ -1,17 +1,16 @@
 # foro/views.py
-
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
 from django.contrib import messages
-from django.http import HttpResponse
+from django.http import HttpResponse, Http404
 from django.template.loader import render_to_string
-from core.authz import role_required
+from django.db.models import Count, Q
+import json
 
 from .models import Publicacion, ArchivoAdjunto, Comentario
 from .forms import PublicacionForm, ComentarioCreateForm
-from core.authz import can
-from django.db.models import Q
+from core.authz import can, role_required
 
 # ==== API (DRF) ====
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
@@ -27,28 +26,23 @@ from rest_framework import status
 
 @login_required
 def lista_publicaciones(request):
-    """Listado y formulario web para crear publicaciones."""
+    """Listado web. Ahora solo carga publicaciones, no comentarios."""
     
-    # --- ▼ REEMPLAZA TU CONSULTA 'publicaciones' POR ESTO ▼ ---
-    
-    # Comprobamos si el usuario es moderador
     es_moderador = can(request.user, "foro", "moderar")
 
     if es_moderador:
-        # Los moderadores ven TODO (incluyendo publicaciones ocultas)
         publicaciones_qs = Publicacion.objects.all()
     else:
-        # Los vecinos normales solo ven las publicaciones visibles
         publicaciones_qs = Publicacion.objects.filter(visible=True)
 
     publicaciones = (
         publicaciones_qs
-        .select_related("autor") # <--- AÑADE ESTO
+        .select_related("autor")
         .prefetch_related("adjuntos")
+        .annotate(num_comentarios=Count('comentarios')) # Contamos comentarios
         .order_by("-fecha_creacion")
     )
-
-    # Restaurar estado del form si hubo errores en POST previo
+    
     form_con_error_data = request.session.pop("form_con_error_data", None)
     form_errors = request.session.pop("form_errors", None)
 
@@ -69,7 +63,7 @@ def lista_publicaciones(request):
 
 @login_required
 def crear_publicacion(request):
-    """Crea publicación desde el form de la vista anterior (maneja adjuntos)."""
+    """Crea publicación (formulario modal). Redirige a la lista."""
     if request.method != "POST":
         return redirect("lista_publicaciones")
 
@@ -79,14 +73,13 @@ def crear_publicacion(request):
         publicacion.autor = request.user
         publicacion.save()
 
-        # Adjuntos subidos con <input name="archivos" multiple>
         for f in request.FILES.getlist("archivos"):
             ArchivoAdjunto.objects.create(publicacion=publicacion, archivo=f)
 
         messages.success(request, "Publicación creada.")
         return redirect("lista_publicaciones")
 
-    # Guardar errores para rehidratar el form tras el redirect
+    # Si hay errores, guardamos en sesión y redirigimos
     request.session["form_con_error_data"] = request.POST
     request.session["form_errors"] = form.errors.as_json()
     messages.error(request, "No se pudo crear la publicación.")
@@ -94,121 +87,119 @@ def crear_publicacion(request):
 
 
 @login_required
-def foro_web(request):
-    """Versión web con publicaciones y comentarios precargados."""
-    publicaciones = (
-        Publicacion.objects
-        .select_related("autor")
-        .prefetch_related("comentarios__autor", "adjuntos")
-        .order_by("-fecha_creacion")
-    )
-    return render(request, "foro/foro_web.html", {"publicaciones": publicaciones})
-
-
-@require_POST
-@login_required
-def comentar(request, publicacion_id):
+def detalle_publicacion(request, pk):
     """
-    Crea comentario desde la web (form HTML).
-    Esta vista está diseñada para ser llamada por HTMX.
+    NUEVA VISTA. Muestra una publicación y sus comentarios.
+    También maneja el POST para crear nuevos comentarios/respuestas.
     """
-    publicacion = get_object_or_404(Publicacion, id=publicacion_id)
-    form = ComentarioCreateForm(request.POST)
-    
-    if form.is_valid():
-        form.save(publicacion=publicacion, autor=request.user)
-        # Los 'messages' no se mostrarán porque HTMX reemplaza el HTML.
-        # El éxito es implícito cuando el comentario aparece.
-    else:
-        # Si el form no es válido (ej. comentario vacío), no hacemos nada
-        # y simplemente devolvemos la lista de comentarios sin cambios.
-        # Podríamos pasar el error, pero por ahora lo mantenemos simple.
-        pass
-
-    # --- ESTA ES LA CORRECCIÓN ---
-    # En lugar de un 'redirect', llamamos a tu otra vista 'comentarios_partial'
-    # que genera solo el HTML de la lista de comentarios.
-    # Esto es exactamente lo que HTMX espera recibir.
-    return comentarios_partial(request, publicacion_id)
-
-
-@login_required
-def comentarios_partial(request, publicacion_id):
-    """Devuelve el HTML parcial de los comentarios de una publicación."""
-    pub = get_object_or_404(Publicacion, pk=publicacion_id)
-    
-    # --- ▼ REEMPLAZA TU CONSULTA 'comentarios' POR ESTO ▼ ---
     es_moderador = can(request.user, "foro", "moderar")
     
-    if es_moderador:
-        # El moderador ve todos los comentarios
-        comentarios_qs = pub.comentarios.all()
+    # Obtenemos la publicación
+    try:
+        if es_moderador:
+            publicacion = get_object_or_404(Publicacion.objects.select_related("autor").prefetch_related("adjuntos"), pk=pk)
+        else:
+            publicacion = get_object_or_404(Publicacion.objects.select_related("autor").prefetch_related("adjuntos"), pk=pk, visible=True)
+    except Http404:
+        messages.error(request, "Esa publicación no existe o no tienes permiso para verla.")
+        return redirect("lista_publicaciones")
+
+    # Lógica para ENVIAR un comentario (POST)
+    if request.method == "POST":
+        form = ComentarioCreateForm(request.POST)
+        if form.is_valid():
+            form.save(publicacion=publicacion, autor=request.user)
+            messages.success(request, "Comentario publicado.")
+            # Redirigimos a la misma página (al ancla del nuevo comentario si quisiéramos)
+            return redirect("detalle_publicacion", pk=publicacion.pk)
+        else:
+            messages.error(request, "No se pudo publicar el comentario.")
+            # Si hay error, continuamos al GET para mostrar el form con errores
     else:
-        # El vecino normal ve solo comentarios visibles O sus propios comentarios
-        comentarios_qs = pub.comentarios.filter(
+        # Lógica para VER la página (GET)
+        form = ComentarioCreateForm()
+
+    # Obtenemos los comentarios para esta publicación
+    if es_moderador:
+        comentarios_qs = publicacion.comentarios.all()
+    else:
+        comentarios_qs = publicacion.comentarios.filter(
             Q(visible=True) | Q(autor=request.user)
         )
         
     comentarios = comentarios_qs.select_related("autor").order_by("fecha_creacion")
-    html = render_to_string(
-        "foro/_comentarios_ul.html",  # <--- ¡CORREGIDO!
-        {"publicacion": pub, "comentarios": comentarios},
-        request=request,
-    )
-    return HttpResponse(html)
+    
+    context = {
+        "publicacion": publicacion,
+        "comentarios": comentarios,
+        "form_comentario": form,
+    }
+    return render(request, "foro/detalle_publicacion.html", context)
+
+
+# --- VISTAS DE MODERACIÓN (WEB) ---
+# (Las vistas de HTMX fueron eliminadas o renombradas)
+
 @require_POST
 @login_required
-@role_required("foro", "moderar") # Solo moderadores
-def alternar_publicacion(request, pk):
-    """
-    Oculta o muestra una publicación completa.
-    """
+@role_required("foro", "moderar")
+def alternar_publicacion_web(request, pk):
+    """Oculta o muestra una publicación y redirige a la lista."""
     publicacion = get_object_or_404(Publicacion, pk=pk)
-    # Alternamos el estado
     publicacion.visible = not publicacion.visible
     publicacion.save()
     
-    # --- ▼ ESTA ES LA CORRECCIÓN ▼ ---
-    # Volvemos a hacer la consulta para obtener la lista actualizada
-    es_moderador = can(request.user, "foro", "moderar")
-    if es_moderador:
-        publicaciones_qs = Publicacion.objects.all()
+    if publicacion.visible:
+        messages.success(request, "Publicación restaurada.")
     else:
-        publicaciones_qs = Publicacion.objects.filter(visible=True)
-
-    publicaciones = (
-        publicaciones_qs
-        .select_related("autor")
-        .prefetch_related("adjuntos")
-        .order_by("-fecha_creacion")
-    )
+        messages.warning(request, "Publicación ocultada.")
     
-    context = {"publicaciones": publicaciones}
-    
-    # Devolvemos SÓLO el fragmento del bucle, no la página entera
-    return render(request, "foro/_publicaciones_loop.html", context)
-    # --- ▲ FIN DE LA CORRECCIÓN ▲ ---
+    return redirect("lista_publicaciones")
 
 @require_POST
 @login_required
-def eliminar_comentario(request, pk):
-    """
-    Oculta (soft delete) un comentario.
-    Un moderador puede ocultar cualquiera.
-    Un usuario normal solo puede ocultar el suyo.
-    """
+def eliminar_comentario_web(request, pk):
+    """Oculta (soft delete) un comentario y redirige de vuelta."""
     comentario = get_object_or_404(Comentario, pk=pk)
     es_moderador = can(request.user, "foro", "moderar")
     
-    # Comprobar permisos
     if request.user == comentario.autor or es_moderador:
         comentario.visible = False
         comentario.save()
+        messages.warning(request, "Comentario eliminado.")
     else:
-        messages.error(request, "No tienes permisos para eliminar este comentario.")
+        messages.error(request, "No tienes permisos para esta acción.")
 
-    # Devolvemos el fragmento de comentarios actualizado
-    return comentarios_partial(request, comentario.publicacion_id)
+    # Redirige de vuelta a la página de detalle
+    return redirect("detalle_publicacion", pk=comentario.publicacion_id)
+
+@require_POST
+@login_required
+@role_required("foro", "moderar")
+def restaurar_comentario_web(request, pk):
+    """Restaura un comentario (lo vuelve visible) y redirige de vuelta."""
+    comentario = get_object_or_404(Comentario, pk=pk)
+    
+    if not comentario.visible:
+        comentario.visible = True
+        comentario.save()
+        messages.success(request, "Comentario restaurado.")
+    
+    return redirect("detalle_publicacion", pk=comentario.publicacion_id)
+
+@require_POST
+@login_required
+@role_required("foro", "delete")
+def eliminar_publicacion_web(request, pk):
+    """Elimina PERMANENTEMENTE una publicación y redirige a la lista."""
+    publicacion = get_object_or_404(Publicacion, pk=pk)
+    contenido_truncado = (publicacion.contenido[:20] + '...') if len(publicacion.contenido) > 20 else publicacion.contenido
+    
+    publicacion.delete()
+    
+    messages.error(request, f"Publicación '{contenido_truncado}' eliminada permanentemente.")
+    return redirect("lista_publicaciones")
+
 
 # ------------------------------------------------------------------------------
 #                                   API (REST)

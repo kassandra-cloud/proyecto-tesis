@@ -1,0 +1,196 @@
+{% extends 'base.html' %}
+{% load can %}
+
+{% block content %}
+
+<div class="row justify-content-center">
+    <div class="col-lg-9">
+
+        <a href="{% url 'lista_publicaciones' %}" class="btn btn-outline-secondary mb-3">
+            ← Volver al Foro
+        </a>
+
+        <div class="card shadow-sm mb-4" id="pub-{{ publicacion.id }}">
+            <div class="card-body">
+                <article class="post">
+                    <p class="mb-1 d-flex justify-content-between align-items-center">
+                        <span>
+                            <strong>@{{ publicacion.autor.username }}</strong>
+                            <small class="text-muted">({{ publicacion.fecha_creacion|date:"d/m/Y H:i" }})</small>
+                        </span>
+                        
+                        {% user_can 'foro' 'moderar' as puede_moderar %}
+                        {% if puede_moderar %}
+                            <div class="d-flex">
+                                <form class="m-0" method="POST" action="{% url 'alternar_publicacion_web' publicacion.id %}" onsubmit="return confirm('¿Seguro que quieres cambiar la visibilidad de esta publicación?');">
+                                    {% csrf_token %}
+                                    {% if publicacion.visible %}
+                                        <button type="submit" class="btn btn-sm btn-outline-warning">Ocultar</button>
+                                    {% else %}
+                                        <button type="submit" class="btn btn-sm btn-outline-success">Mostrar</button>
+                                    {% endif %}
+                                </form>
+
+                                {% user_can 'foro' 'delete' as puede_eliminar_perm %}
+                                {% if puede_eliminar_perm %}
+                                    <form class="m-0" method="POST" action="{% url 'eliminar_publicacion_web' publicacion.id %}" onsubmit="return confirm('¡ADVERTENCIA! Vas a ELIMINAR PERMANENTEMENTE esta publicación y TODOS sus comentarios. ¿Estás seguro?');">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-sm btn-danger ms-2">
+                                            <i class="fas fa-trash-alt"></i>
+                                        </button>
+                                    </form>
+                                {% endif %}
+                            </div>
+                        {% endif %}
+                    </p>
+                    
+                    {% if not publicacion.visible %}
+                        <div class="alert alert-warning small p-2">
+                          Esta publicación está oculta para los vecinos.
+                        </div>
+                    {% endif %}
+                    
+                    <p>{{ publicacion.contenido|linebreaks }}</p>
+
+                    {% if publicacion.adjuntos.all %}
+                        <p class="fw-semibold">Archivos Adjuntos:</p>
+                        <ul class="mb-3 list-unstyled">
+                            {% for adjunto in publicacion.adjuntos.all %}
+                                <li class="mb-2">
+                                    {% if adjunto.tipo_archivo == "imagen" %}
+                                        <img src="{{ adjunto.archivo.url }}" alt="Imagen" style="max-width: 100%; height: auto; border-radius: 8px; max-height: 500px;" loading="lazy">
+                                    {% elif adjunto.tipo_archivo == "audio" %}
+                                        <audio controls class="w-100"><source src="{{ adjunto.archivo.url }}"></audio>
+                                    {% elif adjunto.tipo_archivo == "video" %}
+                                        <video controls width="100%" style="max-width: 400px;" preload="metadata" loading="lazy"><source src="{{ adjunto.archivo.url }}"></video>
+                                    {% else %}
+                                        <a href="{{ adjunto.archivo.url }}" target="_blank">{{ adjunto.archivo.name }}</a>
+                                    {% endif %}
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                </article>
+            </div>
+        </div>
+
+        <div class="card shadow-sm mb-4">
+            <div class="card-body">
+                <h5 class="h6">Escribe un comentario</h5>
+                <form method="POST">
+                    {% csrf_token %}
+                    <div class="mb-2">
+                        {{ form_comentario.contenido }}
+                    </div>
+                    <button type="submit" class="btn btn-primary">Comentar</button>
+                </form>
+            </div>
+        </div>
+
+
+        <h3 class="h5">Comentarios</h3>
+        <ul class="list-unstyled mb-3">
+            {% for c in comentarios %}
+              {% if not c.parent %}
+                <li class="mb-3">
+                  <div class="card shadow-sm">
+                    <div class="card-body">
+                        <div class="small text-muted">
+                            <strong>@{{ c.autor.username }}</strong> · {{ c.fecha_creacion|date:"d/m/Y H:i" }}
+                        </div>
+                        
+                        <div class="mb-1">
+                           {{ c.contenido|linebreaksbr }}
+                           {% if not c.visible %}
+                              <span class="badge bg-warning text-dark ms-2">Oculto</span>
+                           {% endif %}
+                        </div>
+              
+                        <div class="d-flex gap-2 align-items-center">
+                            <a href="#" class="text-decoration-none small" data-reply="{{ c.id }}">Responder</a>
+                            
+                            {% user_can 'foro' 'moderar' as puede_moderar %}
+                            
+                            {% if c.visible and request.user == c.autor or c.visible and puede_moderar %}
+                            <form class="m-0" method="POST" action="{% url 'eliminar_comentario_web' c.id %}" onsubmit="return confirm('¿Seguro que quieres eliminar este comentario?');">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-link text-danger p-0 m-0" style="font-size: 0.8em;">Eliminar</button>
+                            </form>
+                            {% endif %}
+              
+                            {% if not c.visible and puede_moderar %}
+                                <form class="m-0" method="POST" action="{% url 'restaurar_comentario_web' c.id %}">
+                                    {% csrf_token %}
+                                    <button typef="submit" class="btn btn-link text-success p-0 m-0" style="font-size: 0.8em;">Restaurar</button>
+                                </form>
+                            {% endif %}
+                        </div>
+              
+                        <form id="reply-form-{{ c.id }}" method="POST" style="display:none" class="mt-2">
+                          {% csrf_token %}
+                          <input type="hidden" name="parent_id" value="{{ c.id }}">
+                          <div class="input-group">
+                            <textarea name="contenido" class="form-control" rows="1" placeholder="Responder…"></textarea>
+                            <button class="btn btn-outline-primary" type="submit">Enviar</button>
+                          </div>
+                        </form>
+              
+                        <ul class="list-unstyled ms-4 mt-2">
+                          {% for r in comentarios %}
+                            {% if r.parent_id == c.id %}
+                              <li class="mb-2">
+                                <div class="small text-muted">
+                                  <strong>@{{ r.autor.username }}</strong> · {{ r.fecha_creacion|date:"d/m/Y H:i" }}
+                                </div>
+                                <div class="mb-1">
+                                  {{ r.contenido|linebreaksbr }}
+                                  {% if not r.visible %}
+                                      <span class="badge bg-warning text-dark ms-2">Oculto</span>
+                                  {% endif %}
+                                </div>
+                                <div class="d-flex gap-2 align-items-center">
+                                    {% if r.visible and request.user == r.autor or r.visible and puede_moderar %}
+                                    <form class="m-0" method="POST" action="{% url 'eliminar_comentario_web' r.id %}" onsubmit="return confirm('¿Seguro que quieres eliminar este comentario?');">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-link text-danger p-0 m-0" style="font-size: 0.8em;">Eliminar</button>
+                                    </form>
+                                    {% endif %}
+                                    {% if not r.visible and puede_moderar %}
+                                        <form class="m-0" method="POST" action="{% url 'restaurar_comentario_web' r.id %}">
+                                            {% csrf_token %}
+                                            <button typef="submit" class="btn btn-link text-success p-0 m-0" style="font-size: 0.8em;">Restaurar</button>
+                                        </form>
+                                    {% endif %}
+                                </div>
+                              </li>
+                            {% endif %}
+                          {% endfor %}
+                        </ul>
+                    </div>
+                  </div>
+                </li>
+              {% endif %}
+            {% empty %}
+              <li class="text-muted">No hay comentarios en esta publicación.</li>
+            {% endfor %}
+          </ul>
+
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  document.addEventListener('click', function (e) {
+    const btn = e.target.closest('[data-reply]');
+    if (!btn) return;
+    e.preventDefault();
+    const id = btn.getAttribute('data-reply');
+    const form = document.getElementById('reply-form-' + id);
+    if (form) {
+        form.style.display = (form.style.display === 'none' || !form.style.display) ? 'block' : 'none';
+    }
+  });
+</script>
+{% endblock %}

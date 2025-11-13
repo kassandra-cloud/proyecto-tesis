@@ -4,13 +4,91 @@
 {% block content %}
 
 <div class="row justify-content-center">
-    <div class="col-lg-9"> <h1 class="text-center">Foro de la Junta de Vecinos</h1>
+    <div class="col-lg-9"> <h1>Foro de la Junta de Vecinos</h1>
         <hr>
 
-        <h2 class="text-center">Publicaciones</h2>
+        <h2>Publicaciones</h2>
         <div class="listado-publicaciones">
-            {% include "foro/_publicaciones_loop.html" %}
-        </div>
+            
+            {% for publicacion in publicaciones %}
+                <div class="card shadow-sm mb-4" id="pub-{{ publicacion.id }}">
+                    <div class="card-body">
+                        <article class="post">
+                            <p class="mb-1 d-flex justify-content-between align-items-center">
+                                <span>
+                                    <strong>@{{ publicacion.autor.username }}</strong>
+                                    <small class="text-muted">({{ publicacion.fecha_creacion|date:"d/m/Y H:i" }})</small>
+                                </span>
+                                
+                                {% user_can 'foro' 'moderar' as puede_moderar %}
+                                {% if puede_moderar %}
+                                    <div class="d-flex">
+                                        
+                                        <form class="m-0" method="POST" action="{% url 'alternar_publicacion_web' publicacion.id %}" onsubmit="return confirm('¿Seguro que quieres cambiar la visibilidad de esta publicación?');">
+                                            {% csrf_token %}
+                                            {% if publicacion.visible %}
+                                                <button type="submit" class="btn btn-sm btn-outline-warning">Ocultar</button>
+                                            {% else %}
+                                                <button type="submit" class="btn btn-sm btn-outline-success">Mostrar</button>
+                                            {% endif %}
+                                        </form>
+            
+                                        {% user_can 'foro' 'delete' as puede_eliminar_perm %}
+                                        {% if puede_eliminar_perm %}
+                                            <form class="m-0" method="POST" action="{% url 'eliminar_publicacion_web' publicacion.id %}" onsubmit="return confirm('¡ADVERTENCIA!\n\nVas a ELIMINAR PERMANENTEMENTE esta publicación y TODOS sus comentarios.\n\nEsta acción NO se puede deshacer.\n\n¿Estás seguro?');">
+                                                {% csrf_token %}
+                                                <button type="submit" class="btn btn-sm btn-danger ms-2">
+                                                    <i class="fas fa-trash-alt"></i>
+                                                </button>
+                                            </form>
+                                        {% endif %}
+                                    </div>
+                                {% endif %}
+                                </p>
+                            
+                            {% if not publicacion.visible %}
+                                <div class="alert alert-warning small p-2">
+                                  Esta publicación está oculta para los vecinos.
+                                </div>
+                            {% endif %}
+                            
+                            <a href="{% url 'detalle_publicacion' publicacion.pk %}" class="text-decoration-none text-dark">
+                                <p>{{ publicacion.contenido|linebreaks }}</p>
+                            </a>
+                            {% if publicacion.adjuntos.all %}
+                                <p class="fw-semibold">Archivos Adjuntos:</p>
+                                <ul class="mb-3 list-unstyled">
+                                    {% for adjunto in publicacion.adjuntos.all %}
+                                    <li class="mb-2">
+                                        {% if adjunto.tipo_archivo == "imagen" %}
+                                            <img src="{{ adjunto.archivo.url }}" alt="Imagen" style="max-width: 100%; height: auto; border-radius: 8px; max-height: 500px;" loading="lazy">
+                                        {% elif adjunto.tipo_archivo == "audio" %}
+                                            <audio controls class="w-100"><source src="{{ adjunto.archivo.url }}"></audio>
+                                        {% elif adjunto.tipo_archivo == "video" %}
+                                            <video controls width="100%" style="max-width: 400px;" preload="metadata" loading="lazy"><source src="{{ adjunto.archivo.url }}"></video>
+                                        {% else %}
+                                            <a href="{{ adjunto.archivo.url }}" target="_blank">{{ adjunto.archivo.name }}</a>
+                                        {% endif %}
+                                    </li>
+                                    {% endfor %}
+                                </ul>
+                            {% endif %}
+            
+                            <a href="{% url 'detalle_publicacion' publicacion.pk %}" class="btn btn-outline-primary btn-sm mt-3">
+                               Ver / Comentar ({{ publicacion.num_comentarios }})
+                            </a>
+                            
+                        </article>
+                    </div>
+                </div> 
+            {% empty %}
+                <div class="card shadow-sm">
+                    <div class="card-body text-center text-muted">
+                        No hay publicaciones todavía. ¡Sé el primero!
+                    </div>
+                </div>
+            {% endfor %}
+            </div>
     </div>
 </div> 
 

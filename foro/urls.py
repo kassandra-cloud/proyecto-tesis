@@ -1,17 +1,19 @@
-
-# foro/urls.py
 from django.urls import path
 from . import views
+
+# app_name = 'foro' # No necesitamos namespace
 
 urlpatterns = [
     # ---------------- WEB ----------------
     path("lista/", views.lista_publicaciones, name="lista_publicaciones"),
     path("crear/", views.crear_publicacion, name="crear_publicacion"),
-    path("foro-web/", views.foro_web, name="foro_web"),
-    path("<int:publicacion_id>/comentar/", views.comentar, name="comentar"),
-    path("<int:publicacion_id>/comentarios/partial/", views.comentarios_partial, name="comentarios_partial"),
-    path("publicacion/<int:pk>/alternar/", views.alternar_publicacion, name="alternar_publicacion"),
-    path("comentario/<int:pk>/eliminar/", views.eliminar_comentario, name="eliminar_comentario"),
+    
+    # --- URL NUEVA Y MODIFICADAS ---
+    path("publicacion/<int:pk>/", views.detalle_publicacion, name="detalle_publicacion"),
+    path("publicacion/<int:pk>/alternar/", views.alternar_publicacion_web, name="alternar_publicacion_web"),
+    path("publicacion/<int:pk>/eliminar/", views.eliminar_publicacion_web, name="eliminar_publicacion_web"),
+    path("comentario/<int:pk>/eliminar/", views.eliminar_comentario_web, name="eliminar_comentario_web"),
+    path("comentario/<int:pk>/restaurar/", views.restaurar_comentario_web, name="restaurar_comentario_web"),
 
     # ---------------- API (COINCIDE CON ANDROID) ----------------
     # GET /foro/api/v1/publicaciones/
