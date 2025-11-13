@@ -6,7 +6,7 @@ Django 5.0.x
 from pathlib import Path
 import os
 from dotenv import load_dotenv
-
+from django.conf import settings
 # -----------------------------------------------------------------------------
 # Paths & .env
 # -----------------------------------------------------------------------------
@@ -206,4 +206,5 @@ CHANNEL_LAYERS = {
     "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
 }
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
-VOSK_MODEL_PATH = Path(r"C:\Users\kassandra\OneDrive\Escritorio\proyecto-tesis\vosk-model-small-es-0.42")
+MODEL_PATH_RELATIVO= Path(r"vosk-model-small-es-0.42")
+MODEL_PATH = os.path.join(settings.BASE_DIR, MODEL_PATH_RELATIVO)

@@ -22,8 +22,8 @@ class STTConsumer(AsyncWebsocketConsumer):
             global _VOSK_MODEL
             if _VOSK_MODEL is None:
                 from vosk import Model
-                logger.info("Cargando modelo Vosk: %s", settings.VOSK_MODEL_PATH)
-                _VOSK_MODEL = Model(str(settings.VOSK_MODEL_PATH))
+                logger.info("Cargando modelo Vosk: %s", settings.MODEL_PATH_RELATIVO)
+                _VOSK_MODEL = Model(str(settings.MODEL_PATH_RELATIVO))
             from vosk import KaldiRecognizer
             self.rec = KaldiRecognizer(_VOSK_MODEL, SAMPLE_RATE)
             self.rec.SetWords(True)
