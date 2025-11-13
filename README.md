@@ -27,10 +27,7 @@ Ahora, **activa el entorno**. Este paso debes hacerlo **CADA VEZ** que abras una
     ```bash
     .\venv\Scripts\activate
     ```
-* **En macOS o Linux:**
-    ```bash
-    source venv/bin/activate
-    ```
+
 > ✨ Sabrás que el entorno está activo porque verás `(venv)` al inicio de la línea de comandos.
 
 ### 2. Instalar las Dependencias
@@ -44,13 +41,8 @@ pip install -r requirements.txt
 ### 3. Configurar y Ejecutar el Proyecto
 
 ```bash
-# 1. Crea las tablas en la base de datos
-python manage.py migrate
 
-# 2. Crea tu propio superusuario para acceder al admin
-python manage.py createsuperuser
-
-# 3. Inicia el servidor de desarrollo
+# 1. Inicia el servidor de desarrollo
 python manage.py runserver
 ```
 
@@ -99,103 +91,3 @@ Hemos añadido un archivo llamado `.gitignore`. Su propósito es **decirle a Git
 
 Al ignorar estos archivos, mantenemos el repositorio ligero, limpio y evitamos conflictos innecesarios.
 
-## 📡 API REST de Votaciones (v1)
-
-Esta API permite a la app web y móvil interactuar con el módulo de votaciones.
-
-🔐 Autenticación
-
-Requiere Token (DRF).
-
-Header:
-Authorization: Token <TU_TOKEN>
-
-Si usas rest_framework.authtoken:
-
-python manage.py migrate
-python manage.py drf_create_token <usuario>
-
-
-(o crea el token desde el admin)
-
-🔗 Endpoints
-
-1) Listar votaciones abiertas
-
-GET /votaciones/api/v1/abiertas/
-
-200 OK (ejemplo):
-
-[
-  {
-    "id": 12,
-    "pregunta": "¿Aprobar presupuesto 2026?",
-    "fecha_cierre": "2025-10-30T23:59:59",
-    "activa": true,
-    "esta_abierta": true,
-    "opciones": [
-      {"id": 51, "texto": "Sí"},
-      {"id": 52, "texto": "No"}
-    ],
-    "ya_vote": false,
-    "opcion_votada_id": null
-  }
-]
-
-
-2) Emitir voto
-
-POST /votaciones/api/v1/<pk>/votar/
-
-Body JSON:
-
-{ "opcion_id": 51 }
-
-
-Respuestas esperadas
-
-200: { "ok": true, "mensaje": "Voto registrado" }
-
-400/409: faltan datos / voto duplicado
-
-403: votación cerrada
-
-3) Resultados de una votación
-
-GET /votaciones/api/v1/<pk>/resultados/
-
-200 OK (ejemplo):
-
-{
-  "votacion": { "id": 12, "pregunta": "¿Aprobar presupuesto 2026?" },
-  "total_votos": 147,
-  "opciones": [
-    { "opcion_id": 51, "texto": "Sí", "votos": 91 },
-    { "opcion_id": 52, "texto": "No", "votos": 56 }
-  ]
-}
-
-🧪 Pruebas rápidas (cURL)
-# Listar abiertas
-curl -H "Authorization: Token $TOKEN" http://127.0.0.1:8000/votaciones/api/v1/abiertas/
-
-# Votar (reemplaza {pk} y opcion_id)
-curl -X POST -H "Authorization: Token $TOKEN" -H "Content-Type: application/json" \
--d '{"opcion_id":51}' http://127.0.0.1:8000/votaciones/api/v1/{pk}/votar/
-
-# Resultados
-curl -H "Authorization: Token $TOKEN" http://127.0.0.1:8000/votaciones/api/v1/{pk}/resultados/
-
-📱 App móvil (emulador Android)
-
-Base URL: http://10.0.2.2:8000/
-
-Producción: usar el dominio/IP del servidor.
-
-🧭 Reglas clave
-
-Un usuario solo puede votar una vez por votación (enforced en base de datos).
-
-Solo se puede votar si la votación está abierta (activa y no expirada).
-
-Un voto solo es válido si la opción pertenece a esa votación.
