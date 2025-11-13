@@ -49,6 +49,13 @@ python manage.py runserver
 ¡Listo! Ya puedes acceder a la aplicación en `http://127.0.0.1:8000/`.
 
 ---
+¿Quieres añadir una nueva librería? La añades solo a requirements.in.
+
+Ejecutas pip-compile requirements.in para actualizar el requirements.txt.
+
+Ejecutas pip-sync para instalarla.
+
+Haces git commit de ambos archivos.
 
 ## 🤝 Flujo de Trabajo en Equipo con Git
 
