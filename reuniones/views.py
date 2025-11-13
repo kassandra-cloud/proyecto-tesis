@@ -47,27 +47,23 @@ def _pdf_bytes_desde_xhtml(template_path: str, context: dict) -> bytes:
 @login_required
 @role_required("reuniones", "view")
 def reunion_list(request):
-    estado = request.GET.get("estado", "programada")  # por defecto: programadas
+    estado = request.GET.get("estado", "programada")
     now = timezone.now()
 
-    # misma regla que la API: 2 horas = “en curso”
     if estado == "realizada":
         qs = Reunion.objects.filter(fecha__lt=now - timedelta(hours=2))
         titulo = "Reuniones Realizadas"
     else:  # programada / en_curso
-        qs = Reunion.objects.filter(fecha__gt=now) | Reunion.objects.filter(
-            fecha__lte=now, fecha__gte=now - timedelta(hours=2)
-        )
+        qs = (Reunion.objects.filter(fecha__gt=now) |
+              Reunion.objects.filter(fecha__lte=now, fecha__gte=now - timedelta(hours=2)))
         titulo = "Reuniones Programadas"
 
     reuniones = qs.order_by("-fecha")
-
-    context = {
+    return render(request, "reuniones/reunion_list.html", {
         "reuniones": reuniones,
         "estado": estado,
         "titulo": titulo,
-    }
-    return render(request, "reuniones/reunion_list.html", context)
+    })
 
 @login_required
 @role_required("reuniones", "view")

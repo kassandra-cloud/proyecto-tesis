@@ -4,20 +4,22 @@ from rest_framework.pagination import PageNumberPagination
 from django.db.models import Q
 from .models import Reunion, Acta,Asistencia
 from .serializers import ReunionSerializer, ActaSerializer,AsistenciaSerializer
-
+from django.utils import timezone
+from datetime import timedelta
 class DefaultPagination(PageNumberPagination):
     page_size = 20
     page_size_query_param = "page_size"
     max_page_size = 100
 
 class ReunionViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = Reunion.objects.order_by("-fecha")
+    queryset = Reunion.objects.all().order_by("-fecha")
     serializer_class = ReunionSerializer
-    permission_classes = [permissions.AllowAny]  # solo lectura pública
-    pagination_class = DefaultPagination
+    permission_classes = [permissions.AllowAny]   # sólo lectura pública
+    pagination_class = DefaultPagination          # si ya la tienes
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ["titulo", "tabla", "tipo"]
     ordering_fields = ["fecha", "titulo"]
+
     def get_queryset(self):
         qs = super().get_queryset()
         estado = self.request.query_params.get("estado")
@@ -25,15 +27,14 @@ class ReunionViewSet(viewsets.ReadOnlyModelViewSet):
             return qs
 
         now = timezone.now()
-        # si SOLO tienes fecha (inicio), replicamos la lógica del serializer:
         if estado == "programada":
             return qs.filter(fecha__gt=now)
         if estado == "en_curso":
+            # ajusta la ventana si quieres
             return qs.filter(fecha__lte=now, fecha__gte=now - timedelta(hours=2))
         if estado == "realizada":
             return qs.filter(fecha__lt=now - timedelta(hours=2))
         return qs
-
 class ActaViewSet(viewsets.ReadOnlyModelViewSet):
     """
     GET /reuniones/api/actas/           → lista (paginada)
