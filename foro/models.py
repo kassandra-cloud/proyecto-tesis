@@ -20,13 +20,19 @@ class ArchivoAdjunto(models.Model):
         on_delete=models.CASCADE,
         related_name='adjuntos'
     )
-    autor = models.ForeignKey(              # 👈 NUEVO
+    autor = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name='adjuntos_foro'
     )
     archivo = models.FileField(upload_to='archivos/')
-    fecha_creacion = models.DateTimeField(auto_now_add=True)   # 👈 NUEVO
+    fecha_creacion = models.DateTimeField(auto_now_add=True)
+
+    # 🔹 NUEVO: para saber si debe mostrarse como "mensaje" (app) o adjunto normal (web)
+    es_mensaje = models.BooleanField(
+        default=False,
+        help_text="Si está marcado, se mostrará en la sección de comentarios."
+    )
 
     def __str__(self):
         return self.archivo.name

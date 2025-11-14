@@ -1,6 +1,6 @@
 from django.urls import path
 from . import views
-
+from .views import enviar_mensaje
 # app_name = 'foro' # No necesitamos namespace
 
 urlpatterns = [
@@ -27,4 +27,9 @@ urlpatterns = [
             views.api_subir_adjunto,
             name="api_subir_adjunto",
         ),
+    path("foro/mensaje/", views.crear_mensaje, name="api_foro_mensaje"),
+    path("api/publicaciones/<int:publicacion_id>/mensaje/",
+    enviar_mensaje,
+    name="foro_enviar_mensaje"
+)
 ]
