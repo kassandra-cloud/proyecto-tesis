@@ -9,10 +9,10 @@ User = get_user_model()
 class RecursoSerializer(serializers.ModelSerializer):
     disponible = serializers.SerializerMethodField() 
     solicitud_activa_usuario = serializers.SerializerMethodField()
-
+    estado_ultima_solicitud = serializers.SerializerMethodField()
     class Meta:
         model = Recurso
-        fields = ["id", "nombre", "descripcion", "disponible", "solicitud_activa_usuario"] 
+        fields = ["id", "nombre", "descripcion", "disponible", "solicitud_activa_usuario","estado_ultima_solicitud"] 
 
     def get_disponible(self, obj: Recurso) -> bool:
         """
@@ -50,6 +50,24 @@ class RecursoSerializer(serializers.ModelSerializer):
             ).exists()
             
         return False
+    def get_estado_ultima_solicitud(self, obj: Recurso) -> str | None:
+        """
+        Devuelve el estado de la solicitud más reciente del usuario actual para este recurso.
+        """
+        request = self.context.get('request')
+        
+        if request and request.user.is_authenticated:
+            user = request.user
+            
+            # Buscar la solicitud más reciente del usuario para este recurso
+            ultima_solicitud = SolicitudReserva.objects.filter(
+                recurso=obj,
+                solicitante=user
+            ).order_by('-creado_el').first() # Asumo que tienes un campo 'creado_el'
+            
+            return ultima_solicitud.estado if ultima_solicitud else None
+            
+        return None # Si no hay usuario o no hay solicitudes
 class SolicitudReservaSerializer(serializers.ModelSerializer):
     recurso_nombre = serializers.CharField(source="recurso.nombre", read_only=True)
 
