@@ -48,12 +48,22 @@ class SolicitudReservaViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = super().get_queryset()
-        # mine=true => solo las del usuario logueado
-        mine = self.request.query_params.get("mine")
-        if mine and mine.lower() in ("1", "true", "yes"):
-            qs = qs.filter(solicitante=self.request.user)
+        
+        # 💡 CORRECCIÓN CRÍTICA:
+        # 1. Por defecto, siempre filtramos por el usuario logueado para seguridad (MINE=TRUE implícito).
+        qs = qs.filter(solicitante=self.request.user) 
 
-        # filtro de estado opcional
+        # 2. Solo si el usuario es STAFF y solicita explícitamente ver TODAS (mine=false),
+        # reestablecemos el queryset a TODAS las solicitudes.
+        show_all_requested = self.request.query_params.get("mine")
+        
+        # Verifica si el staff está solicitando ver 'mine=false'
+        if show_all_requested and show_all_requested.lower() in ("0", "false", "f", "no"):
+             if self.request.user.is_staff: 
+                 # Solo Staff puede anular el filtro.
+                 qs = super().get_queryset() 
+
+        # 3. Filtro de estado opcional
         estado = self.request.query_params.get("estado")
         if estado in dict(SolicitudReserva.ESTADOS):
             qs = qs.filter(estado=estado)

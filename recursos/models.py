@@ -153,22 +153,30 @@ class SolicitudReserva(models.Model):
                     "Ya existe una reserva APROBADA que se solapa en esas fechas para este recurso."
                 )
 
-        # 3) **Regla de negocio principal**:
-        #    bloquear segunda solicitud ACTIVA (PENDIENTE o APROBADA vigente) para el mismo recurso y solicitante
-        hoy = timezone.now().date()
-        activa_existente = (
+        # 3) **Regla de negocio principal (CORREGIDA)**:
+        #    Bloquear cualquier solicitud (PENDIENTE o APROBADA) del mismo solicitante
+        #    y recurso que se solape en el tiempo con esta nueva solicitud.
+        
+        activa_solapada = (
             SolicitudReserva.objects
             .filter(
                 solicitante=self.solicitante,
                 recurso=self.recurso,
                 estado__in=["PENDIENTE", "APROBADA"],
-                fecha_fin__gte=hoy,          # vigente
             )
             .exclude(pk=self.pk)
+            .filter(
+                # Lógica de solapamiento: (FechaInicioExistente < FechaFinNueva) AND (FechaFinExistente > FechaInicioNueva)
+                fecha_inicio__lt=self.fecha_fin,
+                fecha_fin__gt=self.fecha_inicio
+            )
             .exists()
         )
-        if activa_existente:
-            raise ValidationError("Ya tienes una solicitud activa para este recurso.")
+
+        if activa_solapada:
+            raise ValidationError(
+                "Ya tienes una solicitud PENDIENTE o APROBADA que se solapa con estas fechas para este recurso."
+            )
 
     def save(self, *args, **kwargs):
         self.full_clean()  # garantiza validaciones también vía admin o API
