@@ -1,39 +1,68 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block content %}
 
-<div class="row justify-content-center">
-    <div class="col-lg-8">
-
-        <div class="card shadow-sm">
-            <div class="card-body">
-
-                {% if taller %}
-                    <h1 class="h4 text-center">Editar Taller: {{ taller.nombre }}</h1>
-                {% else %}
-                    <h1 class="h4">Crear Nuevo Taller</h1>
-                {% endif %}
-                <hr>
-
-                <form method="post" novalidate>
-                    {% csrf_token %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        {% if taller %}
+                            ✏️ Editar Taller: {{ taller.nombre }}
+                        {% else %}
+                            ✨ Crear Nuevo Taller
+                        {% endif %}
+                    </h4>
+                </div>
+                <div class="card-body">
                     
-                    {% for field in form %}
-                        <div class="mb-3">
-                            {{ field.label_tag }}
-                            {{ field }}
-                            {% if field.errors %}
-                                <div class="invalid-feedback d-block">
-                                    {{ field.errors.0 }}
-                                </div>
-                            {% endif %}
+                    {% if taller %}
+                        {# Si existe 'taller', es para EDITAR. Apunta a la URL de edición con el ID. #}
+                        {% url 'talleres:editar_taller' taller_id=taller.id as form_action_url %}
+                    {% else %}
+                        {# Si no existe 'taller', es para CREAR. Apunta a la URL de creación. #}
+                        {% url 'talleres:crear_taller' as form_action_url %}
+                    {% endif %}
+                    
+                    <form method="post" action="{{ form_action_url }}">
+                        {% csrf_token %}
+
+                        {% if form.non_field_errors %}
+                            <div class="alert alert-danger" role="alert">
+                                {% for error in form.non_field_errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+
+                        {% for field in form %}
+                            <div class="mb-3">
+                                <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
+                                {{ field }}
+                                {% for error in field.errors %}
+                                    <div class="form-text text-danger">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        {% endfor %}
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+                            <a href="{% url 'talleres:lista_talleres' %}" class="btn btn-secondary">Cancelar</a>
+                            <button type="submit" class="btn btn-success">
+                                {% if taller %}
+                                    Guardar Cambios
+                                {% else %}
+                                    Crear Taller
+                                {% endif %}
+                            </button>
                         </div>
-                    {% endfor %}
-                    
-                    <div class="d-flex gap-2 mt-4">
-                        <button type="submit" class="btn btn-success">Guardar Cambios</button>
-                        <a href="{% url 'lista_talleres' %}" class="btn btn-outline-secondary">Cancelar</a>
-                    </div>
-                </form>
+                    </form>
 
-            </div> </div> </div> </div> {% endblock %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock content %}
