@@ -61,8 +61,11 @@
                 </div>
 
             </div> <div class="card-footer bg-light d-flex gap-2">
-                <a href="{% url 'lista_talleres' %}" class="btn btn-outline-secondary">← Volver a la lista</a>
-                <a href="{% url 'editar_taller' taller.id %}" class="btn btn-warning">Editar Taller</a>
-                <a href="{% url 'eliminar_taller' taller.id %}" class="btn btn-danger">Eliminar Taller</a>
+                {# CORREGIDO: Se añadió el namespace 'talleres:' #}
+                <a href="{% url 'talleres:lista_talleres' %}" class="btn btn-outline-secondary">← Volver a la lista</a>
+                {# CORREGIDO: Se añadió el namespace 'talleres:' #}
+                <a href="{% url 'talleres:editar_taller' taller.id %}" class="btn btn-warning">Editar Taller</a>
+                {# CORREGIDO: Se añadió el namespace 'talleres:' #}
+                <a href="{% url 'talleres:eliminar_taller' taller.id %}" class="btn btn-danger">Eliminar Taller</a>
             </div>
         </div> </div> </div> {% endblock %}

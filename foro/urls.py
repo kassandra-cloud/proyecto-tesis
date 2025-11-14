@@ -1,7 +1,7 @@
 from django.urls import path
 from . import views
 from .views import enviar_mensaje
-# app_name = 'foro' # No necesitamos namespace
+app_name = 'foro' # No necesitamos namespace
 
 urlpatterns = [
     # ---------------- WEB ----------------

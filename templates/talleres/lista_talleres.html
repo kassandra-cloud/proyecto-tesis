@@ -28,7 +28,8 @@
 
                             <p class="card-text text-muted small">{{ taller.descripcion|truncatewords:20 }}</p>
                             
-                            <a href="{% url 'detalle_taller' taller.id %}" class="btn btn-sm btn-outline-primary mt-auto">
+                            {# CORREGIDO: Se añadió el namespace 'talleres:' #}
+                            <a href="{% url 'talleres:detalle_taller' taller.id %}" class="btn btn-sm btn-outline-primary mt-auto">
                                 Ver Detalles / Inscritos
                             </a>
                         </div>
@@ -50,7 +51,8 @@
     <div class="modal-dialog">
         <div class="modal-content">
             
-            <form method="post" action="{% url 'crear_taller' %}" novalidate>
+            {# CORREGIDO: Se añadió el namespace 'talleres:' a la acción del formulario #}
+            <form method="post" action="{% url 'talleres:crear_taller' %}" novalidate>
                 {% csrf_token %}
                 <div class="modal-header">
                     <h5 class="modal-title" id="modalLabel">Crear Nuevo Taller</h5>

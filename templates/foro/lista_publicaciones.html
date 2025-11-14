@@ -24,7 +24,10 @@
                                 {% if puede_moderar %}
                                     <div class="d-flex">
                                         
-                                        <form class="m-0" method="POST" action="{% url 'alternar_publicacion_web' publicacion.id %}" onsubmit="return confirm('¿Seguro que quieres cambiar la visibilidad de esta publicación?');">
+                                        <form class="m-0" method="POST" 
+                                            {# CORREGIDO: Se añadió 'foro:' #}
+                                            action="{% url 'foro:alternar_publicacion_web' publicacion.id %}" 
+                                            onsubmit="return confirm('¿Seguro que quieres cambiar la visibilidad de esta publicación?');">
                                             {% csrf_token %}
                                             {% if publicacion.visible %}
                                                 <button type="submit" class="btn btn-sm btn-outline-warning">Ocultar</button>
@@ -32,10 +35,13 @@
                                                 <button type="submit" class="btn btn-sm btn-outline-success">Mostrar</button>
                                             {% endif %}
                                         </form>
-            
+                                        
                                         {% user_can 'foro' 'delete' as puede_eliminar_perm %}
                                         {% if puede_eliminar_perm %}
-                                            <form class="m-0" method="POST" action="{% url 'eliminar_publicacion_web' publicacion.id %}" onsubmit="return confirm('¡ADVERTENCIA!\n\nVas a ELIMINAR PERMANENTEMENTE esta publicación y TODOS sus comentarios.\n\nEsta acción NO se puede deshacer.\n\n¿Estás seguro?');">
+                                            <form class="m-0" method="POST" 
+                                                {# CORREGIDO: Se añadió 'foro:' #}
+                                                action="{% url 'foro:eliminar_publicacion_web' publicacion.id %}" 
+                                                onsubmit="return confirm('¡ADVERTENCIA!\n\nVas a ELIMINAR PERMANENTEMENTE esta publicación y TODOS sus comentarios.\n\nEsta acción NO se puede deshacer.\n\n¿Estás seguro?');">
                                                 {% csrf_token %}
                                                 <button type="submit" class="btn btn-sm btn-danger ms-2">
                                                     <i class="fas fa-trash-alt"></i>
@@ -48,11 +54,12 @@
                             
                             {% if not publicacion.visible %}
                                 <div class="alert alert-warning small p-2">
-                                  Esta publicación está oculta para los vecinos.
+                                    Esta publicación está oculta para los vecinos.
                                 </div>
                             {% endif %}
                             
-                            <a href="{% url 'detalle_publicacion' publicacion.pk %}" class="text-decoration-none text-dark">
+                            {# CORREGIDO: Se añadió 'foro:' #}
+                            <a href="{% url 'foro:detalle_publicacion' publicacion.pk %}" class="text-decoration-none text-dark">
                                 <p>{{ publicacion.contenido|linebreaks }}</p>
                             </a>
                             {% if publicacion.adjuntos.all %}
@@ -73,9 +80,10 @@
                                     {% endfor %}
                                 </ul>
                             {% endif %}
-            
-                            <a href="{% url 'detalle_publicacion' publicacion.pk %}" class="btn btn-outline-primary btn-sm mt-3">
-                               Ver Comentarios ({{ publicacion.num_comentarios }})
+                            
+                            {# CORREGIDO: Se añadió 'foro:' #}
+                            <a href="{% url 'foro:detalle_publicacion' publicacion.pk %}" class="btn btn-outline-primary btn-sm mt-3">
+                                Ver Comentarios ({{ publicacion.num_comentarios }})
                             </a>
                             
                         </article>
@@ -100,7 +108,8 @@
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             
-            <form method="POST" action="{% url 'crear_publicacion' %}" enctype="multipart/form-data">
+            {# CORREGIDO: Se añadió 'foro:' #}
+            <form method="POST" action="{% url 'foro:crear_publicacion' %}" enctype="multipart/form-data">
                 {% csrf_token %}
                 
                 <div class="modal-header">
@@ -155,48 +164,54 @@
 </script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-  const startBtn = document.getElementById('start-record');
-  const stopBtn = document.getElementById('stop-record');
-  const audioPlayback = document.getElementById('audio-playback');
-  const fileInput = document.getElementById('id_archivos');
+    const startBtn = document.getElementById('start-record');
+    const stopBtn = document.getElementById('stop-record');
+    const audioPlayback = document.getElementById('audio-playback');
+    const fileInput = document.getElementById('id_archivos');
 
-  let mediaRecorder;
-  let audioChunks = [];
+    let mediaRecorder;
+    let audioChunks = [];
 
-  startBtn.addEventListener('click', async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaRecorder = new MediaRecorder(stream);
-      mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
-      mediaRecorder.onstop = () => {
-        const blob = new Blob(audioChunks, { type: 'audio/webm' });
-        const url = URL.createObjectURL(blob);
-        audioPlayback.src = url;
-        audioPlayback.style.display = 'block';
-        const file = new File([blob], 'grabacion.webm', { type: 'audio/webm' });
-        const dt = new DataTransfer();
-        for (let i = 0; i < fileInput.files.length; i++) dt.items.add(fileInput.files[i]);
-        dt.items.add(file);
-        fileInput.files = dt.files;
-        audioChunks = [];
-      };
-      mediaRecorder.start();
-      startBtn.disabled = true;
-      stopBtn.disabled = false;
-      audioPlayback.style.display = 'none';
-    } catch (err) {
-      console.error('Error al acceder al micrófono:', err);
-      alert('No se pudo acceder al micrófono.');
-    }
-  });
+    startBtn.addEventListener('click', async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder = new MediaRecorder(stream);
+            mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+            mediaRecorder.onstop = () => {
+                const blob = new Blob(audioChunks, { type: 'audio/webm' });
+                const url = URL.createObjectURL(blob);
+                audioPlayback.src = url;
+                audioPlayback.style.display = 'block';
+                // Creamos un objeto File para inyectarlo en el input de archivos
+                const file = new File([blob], 'grabacion.webm', { type: 'audio/webm' });
+                
+                // Actualizamos el FileList del input 'archivos' con la nueva grabación
+                const dt = new DataTransfer();
+                // Mantenemos los archivos que ya existían
+                for (let i = 0; i < fileInput.files.length; i++) dt.items.add(fileInput.files[i]);
+                // Añadimos el nuevo archivo de audio
+                dt.items.add(file);
+                fileInput.files = dt.files;
+                
+                audioChunks = [];
+            };
+            mediaRecorder.start();
+            startBtn.disabled = true;
+            stopBtn.disabled = false;
+            audioPlayback.style.display = 'none';
+        } catch (err) {
+            console.error('Error al acceder al micrófono:', err);
+            alert('No se pudo acceder al micrófono.');
+        }
+    });
 
-  stopBtn.addEventListener('click', () => {
-    if (mediaRecorder) {
-      mediaRecorder.stop();
-      startBtn.disabled = false;
-      stopBtn.disabled = true;
-    }
-  });
+    stopBtn.addEventListener('click', () => {
+        if (mediaRecorder) {
+            mediaRecorder.stop();
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+        }
+    });
 });
 </script>
 {% endblock %}

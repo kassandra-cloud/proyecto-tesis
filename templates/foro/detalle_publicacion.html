@@ -6,7 +6,8 @@
 <div class="row justify-content-center">
     <div class="col-lg-9">
 
-        <a href="{% url 'lista_publicaciones' %}" class="btn btn-outline-secondary mb-3">
+        {# CORRECCIÓN DE URL: Se añadió el namespace 'foro:' #}
+        <a href="{% url 'foro:lista_publicaciones' %}" class="btn btn-outline-secondary mb-3">
             ← Volver al Foro
         </a>
 
@@ -25,7 +26,8 @@
                         {% if puede_moderar %}
                             <div class="d-flex">
                                 <form class="m-0" method="POST"
-                                      action="{% url 'alternar_publicacion_web' publicacion.id %}"
+                                    {# CORRECCIÓN DE URL: Se añadió el namespace 'foro:' #}
+                                      action="{% url 'foro:alternar_publicacion_web' publicacion.id %}"
                                       onsubmit="return confirm('¿Seguro que quieres cambiar la visibilidad de esta publicación?');">
                                     {% csrf_token %}
                                     {% if publicacion.visible %}
@@ -38,7 +40,8 @@
                                 {% user_can 'foro' 'delete' as puede_eliminar_perm %}
                                 {% if puede_eliminar_perm %}
                                     <form class="m-0" method="POST"
-                                          action="{% url 'eliminar_publicacion_web' publicacion.id %}"
+                                        {# CORRECCIÓN DE URL: Se añadió el namespace 'foro:' #}
+                                          action="{% url 'foro:eliminar_publicacion_web' publicacion.id %}"
                                           onsubmit="return confirm('¡ADVERTENCIA! Vas a ELIMINAR PERMANENTEMENTE esta publicación y TODOS sus comentarios. ¿Estás seguro?');">
                                         {% csrf_token %}
                                         <button type="submit" class="btn btn-sm btn-danger ms-2">
@@ -108,9 +111,10 @@
 
         <h3 class="h5">Comentarios</h3>
 
-        {# ---- MENSAJES CON IMAGEN PROVENIENTES DE LA APP ---- #}
+        {# ---- MENSAJES MULTIMEDIA (IMAGEN/AUDIO) PROVENIENTES DE LA APP ---- #}
         {% for adjunto in publicacion.adjuntos.all %}
-            {% if adjunto.es_mensaje and adjunto.tipo_archivo == "imagen" %}
+            {# Se cambió la condición para incluir cualquier mensaje marcado desde la app #}
+            {% if adjunto.es_mensaje %}
                 <div class="mb-3">
                     <div class="card shadow-sm">
                         <div class="card-body">
@@ -119,10 +123,19 @@
                                 · {{ adjunto.fecha_creacion|date:"d/m/Y H:i" }}
                             </div>
                             <div class="mt-2">
-                                <img src="{{ adjunto.archivo.url }}"
-                                     alt="Imagen enviada desde la app"
-                                     style="max-width: 100%; height: auto; border-radius: 8px; max-height: 500px;"
-                                     loading="lazy">
+                                {% if adjunto.tipo_archivo == "imagen" %}
+                                    <img src="{{ adjunto.archivo.url }}"
+                                         alt="Imagen enviada desde la app"
+                                         style="max-width: 100%; height: auto; border-radius: 8px; max-height: 500px;"
+                                         loading="lazy">
+                                {# NUEVA LÓGICA PARA AUDIO #}
+                                {% elif adjunto.tipo_archivo == "audio" %}
+                                    <p class="mb-1 text-primary fw-bold">Mensaje de Audio:</p>
+                                    <audio controls class="w-100">
+                                        <source src="{{ adjunto.archivo.url }}">
+                                        Su navegador no soporta el elemento de audio.
+                                    </audio>
+                                {% endif %}
                             </div>
                         </div>
                     </div>
@@ -156,7 +169,8 @@
                             
                             {% if c.visible and request.user == c.autor or c.visible and puede_moderar %}
                             <form class="m-0" method="POST"
-                                  action="{% url 'eliminar_comentario_web' c.id %}"
+                                  {# CORRECCIÓN DE URL: Se añadió el namespace 'foro:' #}
+                                  action="{% url 'foro:eliminar_comentario_web' c.id %}"
                                   onsubmit="return confirm('¿Seguro que quieres Ocultar este comentario?');">
                                 {% csrf_token %}
                                 <button type="submit" class="btn btn-link text-danger p-0 m-0"
@@ -166,7 +180,8 @@
               
                             {% if not c.visible and puede_moderar %}
                                 <form class="m-0" method="POST"
-                                      action="{% url 'restaurar_comentario_web' c.id %}">
+                                    {# CORRECCIÓN DE URL: Se añadió el namespace 'foro:' #}
+                                      action="{% url 'foro:restaurar_comentario_web' c.id %}">
                                     {% csrf_token %}
                                     <button typef="submit" class="btn btn-link text-success p-0 m-0"
                                             style="font-size: 0.8em;">Restaurar</button>
@@ -201,7 +216,8 @@
                                 <div class="d-flex gap-2 align-items-center">
                                     {% if r.visible and request.user == r.autor or r.visible and puede_moderar %}
                                     <form class="m-0" method="POST"
-                                          action="{% url 'eliminar_comentario_web' r.id %}"
+                                          {# CORRECCIÓN DE URL: Se añadió el namespace 'foro:' #}
+                                          action="{% url 'foro:eliminar_comentario_web' r.id %}"
                                           onsubmit="return confirm('¿Seguro que quieres Ocultar este comentario?');">
                                         {% csrf_token %}
                                         <button type="submit" class="btn btn-link text-danger p-0 m-0"
@@ -210,7 +226,8 @@
                                     {% endif %}
                                     {% if not r.visible and puede_moderar %}
                                         <form class="m-0" method="POST"
-                                              action="{% url 'restaurar_comentario_web' r.id %}">
+                                              {# CORRECCIÓN DE URL: Se añadió el namespace 'foro:' #}
+                                              action="{% url 'foro:restaurar_comentario_web' r.id %}">
                                             {% csrf_token %}
                                             <button typef="submit" class="btn btn-link text-success p-0 m-0"
                                                     style="font-size: 0.8em;">Restaurar</button>

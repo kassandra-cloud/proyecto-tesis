@@ -1,27 +1,33 @@
 {% extends 'base.html' %}
 
 {% block content %}
-
 <div class="row justify-content-center">
-    <div class="col-lg-8">
-    
-        <div class="card shadow-sm border-danger">
-            <div class="card-body">
-
-                <h1 class="h4 text-center mb-3 text-danger">¿Estás seguro?</h1>
+    <div class="col-md-6">
+        <div class="card border-danger shadow-lg mt-5">
+            <div class="card-header bg-danger text-white">
+                <h5 class="mb-0">Confirmar Eliminación de Taller</h5>
+            </div>
+            <div class="card-body text-center">
+                <i class="fas fa-exclamation-triangle fa-3x text-danger mb-3"></i>
+                <p>¿Estás seguro de que deseas eliminar permanentemente el taller **"{{ taller.nombre }}"**?</p>
+                <p class="text-danger fw-bold">Esta acción no se puede deshacer y eliminará todos los inscritos.</p>
+            </div>
+            <div class="card-footer d-flex justify-content-center gap-3">
                 
-                <div class="alert alert-danger" role="alert">
-                    <p class="mb-1">Estás a punto de eliminar permanentemente el taller:</p>
-                    <h4 class="alert-heading">"{{ taller.nombre }}"</h4>
-                    <p class="mb-0">Esta acción no se puede deshacer.</p>
-                </div>
-
-                <form method="POST" class="mt-4">
+                {# CORREGIDO: Se añade el namespace 'talleres:' #}
+                <a href="{% url 'talleres:lista_talleres' %}" class="btn btn-outline-secondary">
+                    Cancelar / Volver
+                </a>
+                
+                {# CORREGIDO: Se añade el namespace 'talleres:' a la acción del formulario #}
+                <form method="post" action="{% url 'talleres:eliminar_taller' taller.id %}" class="d-inline">
                     {% csrf_token %}
-                    <div class="d-flex gap-2">
-                        <button type="submit" class="btn btn-danger">Sí, eliminar</button>
-                        <a href="{% url 'lista_talleres' %}" class="btn btn-outline-secondary">No, cancelar</a>
-                    </div>
+                    <input type="hidden" name="confirm" value="true">
+                    <button type="submit" class="btn btn-danger">Confirmar Eliminación</button>
                 </form>
 
-            </div> </div> </div> </div> {% endblock %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

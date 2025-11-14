@@ -45,7 +45,8 @@ def crear_taller(request):
         if form.is_valid():
             form.save()
             messages.success(request, 'Taller creado exitosamente.')
-            return redirect('lista_talleres')
+            # 💡 CORRECCIÓN: Añadido 'talleres:'
+            return redirect('talleres:lista_talleres') 
     else:
         form = TallerForm()
 
@@ -53,7 +54,8 @@ def crear_taller(request):
         'form': form,
         'taller': None # Para que la plantilla sepa que estamos creando
     }
-    return render(request, 'talleres/crear_taller.html', context)
+    # 💡 CORRECCIÓN: Añadido 'talleres:'
+    return redirect('talleres:lista_talleres') 
 
 @login_required
 def editar_taller(request, taller_id):
@@ -67,7 +69,8 @@ def editar_taller(request, taller_id):
         if form.is_valid():
             form.save()
             messages.success(request, 'Taller actualizado exitosamente.')
-            return redirect('detalle_taller', taller_id=taller.id)
+            # 💡 CORRECCIÓN: Añadido 'talleres:'
+            return redirect('talleres:detalle_taller', taller_id=taller.id)
     else:
         form = TallerForm(instance=taller)
 
@@ -87,7 +90,8 @@ def eliminar_taller(request, taller_id):
     if request.method == 'POST':
         taller.delete()
         messages.success(request, f'El taller "{taller.nombre}" ha sido eliminado.')
-        return redirect('lista_talleres')
+        # 💡 CORRECCIÓN: Añadido 'talleres:' (Línea 90 que fallaba en la traza)
+        return redirect('talleres:lista_talleres')
     
     context = {
         'taller': taller

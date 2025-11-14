@@ -6,7 +6,7 @@ from rest_framework.routers import DefaultRouter
 from .api import TallerViewSet
 
 
-
+app_name = 'talleres'
 urlpatterns = [
     path("", views.lista_talleres, name="lista_talleres"),
     path("crear/", views.crear_taller, name="crear_taller"),

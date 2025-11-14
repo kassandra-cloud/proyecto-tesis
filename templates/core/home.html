@@ -35,7 +35,8 @@
         </div>
         
         <div class="col-md-6 col-lg-2 mb-4">
-            <a href="{% url 'lista_publicaciones' %}" class="dashboard-card-link">
+            {# CORREGIDO: Se añadió el namespace 'foro:' #}
+            <a href="{% url 'foro:lista_publicaciones' %}" class="dashboard-card-link">
                 <div class="dashboard-card card-publicaciones">
                     <i class="fas fa-comments icon"></i>
                     <h3>{{ nuevas_publicaciones_24h }}</h3>
@@ -55,7 +56,8 @@
         </div>
         
         <div class="col-md-6 col-lg-2 mb-4">
-            <a href="{% url 'lista_talleres' %}" class="dashboard-card-link">
+            {# CORREGIDO: Se añadió el namespace 'talleres:' #}
+            <a href="{% url 'talleres:lista_talleres' %}" class="dashboard-card-link">
                 <div class="dashboard-card card-talleres">
                     <i class="fas fa-chalkboard-teacher icon"></i>
                     <h3>{{ talleres_con_cupos }}</h3>
@@ -93,7 +95,8 @@
                 {% else %}
                     <p>No hay publicaciones recientes en el foro.</p>
                 {% endif %}
-                <a href="{% url 'lista_publicaciones' %}" class="btn btn-link mt-3">Ver / Moderar Foro</a>
+                {# CORREGIDO: Se añadió el namespace 'foro:' #}
+                <a href="{% url 'foro:lista_publicaciones' %}" class="btn btn-link mt-3">Ver / Moderar Foro</a>
             </div>
         </div>
         <div class="col-lg-6 mb-4">
@@ -137,7 +140,10 @@
                     {% for taller in talleres_con_cupos_list %}
                         <div class="activity-item">
                             <i class="fas fa-chalkboard icon"></i> <strong>{{ taller.nombre }}</strong>
-                            <small>Cupos: {{ taller.cupos_disponibles }} / {{ taller.cupos_totales }} - <a href="{% url 'detalle_taller' taller.id %}">Ver Inscritos</a></small>
+                            <small>Cupos: {{ taller.cupos_disponibles }} / {{ taller.cupos_totales }} - 
+                                {# CORREGIDO: Se añadió el namespace 'talleres:' #}
+                                <a href="{% url 'talleres:detalle_taller' taller.id %}">Ver Inscritos</a>
+                            </small>
                         </div>
                     {% endfor %}
                 {% else %}
@@ -149,7 +155,6 @@
         <div class="col-lg-6 mb-4">
             <div class="row h-100">
                 <div class="col-6 mb-4">
-                    <!-- CORRECCIÓN APLICADA AQUÍ -->
                     <a href="{% url 'anuncios:crear_anuncio' %}" class="action-button btn-anuncio"> 
                         <i class="fas fa-bullhorn icon"></i>
                         <h5>Crear Anuncio</h5>

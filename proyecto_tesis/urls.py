@@ -25,9 +25,9 @@ urlpatterns = [
     path("usuarios/", include("usuarios.urls")),  # módulo de gestión de usuarios
     path("accounts/", include("django.contrib.auth.urls")), 
     path("reuniones/", include("reuniones.urls")),
-    path("talleres/", include("talleres.urls")),
+    path('talleres/', include('talleres.urls', namespace='talleres')),
     path("votaciones/", include("votaciones.urls")),
-    path('foro/', include('foro.urls')),
+    path('foro/', include('foro.urls', namespace='foro')),
     path('anuncios/', include('anuncios.urls', namespace='anuncios')),
     path('recursos/', include('recursos.urls', namespace='recursos')),
 ]

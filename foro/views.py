@@ -121,7 +121,7 @@ def detalle_publicacion(request, pk):
             publicacion = get_object_or_404(Publicacion.objects.select_related("autor").prefetch_related("adjuntos"), pk=pk, visible=True)
     except Http404:
         messages.error(request, "Esa publicación no existe o no tienes permiso para verla.")
-        return redirect("lista_publicaciones")
+        return redirect("foro:lista_publicaciones") # 👈 CORRECCIÓN: Añadido "foro:"
 
     # Lógica para ENVIAR un comentario (POST)
     if request.method == "POST":
@@ -130,7 +130,7 @@ def detalle_publicacion(request, pk):
             form.save(publicacion=publicacion, autor=request.user)
             messages.success(request, "Comentario publicado.")
             # Redirigimos a la misma página (al ancla del nuevo comentario si quisiéramos)
-            return redirect("detalle_publicacion", pk=publicacion.pk)
+            return redirect("foro:detalle_publicacion", pk=publicacion.pk) # 👈 CORRECCIÓN: Añadido "foro:"
         else:
             messages.error(request, "No se pudo publicar el comentario.")
             # Si hay error, continuamos al GET para mostrar el form con errores
@@ -173,7 +173,7 @@ def alternar_publicacion_web(request, pk):
     else:
         messages.warning(request, "Publicación ocultada.")
     
-    return redirect("lista_publicaciones")
+    return redirect("foro:lista_publicaciones") # 👈 CORRECCIÓN: Añadido "foro:"
 
 @require_POST
 @login_required
@@ -190,7 +190,7 @@ def eliminar_comentario_web(request, pk):
         messages.error(request, "No tienes permisos para esta acción.")
 
     # Redirige de vuelta a la página de detalle
-    return redirect("detalle_publicacion", pk=comentario.publicacion_id)
+    return redirect("foro:detalle_publicacion", pk=comentario.publicacion_id) # 👈 CORRECCIÓN: Añadido "foro:"
 
 @require_POST
 @login_required
@@ -204,7 +204,7 @@ def restaurar_comentario_web(request, pk):
         comentario.save()
         messages.success(request, "Comentario restaurado.")
     
-    return redirect("detalle_publicacion", pk=comentario.publicacion_id)
+    return redirect("foro:detalle_publicacion", pk=comentario.publicacion_id) # 👈 CORRECCIÓN: Añadido "foro:"
 
 @require_POST
 @login_required
@@ -217,7 +217,7 @@ def eliminar_publicacion_web(request, pk):
     publicacion.delete()
     
     messages.error(request, f"Publicación '{contenido_truncado}' eliminada permanentemente.")
-    return redirect("lista_publicaciones")
+    return redirect("foro:lista_publicaciones") # 👈 CORRECCIÓN: Añadido "foro:"
 
 
 # ------------------------------------------------------------------------------
@@ -280,7 +280,7 @@ def crear_publicacion(request):
     """Crea una publicación desde el sitio web (formulario en modal)."""
 
     if request.method != "POST":
-        return redirect("lista_publicaciones")
+        return redirect("foro:lista_publicaciones") # 👈 CORRECCIÓN: Añadido "foro:"
 
     form = PublicacionForm(request.POST, request.FILES)
     if form.is_valid():
@@ -297,13 +297,13 @@ def crear_publicacion(request):
             )
 
         messages.success(request, "Publicación creada correctamente.")
-        return redirect("lista_publicaciones")
+        return redirect("foro:lista_publicaciones") # 👈 CORRECCIÓN: Añadido "foro:"
 
     # Si hay error, mantener el formulario en sesión
     request.session["form_con_error_data"] = request.POST
     request.session["form_errors"] = form.errors.as_json()
     messages.error(request, "No se pudo crear la publicación.")
-    return redirect("lista_publicaciones")
+    return redirect("foro:lista_publicaciones") # 👈 CORRECCIÓN: Añadido "foro:"
 
 @api_view(["GET"])
 @authentication_classes([TokenAuthentication, SessionAuthentication])
