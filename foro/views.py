@@ -32,6 +32,8 @@ from rest_framework.decorators import (
     authentication_classes,
     parser_classes,
 )
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+
 # ------------------------------------------------------------------------------
 #                                   WEB
 # ------------------------------------------------------------------------------
@@ -71,35 +73,37 @@ def lista_publicaciones(request):
         "form_errors_manual": form_errors,
     }
     return render(request, "foro/lista_publicaciones.html", context)
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def crear_mensaje(request):
 
-@login_required
-def crear_publicacion(request):
-    """Crea publicación (formulario modal). Redirige a la lista."""
-    if request.method != "POST":
-        return redirect("lista_publicaciones")
+    publicacion_id = request.data.get("publicacion_id")
+    texto = request.data.get("texto", "").strip()
+    archivo = request.FILES.get("archivo")
 
-    form = PublicacionForm(request.POST)
-    if form.is_valid():
-        publicacion = form.save(commit=False)
-        publicacion.autor = request.user
-        publicacion.save()
+    try:
+        publicacion = Publicacion.objects.get(id=publicacion_id)
+    except Publicacion.DoesNotExist:
+        return Response({"error": "Publicación no existe"}, status=404)
 
-        # Crear adjuntos con autor = usuario logueado
-        for f in request.FILES.getlist("archivos"):
-            ArchivoAdjunto.objects.create(
-                publicacion=publicacion,
-                archivo=f,
-                autor=request.user,   # 👈 ESTE ES EL CAMBIO IMPORTANTE
-            )
+    # 1) si hay texto -> crear comentario
+    if texto:
+        Comentario.objects.create(
+            publicacion=publicacion,
+            autor=request.user,
+            contenido=texto
+        )
 
-        messages.success(request, "Publicación creada.")
-        return redirect("lista_publicaciones")
+    # 2) si hay imagen -> crear "mensaje adjunto"
+    if archivo:
+        ArchivoAdjunto.objects.create(
+            publicacion=publicacion,
+            archivo=archivo,
+            autor=request.user,
+            es_mensaje=True  # <- CLAVE
+        )
 
-    # Si hay errores, guardamos en sesión y redirigimos
-    request.session["form_con_error_data"] = request.POST
-    request.session["form_errors"] = form.errors.as_json()
-    messages.error(request, "No se pudo crear la publicación.")
-    return redirect("lista_publicaciones")
+    return Response({"mensaje": "ok"})
 
 @login_required
 def detalle_publicacion(request, pk):
@@ -271,7 +275,35 @@ def _publicacion_to_dict(p: Publicacion, incluir_comentarios: bool = False) -> d
         qs = p.comentarios.select_related("autor").order_by("fecha_creacion")
         data["comentarios"] = [_comentario_to_dict(c) for c in qs]
     return data
+@login_required
+def crear_publicacion(request):
+    """Crea una publicación desde el sitio web (formulario en modal)."""
 
+    if request.method != "POST":
+        return redirect("lista_publicaciones")
+
+    form = PublicacionForm(request.POST, request.FILES)
+    if form.is_valid():
+        publicacion = form.save(commit=False)
+        publicacion.autor = request.user
+        publicacion.save()
+
+        # Guardar archivos adjuntos si existen
+        for f in request.FILES.getlist("archivos"):
+            ArchivoAdjunto.objects.create(
+                publicacion=publicacion,
+                archivo=f,
+                autor=request.user
+            )
+
+        messages.success(request, "Publicación creada correctamente.")
+        return redirect("lista_publicaciones")
+
+    # Si hay error, mantener el formulario en sesión
+    request.session["form_con_error_data"] = request.POST
+    request.session["form_errors"] = form.errors.as_json()
+    messages.error(request, "No se pudo crear la publicación.")
+    return redirect("lista_publicaciones")
 
 @api_view(["GET"])
 @authentication_classes([TokenAuthentication, SessionAuthentication])
@@ -328,33 +360,81 @@ def api_publicacion_comentarios(request, pk: int):
 @permission_classes([IsAuthenticated])
 @parser_classes([MultiPartParser, FormParser])
 def api_subir_adjunto(request, pk: int):
-    """
-    Sube un archivo (imagen, audio, video, etc.) asociado a una publicación del foro.
-    Endpoint: POST /foro/api/v1/publicaciones/<pk>/adjuntos/
-    """
-    # 1) Buscar la publicación
     try:
         publicacion = Publicacion.objects.get(pk=pk, visible=True)
     except Publicacion.DoesNotExist:
-        return Response(
-            {"detail": "Publicación no encontrada."},
-            status=status.HTTP_404_NOT_FOUND,
-        )
+        return Response({"detail": "Publicación no encontrada."}, status=404)
 
-    # 2) Tomar el archivo enviado bajo el nombre "archivo"
     archivo = request.FILES.get("archivo")
     if not archivo:
-        return Response(
-            {"detail": "No se envió ningún archivo en el campo 'archivo'."},
-            status=status.HTTP_400_BAD_REQUEST,
-        )
+        return Response({"detail": "No se envió ningún archivo en el campo 'archivo'."},
+                        status=400)
 
-    # 3) Crear el adjunto
+    # 🔹 AQUÍ marcamos que este adjunto viene de la app y se mostrará como "mensaje"
     adj = ArchivoAdjunto(
         publicacion=publicacion,
-        autor=request.user,          # 👈 AQUÍ
-        archivo=archivo
+        archivo=archivo,
+        autor=request.user,
+        es_mensaje=True,   # 👈 CLAVE
     )
     adj.save()
+
     serializer = ArchivoAdjuntoSerializer(adj, context={"request": request})
+    return Response(serializer.data, status=201)
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+@parser_classes([MultiPartParser, FormParser, JSONParser])
+def enviar_mensaje(request, publicacion_id):
+    """
+    Recibe un mensaje unificado:
+    - texto (opcional)
+    - archivo (opcional)
+    y lo guarda como comentario + adjunto si corresponde.
+    """
+
+    try:
+        pub = Publicacion.objects.get(id=publicacion_id)
+    except Publicacion.DoesNotExist:
+        return Response({"error": "Publicación no encontrada"}, status=status.HTTP_404_NOT_FOUND)
+
+    usuario = request.user
+
+    texto = request.data.get("texto", "").strip()
+    archivo = request.FILES.get("archivo", None)
+
+    # Si NO hay texto y NO hay imagen → error
+    if not texto and not archivo:
+        return Response(
+            {"error": "Debe enviar texto o una imagen"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # -------------------------------
+    # 1. Crear comentario (solo si hay texto)
+    # -------------------------------
+    comentario = None
+    if texto:
+        comentario = Comentario.objects.create(
+            publicacion=pub,
+            autor=usuario,
+            contenido=texto,
+            visible=True
+        )
+
+    # -------------------------------
+    # 2. Crear adjunto (solo si hay imagen)
+    # -------------------------------
+    if archivo:
+        ArchivoAdjunto.objects.create(
+            publicacion=pub,
+            archivo=archivo,
+            tipo_archivo="imagen",
+            autor=usuario
+        )
+
+    # -------------------------------
+    # 3. Devolver la publicación actualizada
+    # -------------------------------
+    serializer = PublicacionSerializer(pub, context={"request": request})
     return Response(serializer.data, status=status.HTTP_201_CREATED)
