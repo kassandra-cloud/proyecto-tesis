@@ -1,76 +1,307 @@
 {% extends "base.html" %}
 {% load can %}
 
-{% block title %}Reuniones{% endblock %}
+{% block title %}{{ titulo|default:"Reuniones" }}{% endblock %}
+
+{% block extra_css %}
+<style>
+/* -----------------------------------------------------------
+   ESTILOS GENERALES FULLCALENDAR
+----------------------------------------------------------- */
+.fc-event {
+  cursor: pointer;
+}
+
+.fc-event-main-frame {
+  padding: 2px 4px;
+  line-height: 1.3;
+}
+
+.fc-event-time {
+  font-size: 0.8em;
+  font-weight: 600;
+}
+
+.fc-event-title {
+  font-weight: 500;
+  white-space: normal;
+}
+
+/* Fines de semana */
+.fc-day-sat,
+.fc-day-sun {
+  background-color: #f8f9fa;
+}
+
+[data-bs-theme="dark"] .fc-day-sat,
+[data-bs-theme="dark"] .fc-day-sun,
+[data-bs-theme="dark"] .fc-list-even {
+  background-color: #2a2e33;
+}
+
+/* Popovers */
+.fc-popover {
+  z-index: 1060;
+}
+
+/* -----------------------------------------------------------
+   BOTONES PERSONALIZADOS PREV / NEXT — ESTILO PROFESIONAL
+----------------------------------------------------------- */
+.fc-myPrev-button,
+.fc-myNext-button {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0.25rem 0.5rem !important;
+  color: #0d6efd !important;
+  font-size: 1.2rem !important;
+}
+
+.fc-myPrev-button:hover,
+.fc-myNext-button:hover {
+  background-color: rgba(13,110,253,0.1) !important;
+  border-radius: 6px;
+}
+
+[data-bs-theme="dark"] .fc-myPrev-button,
+[data-bs-theme="dark"] .fc-myNext-button {
+  color: #66aaff !important;
+}
+
+.fc-myPrev-button::before {
+  font-family: "Font Awesome 5 Free";
+  font-weight: 900;
+  content: "\f053"; /* < */
+}
+
+.fc-myNext-button::before {
+  font-family: "Font Awesome 5 Free";
+  font-weight: 900;
+  content: "\f054"; /* > */
+}
+/* ===========================================================
+   MODO OSCURO REAL PARA FULLCALENDAR LIST VIEW — v6.x
+=========================================================== */
+
+/* Fondo general tabla */
+[data-bs-theme="dark"] .fc-list-table {
+  background-color: #1e1f21 !important;
+  border-color: #3a3b3d !important;
+}
+
+/* Cabecera del día (día completo) */
+[data-bs-theme="dark"] .fc-list-day {
+  background-color: #2a2c2f !important;
+  border-color: #3a3b3d !important;
+}
+
+[data-bs-theme="dark"] .fc-list-day-text,
+[data-bs-theme="dark"] .fc-list-day-side-text {
+  color: #e0e0e0 !important;
+}
+
+/* Filas de eventos */
+[data-bs-theme="dark"] .fc-list-event-td,
+[data-bs-theme="dark"] tr.fc-list-event td {
+  background-color: #1e1f21 !important;
+  border-color: #303133 !important;
+  color: #fff !important;
+}
+
+/* Hora */
+[data-bs-theme="dark"] .fc-list-event-time,
+[data-bs-theme="dark"] .fc-list-item-time {
+  color: #fff !important;
+}
+
+/* Título */
+[data-bs-theme="dark"] .fc-list-event-title,
+[data-bs-theme="dark"] .fc-list-item-title {
+  color: #fff !important;
+}
+
+/* PUNTO VERDE del evento */
+[data-bs-theme="dark"] .fc-list-event-dot {
+  border-color: #4caf50 !important;
+}
+
+/* Hover profesional */
+[data-bs-theme="dark"] tr.fc-list-event:hover td {
+  background-color: #2a2c2f !important;
+}
+/* -----------------------------------------------------------
+   FIX CRÍTICO: BARRA GRIS EN MODO OSCURO (list view)
+----------------------------------------------------------- */
+
+[data-bs-theme="dark"] .fc-list-day-cushion {
+  background-color: #2a2c2f !important;
+  color: #e0e0e0 !important;
+  border-color: #3a3b3d !important;
+}
+
+/* El texto del día (izquierda) */
+[data-bs-theme="dark"] .fc-list-day-cushion .fc-list-day-text {
+  color: #e0e0e0 !important;
+}
+
+/* La fecha derecha (la que está pálida en tu captura) */
+[data-bs-theme="dark"] .fc-list-day-cushion .fc-list-day-side-text {
+  color: #cfcfcf !important;
+}
+</style>
+{% endblock %}
 
 {% block content %}
 <div class="card shadow-sm">
   <div class="card-body">
 
-    <!-- Header con botón crear -->
+    <!-- Título y botón crear -->
     <div class="d-flex justify-content-between align-items-center mb-3">
       <h1 class="h4 m-0">{{ titulo }}</h1>
-      {% user_can 'reuniones' 'create' as puede_crear_reunion %}
-      {% if puede_crear_reunion %}
-        <a class="btn btn-dark" href="{% url 'reuniones:crear_reunion' %}">
-          <span class="me-1">+</span> Nueva Reunión
-        </a>
-      {% endif %}
+      <div class="d-flex gap-2">
+        {% user_can 'reuniones' 'create' as puede_crear_reunion %}
+        {% if puede_crear_reunion %}
+          <a class="btn btn-primary" href="{% url 'reuniones:crear_reunion' %}">
+            <i class="fas fa-plus me-1"></i> Nueva Reunión
+          </a>
+        {% endif %}
+      </div>
     </div>
 
     <!-- Tabs de estado -->
-    <ul class="nav nav-tabs mb-3">
+    <ul class="nav nav-tabs mb-4" id="tabs-estado">
       <li class="nav-item">
-        <a class="nav-link {% if estado != 'realizada' %}active{% endif %}"
-           href="?estado=programada">Programadas</a>
+        <a class="nav-link {% if estado_actual == 'programada' %}active{% endif %}"
+           href="?estado=programada" data-estado="PROGRAMADA">Programadas</a>
       </li>
       <li class="nav-item">
-        <a class="nav-link {% if estado == 'realizada' %}active{% endif %}"
-           href="?estado=realizada">Realizadas</a>
+        <a class="nav-link {% if estado_actual == 'en_curso' %}active{% endif %}"
+           href="?estado=en_curso" data-estado="EN_CURSO">En Curso</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link {% if estado_actual == 'realizada' %}active{% endif %}"
+           href="?estado=realizada" data-estado="REALIZADA">Realizadas</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link {% if estado_actual == 'cancelada' %}active{% endif %}"
+           href="?estado=cancelada" data-estado="CANCELADA">Canceladas</a>
       </li>
     </ul>
 
-    <!-- Tabla -->
-    <div class="table-responsive">
-      <table class="table align-middle">
-        <thead>
-          <tr>
-            <th>Título</th>
-            <th>Tipo</th>
-            <th>Fecha y Hora</th>
-            <th class="text-end">Acciones</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for reunion in reuniones %}
-          <tr>
-            <td>{{ reunion.titulo }}</td>
-            <td>
-              <span class="badge {% if reunion.tipo == 'Extraordinaria' %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
-                {{ reunion.tipo }}
-              </span>
-            </td>
-            <td>{{ reunion.fecha|date:"d/m/Y H:i" }} hrs</td>
-            <td class="text-end">
-              <a href="{% url 'reuniones:detalle_reunion' reunion.pk %}"
-                 class="btn btn-sm btn-outline-secondary">Ver Detalles</a>
-            </td>
-          </tr>
-          {% empty %}
-          <tr>
-            <td colspan="4" class="text-center text-muted py-4">
-              {% if estado == 'realizada' %}
-                No hay reuniones realizadas.
-              {% else %}
-                No hay reuniones programadas.
-              {% endif %}
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+    <!-- Calendario -->
+    <div id="calendario-container">
+      <div id="calendario"></div>
     </div>
 
   </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js'></script>
+<script src='https://cdn.jsdelivr.net/npm/@fullcalendar/bootstrap5@6.1.15/index.global.min.js'></script>
+<script src='https://cdn.jsdelivr.net/npm/fullcalendar/locales/es@6.1.15/index.global.min.js'></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+
+  const calendarioEl = document.getElementById('calendario');
+  const tabsContainer = document.getElementById('tabs-estado');
+
+  function getEstadoActivo() {
+    const tabActiva = tabsContainer.querySelector('.nav-link.active');
+    return tabActiva ? tabActiva.dataset.estado : 'PROGRAMADA';
+  }
+
+  const eventosUrl = "{% url 'reuniones:reuniones_feed' %}";
+
+  const calendario = new FullCalendar.Calendar(calendarioEl, {
+    themeSystem: 'bootstrap5',
+    locale: 'es',
+    initialView: 'dayGridMonth',
+    navLinks: true,
+    editable: false,
+    dayMaxEvents: true,
+
+    /* -----------------------------------------------
+       BOTONES PROFESIONALES PREV / NEXT
+    ----------------------------------------------- */
+    customButtons: {
+      myPrev: {
+        text: '',
+        click: () => calendario.prev()
+      },
+      myNext: {
+        text: '',
+        click: () => calendario.next()
+      }
+    },
+
+    headerToolbar: {
+      left: 'myPrev,myNext today',
+      center: 'title',
+      right: 'dayGridMonth,timeGridWeek,listWeek'
+    },
+
+    buttonText: {
+      today: 'Hoy',
+      month: 'Mes',
+      week: 'Semana',
+      list: 'Lista'
+    },
+
+    /* -----------------------------------------------
+       CONTENIDO DE EVENTOS
+    ----------------------------------------------- */
+    eventContent: function(arg) {
+      if (arg.view.type === 'listWeek') return;
+
+      const time = arg.event.start.toLocaleTimeString('es-CL', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      });
+
+      return {
+        html: `
+          <div class="fc-event-main-frame">
+            <div class="fc-event-title-container">
+              <div class="fc-event-time">${time} hrs</div>
+              <div class="fc-event-title">${arg.event.title}</div>
+            </div>
+          </div>
+        `
+      };
+    },
+
+    /* -----------------------------------------------
+       CARGA DE EVENTOS DESDE API
+    ----------------------------------------------- */
+    events: {
+      url: eventosUrl,
+      extraParams: () => ({
+        estado: getEstadoActivo()
+      })
+    }
+  });
+
+  calendario.render();
+
+  /* -----------------------------------------------
+     TAB ACTIVA → recarga eventos
+  ----------------------------------------------- */
+  tabsContainer.querySelectorAll('a.nav-link').forEach(tab => {
+    tab.addEventListener('shown.bs.tab', function(event) {
+      const nuevoEstado = event.target.dataset.estado;
+
+      const url = new URL(window.location);
+      url.searchParams.set('estado', nuevoEstado.toLowerCase());
+      window.history.pushState({}, '', url);
+
+      calendario.refetchEvents();
+    });
+  });
+
+});
+</script>
 {% endblock %}

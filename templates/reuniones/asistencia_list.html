@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load can %}
 
 {% block title %}{{ titulo }}{% endblock %}
 
@@ -20,17 +21,21 @@
                     </tr>
                 </thead>
                 <tbody>
+                    {# 'vecinos' es la lista de todos los Perfiles de vecino #}
                     {% for vecino in vecinos %}
                     <tr>
                         <td>
                             <div class="form-check">
+                                {# El 'value' es el 'vecino.pk' (ID del Perfil) #}
                                 <input class="form-check-input" type="checkbox" name="presentes" value="{{ vecino.pk }}" 
                                 {% if vecino.pk in asistentes_pks %}checked{% endif %}>
                             </div>
                         </td>
-                        <td>{{ vecino.username }}</td>
-                        <td>{{ vecino.get_full_name|default:"-" }}</td>
-                        <td>{{ vecino.perfil.rut|default:"-" }}</td>
+                        {# --- INICIO DE LA CORRECCIÓN --- #}
+                        <td>{{ vecino.usuario.username }}</td>
+                        <td>{{ vecino.usuario.get_full_name|default:"-" }}</td>
+                        <td>{{ vecino.rut|default:"-" }}</td>
+                        {# --- FIN DE LA CORRECCIÓN --- #}
                     </tr>
                     {% empty %}
                     <tr>
@@ -42,7 +47,10 @@
         </div>
 
         <div class="mt-4 d-flex gap-2">
-            <button type="submit" class="btn btn-dark">Guardar Asistencia</button>
+            {% user_can 'reuniones' 'asistencia' as puede_pasar_lista %}
+            {% if puede_pasar_lista %}
+                <button type="submit" class="btn btn-primary">Guardar Asistencia</button>
+            {% endif %}
             <a href="{% url 'reuniones:detalle_reunion' reunion.pk %}" class="btn btn-outline-secondary">Cancelar</a>
         </div>
     </form>

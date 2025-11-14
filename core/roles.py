@@ -9,6 +9,11 @@ SECRETARIA = Perfil.Roles.SECRETARIA
 TESORERO   = Perfil.Roles.TESORERO
 SUPLENTE   = Perfil.Roles.SUPLENTE
 VECINO    = Perfil.Roles.VECINO 
+
+# Agrupaciones
+ROL_DIRECTIVA = [PRESIDENTE, SECRETARIA, TESORERO, SUPLENTE]
+ROL_VECINO    = [VECINO]
+
 # Recurso -> Acción -> [roles permitidos]
 ROLE_MATRIX: Dict[str, Dict[str, List[str]]] = {
     "usuarios": {
@@ -18,54 +23,67 @@ ROLE_MATRIX: Dict[str, Dict[str, List[str]]] = {
         "delete": [PRESIDENTE],
         "assign": [PRESIDENTE],
     },
+    
+    # --- BLOQUE DE REUNIONES MODIFICADO ---
     "reuniones": {
-        "view":   [PRESIDENTE, SECRETARIA, TESORERO, SUPLENTE,VECINO],
+        "view":   ROL_DIRECTIVA + ROL_VECINO, # Vecinos pueden ver la lista
         "create": [PRESIDENTE, SECRETARIA, SUPLENTE],
         "edit":   [PRESIDENTE, SECRETARIA, SUPLENTE],
-        "close":  [PRESIDENTE, SECRETARIA],
+        "delete": [PRESIDENTE], # Eliminar de la BD
+        "cancel": ROL_DIRECTIVA, # Nueva acción para cancelar
+        "change_estado": ROL_DIRECTIVA, # Nueva acción para Iniciar/Finalizar
         "asistencia": [PRESIDENTE, SECRETARIA, SUPLENTE],
     },
+    # --------------------------------------
+
     "actas": {
-        "view":   [PRESIDENTE, SECRETARIA, TESORERO, SUPLENTE,VECINO],
-        "create": [PRESIDENTE, SECRETARIA, SUPLENTE],
+        "view":   ROL_DIRECTIVA + ROL_VECINO,
         "edit":   [PRESIDENTE, SECRETARIA, SUPLENTE],
         "approve":[PRESIDENTE],
         "delete": [PRESIDENTE],
+        "send":   [PRESIDENTE, SECRETARIA], # Añadí 'send' para el correo
     },
     "talleres": {
-        "view":   [PRESIDENTE, SECRETARIA, TESORERO, SUPLENTE,VECINO],
+        "view":   ROL_DIRECTIVA + ROL_VECINO,
         "create": [PRESIDENTE],
         "edit":   [PRESIDENTE],
         "delete": [PRESIDENTE],
     },
     "votaciones": {
-        "view":   [PRESIDENTE, SECRETARIA, TESORERO, SUPLENTE,VECINO],
+        "view":   ROL_DIRECTIVA + ROL_VECINO,
         "create": [PRESIDENTE, TESORERO],
         "edit":   [PRESIDENTE],  
         "close":  [PRESIDENTE, TESORERO],
         "delete": [PRESIDENTE],  
-        "preview":[PRESIDENTE, SECRETARIA, TESORERO, SUPLENTE],
-        "vote":   [],
-        "results":[PRESIDENTE, SECRETARIA, TESORERO, SUPLENTE],
+        "preview":ROL_DIRECTIVA,
+        "vote":   ROL_VECINO, # Vecinos votan (via API)
+        "results":ROL_DIRECTIVA,
     },
     "recursos": {
-        "view":   [PRESIDENTE, SECRETARIA, TESORERO, SUPLENTE,VECINO],
+        "view":   ROL_DIRECTIVA + ROL_VECINO,
         "create": [PRESIDENTE],
         "edit":   [PRESIDENTE],
         "manage_reservas": [PRESIDENTE, SECRETARIA, SUPLENTE], 
     },
     "reservas": {
-        "view_own":   [PRESIDENTE, SECRETARIA, TESORERO, SUPLENTE, VECINO],
-        "create":     [PRESIDENTE, SECRETARIA, TESORERO, SUPLENTE, VECINO],
-        "cancel_own": [PRESIDENTE, SECRETARIA, TESORERO, SUPLENTE, VECINO],
-        
-        "manage_all": [PRESIDENTE, SECRETARIA, SUPLENTE], 
-    },    
-    "notas": {
-        "admin":  [PRESIDENTE],
+        "view_own":   ROL_DIRECTIVA + ROL_VECINO,
+        "view_all":   ROL_DIRECTIVA,
+        "create":     ROL_VECINO,
+        "cancel_own": ROL_VECINO,
+        "approve":    ROL_DIRECTIVA,
+        "reject":     ROL_DIRECTIVA,
     },
     "foro": {
-        "moderar": [PRESIDENTE, SECRETARIA, TESORERO, SUPLENTE],
-        "delete": [PRESIDENTE, SECRETARIA, TESORERO, SUPLENTE],
+        "view":    ROL_DIRECTIVA + ROL_VECINO,
+        "create":  ROL_VECINO,
+        "comment": ROL_VECINO,
+        "moderate":ROL_DIRECTIVA,
+        "delete": [PRESIDENTE], # Solo el presi borra
     },
+    "anuncios": {
+        "view":   ROL_DIRECTIVA + ROL_VECINO,
+        "create": ROL_DIRECTIVA,
+        "edit":   ROL_DIRECTIVA,
+        "delete": ROL_DIRECTIVA,
+    }
 }

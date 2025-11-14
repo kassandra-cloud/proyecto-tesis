@@ -200,11 +200,16 @@ body {
 .progress-bar-otro {
     background-color: #5db324 !important; 
 }
+
+
 /* =========================================
     SOBREESCRITURAS PARA MODO OSCURO
 =========================================
 */
-
+[data-bs-theme="dark"] .bg-light {
+    background-color: #2a2e33 !important; /* Un gris oscuro, no tan negro */
+    border-color: #444 !important;
+}
 [data-bs-theme="dark"] body {
     background-color: #121212; /* Fondo principal oscuro */
     color: #e0e0e0;      /* Texto principal claro */

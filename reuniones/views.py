@@ -12,7 +12,8 @@ from django.utils.text import slugify
 from django.core.mail import EmailMessage
 from django.contrib.auth import get_user_model
 from datetime import timedelta
-from .models import Reunion, Asistencia, Acta
+# Importamos el nuevo EstadoReunion
+from .models import Reunion, Asistencia, Acta, EstadoReunion
 from .forms import ReunionForm, ActaForm
 from core.authz import role_required
 from core.models import Perfil
@@ -35,57 +36,42 @@ def _pdf_bytes_desde_xhtml(template_path: str, context: dict) -> bytes:
     result = BytesIO()
     pdf = pisa.pisaDocument(BytesIO(html.encode("UTF-8")), dest=result, encoding='UTF-8')
 
-    if pdf.err:
-        # En caso de error devolvemos bytes vacíos (el caller decide la respuesta)
-        return b""
-    return result.getvalue()
-
+    if not pdf.err:
+        return result.getvalue()
+    print(f"Error al generar PDF: {pdf.err}")
+    return b""
 
 # =========================
-# Reuniones
+# Vistas de Reuniones
 # =========================
+
 @login_required
 @role_required("reuniones", "view")
 def reunion_list(request):
-    estado = request.GET.get("estado", "programada")
-    now = timezone.now()
+    estado_query = request.GET.get('estado', 'programada')
 
-    if estado == "realizada":
-        qs = Reunion.objects.filter(fecha__lt=now - timedelta(hours=2))
+    if estado_query == 'realizada':
+        reuniones = Reunion.objects.filter(estado=EstadoReunion.REALIZADA).order_by('-fecha')
         titulo = "Reuniones Realizadas"
-    else:  # programada / en_curso
-        qs = (Reunion.objects.filter(fecha__gt=now) |
-              Reunion.objects.filter(fecha__lte=now, fecha__gte=now - timedelta(hours=2)))
+    elif estado_query == 'en_curso':
+        reuniones = Reunion.objects.filter(estado=EstadoReunion.EN_CURSO).order_by('-fecha')
+        titulo = "Reuniones En Curso"
+    elif estado_query == 'cancelada':
+        reuniones = Reunion.objects.filter(estado=EstadoReunion.CANCELADA).order_by('-fecha')
+        titulo = "Reuniones Canceladas"
+    else:
+        estado_query = 'programada'
+        reuniones = Reunion.objects.filter(estado=EstadoReunion.PROGRAMADA).order_by('fecha')
         titulo = "Reuniones Programadas"
 
-    reuniones = qs.order_by("-fecha")
-    return render(request, "reuniones/reunion_list.html", {
-        "reuniones": reuniones,
-        "estado": estado,
-        "titulo": titulo,
-    })
-
-@login_required
-@role_required("reuniones", "view")
-def reunion_detail(request, pk):
-    reunion = get_object_or_404(Reunion, pk=pk)
-
-    # Usuarios activos con correo (excluye superusuario si quieres)
-    destinatarios = (
-        User.objects
-            .filter(is_active=True)
-            .exclude(email__isnull=True)
-            .exclude(email__exact="")
-            .exclude(is_superuser=True)     # quita esta línea si quieres incluirlos
-            .order_by("first_name", "last_name", "email")
-    )
-
     context = {
-        "reunion": reunion,
-        "destinatarios": destinatarios,   
-        "roles": Perfil.Roles.choices,
+        'reuniones': reuniones,
+        'titulo': titulo,
+        'estado_actual': estado_query
     }
-    return render(request, "reuniones/reunion_detail.html", context)
+    return render(request, "reuniones/reunion_list.html", context)
+
+
 @login_required
 @role_required("reuniones", "create")
 def reunion_create(request):
@@ -95,71 +81,205 @@ def reunion_create(request):
             reunion = form.save(commit=False)
             reunion.creada_por = request.user
             reunion.save()
-            messages.success(request, f"Reunión '{reunion.titulo}' creada correctamente.")
-            return redirect('reuniones:lista_reuniones')
-        else:
-            messages.error(request, "Por favor, corrige los errores del formulario.")
+            messages.success(request, "Reunión creada exitosamente.")
+            return redirect("reuniones:lista_reuniones")
     else:
-        form = ReunionForm()
+        form = ReunionForm(initial={'fecha': timezone.now() + timedelta(days=1)})
+    
+    return render(request, "reuniones/reunion_form.html", {"form": form})
 
-    context = {"form": form, "titulo": "Crear Nueva Reunión"}
-    return render(request, "reuniones/reunion_form.html", context)
 
+@login_required
+@role_required("reuniones", "view")
+def reunion_detail(request, pk):
+    reunion = get_object_or_404(Reunion, pk=pk)
+    try:
+        acta = reunion.acta
+        acta_form = ActaForm(instance=acta)
+    except Acta.DoesNotExist:
+        acta = None
+        acta_form = ActaForm(initial={'reunion': reunion})
+
+    asistentes = Asistencia.objects.filter(reunion=reunion)
+    
+    # --- CORRECCIÓN 1 (para el modal de email) ---
+    id_asistentes_usuarios = asistentes.values_list('vecino__id', flat=True)
+    # Obtenemos TODOS los perfiles (Vecino + Directiva) para el modal
+    vecinos_para_email = Perfil.objects.all().exclude(
+        usuario__id__in=id_asistentes_usuarios
+    ).select_related('usuario')
+    # --- FIN CORRECCIÓN 1 ---
+
+    context = {
+        "reunion": reunion,
+        "acta": acta,
+        "acta_form": acta_form,
+        "asistentes": asistentes,
+        "vecinos_para_email": vecinos_para_email,
+        "total_vecinos": Perfil.objects.all().count(), # Contamos a todos
+    }
+    return render(request, "reuniones/reunion_detail.html", context)
 
 # =========================
-# Asistencia
+# Vistas de Acta
 # =========================
+
+@login_required
+@role_required("actas", "edit")
+def acta_edit(request, pk):
+    return redirect('reuniones:detalle_reunion', pk=pk)
+
+
+@require_POST
+@login_required
+@role_required("actas", "edit")
+def guardar_borrador_acta(request, pk):
+    reunion = get_object_or_404(Reunion, pk=pk)
+    try:
+        acta = reunion.acta
+        form = ActaForm(request.POST, instance=acta)
+    except Acta.DoesNotExist:
+        form = ActaForm(request.POST)
+    
+    if form.is_valid():
+        acta_guardada = form.save(commit=False)
+        acta_guardada.reunion = reunion
+        acta_guardada.save()
+        messages.success(request, "Borrador del acta guardado.")
+    else:
+        messages.error(request, "Error al guardar el borrador.")
+        
+    return redirect("reuniones:detalle_reunion", pk=pk)
+
+
+@require_POST
+@login_required
+@role_required("actas", "approve")
+def aprobar_borrador_acta(request, pk):
+    reunion = get_object_or_404(Reunion, pk=pk)
+    if reunion.estado != EstadoReunion.REALIZADA:
+        messages.error(request, "No se puede aprobar un acta de una reunión que no ha finalizado.")
+        return redirect("reuniones:detalle_reunion", pk=pk)
+        
+    try:
+        acta = reunion.acta
+        acta.aprobada = True
+        acta.aprobado_por = request.user
+        acta.aprobado_en = timezone.now()
+        acta.save()
+        messages.success(request, "El acta ha sido aprobada oficialmente.")
+    except Acta.DoesNotExist:
+        messages.error(request, "No se puede aprobar un acta que no existe.")
+        
+    return redirect("reuniones:detalle_reunion", pk=pk)
+
+
+@require_POST
+@login_required
+@role_required("actas", "edit")
+def rechazar_acta(request, pk):
+    reunion = get_object_or_404(Reunion, pk=pk)
+    try:
+        acta = reunion.acta
+        acta.aprobada = False
+        acta.aprobado_por = None
+        acta.aprobado_en = None
+        acta.save()
+        messages.info(request, "Se ha quitado la aprobación del acta. Vuelve a estar en modo borrador.")
+    except Acta.DoesNotExist:
+        messages.error(request, "No se puede rechazar un acta que no existe.")
+        
+    return redirect("reuniones:detalle_reunion", pk=pk)
+
+# =========================
+# Vistas de Asistencia
+# =========================
+
 @login_required
 @role_required("reuniones", "asistencia")
 def asistencia_list(request, pk):
     reunion = get_object_or_404(Reunion, pk=pk)
-    vecinos = User.objects.filter(is_superuser=False)
-    asistentes_pks = Asistencia.objects.filter(reunion=reunion, presente=True).values_list('vecino__pk', flat=True)
+    
+    # --- CORRECCIÓN 2 (Incluir a la Directiva) ---
+    # Obtenemos TODOS los perfiles (Vecinos + Directiva)
+    vecinos = Perfil.objects.all().select_related('usuario').order_by('usuario__username')
+    # --- FIN CORRECCIÓN 2 ---
 
     if request.method == "POST":
-        Asistencia.objects.filter(reunion=reunion).delete()
-        vecinos_presentes_ids = request.POST.getlist('presentes')
+        
+        presentes_pks = request.POST.getlist('presentes') 
+        presentes_pks_set = set(str(pk) for pk in presentes_pks)
 
-        for vecino in vecinos:
-            esta_presente = str(vecino.pk) in vecinos_presentes_ids
-            Asistencia.objects.create(reunion=reunion, vecino=vecino, presente=esta_presente)
+        for perfil in vecinos:
+            esta_presente = str(perfil.pk) in presentes_pks_set
+            
+            # --- CORRECCIÓN 3 (Quitar 'metodo_registro') ---
+            Asistencia.objects.update_or_create(
+                reunion=reunion,
+                vecino=perfil.usuario,
+                defaults={'presente': esta_presente} # <-- CAMPO INCORRECTO ELIMINADO
+            )
+            # --- FIN CORRECCIÓN 3 ---
+            
+        messages.success(request, "Asistencia guardada correctamente.")
+        return redirect('reuniones:detalle_reunion', pk=pk)
 
-        messages.success(request, "Se ha guardado la lista de asistencia.")
-        return redirect('reuniones:detalle_reunion', pk=reunion.pk)
-
-    context = {
-        "reunion": reunion,
-        "vecinos": vecinos,
-        "asistentes_pks": asistentes_pks,
-        "titulo": f"Registro de Asistencia para '{reunion.titulo}'"
-    }
-    return render(request, "reuniones/asistencia_list.html", context)
-
-
-# =========================
-# Actas (editar / exportar / aprobar)
-# =========================
-@login_required
-@role_required("actas", "edit")
-def acta_edit(request, pk):
-    reunion = get_object_or_404(Reunion, pk=pk)
-    try:
-        acta = reunion.acta
-    except Acta.DoesNotExist:
-        acta = Acta(reunion=reunion)
-
-    if request.method == "POST":
-        form = ActaForm(request.POST, instance=acta)
-        if form.is_valid():
-            form.save()
-            messages.success(request, "El acta se ha guardado correctamente.")
-            return redirect('reuniones:detalle_reunion', pk=reunion.pk)
     else:
-        form = ActaForm(instance=acta)
+        # Lógica para mostrar la página (GET)
+        asistentes_presentes_pks = Asistencia.objects.filter(
+            reunion=reunion, 
+            presente=True
+        ).values_list('vecino__id', flat=True)
+        
+        perfiles_presentes_pks = Perfil.objects.filter(
+            usuario__id__in=asistentes_presentes_pks
+        ).values_list('id', flat=True)
 
-    context = {"form": form, "reunion": reunion, "titulo": f"Editar Acta de '{reunion.titulo}'"}
-    return render(request, "reuniones/acta_edit.html", context)
+        context = {
+            'reunion': reunion,
+            'titulo': f'Lista de Asistencia - {reunion.titulo}',
+            'vecinos': vecinos, 
+            'asistentes_pks': set(perfiles_presentes_pks)
+        }
+        return render(request, "reuniones/asistencia_list.html", context)
 
+
+@require_POST
+@login_required
+@role_required("reuniones", "asistencia")
+def registrar_asistencia_manual(request, pk):
+    # Esta función ya no se usa con el nuevo 'asistencia_list.html',
+    # pero la arreglamos por si acaso.
+    reunion = get_object_or_404(Reunion, pk=pk)
+    vecino_id = request.POST.get('vecino_id') 
+    
+    if not vecino_id:
+        messages.error(request, "No se seleccionó ningún vecino.")
+        return redirect('reuniones:lista_asistencia', pk=pk)
+    
+    perfil_vecino = get_object_or_404(Perfil, id=vecino_id)
+    usuario_vecino = perfil_vecino.usuario
+    
+    # --- CORRECCIÓN 4 (Quitar 'metodo_registro') ---
+    asistencia, created = Asistencia.objects.get_or_create(
+        reunion=reunion,
+        vecino=usuario_vecino, 
+        defaults={'presente': True} # <-- CAMPO INCORRECTO ELIMINADO
+    )
+    # --- FIN CORRECCIÓN 4 ---
+    
+    if created:
+        messages.success(request, f"Se registró la asistencia de {perfil_vecino.usuario.get_full_name()}.")
+    else:
+        asistencia.presente = True
+        asistencia.save()
+        messages.info(request, f"{perfil_vecino.usuario.get_full_name()} ya estaba en la lista, se marcó como presente.")
+        
+    return redirect('reuniones:lista_asistencia', pk=pk)
+
+# =========================
+# Vistas de PDF y Correos
+# =========================
 
 @login_required
 @role_required("actas", "view")
@@ -168,130 +288,36 @@ def acta_export_pdf(request, pk):
     try:
         acta = reunion.acta
     except Acta.DoesNotExist:
-        messages.error(request, "Esta reunión aún no tiene un acta para exportar.")
-        return redirect('reuniones:detalle_reunion', pk=reunion.pk)
+        messages.error(request, "Esta reunión aún no tiene un acta guardada.")
+        return redirect("reuniones:detalle_reunion", pk=pk)
 
     template_path = 'reuniones/acta_pdf_template.html'
-    pdf_bytes = _pdf_bytes_desde_xhtml(template_path, {"reunion": reunion, "acta": acta})
+    context = {"reunion": reunion, "acta": acta}
+    
+    pdf_bytes = _pdf_bytes_desde_xhtml(template_path, context)
+    
+    if not pdf_bytes:
+        messages.error(request, "Error al generar el PDF.")
+        return redirect("reuniones:detalle_reunion", pk=pk)
 
-    if pdf_bytes:
-        response = HttpResponse(pdf_bytes, content_type='application/pdf')
-        response['Content-Disposition'] = f'attachment; filename="acta_reunion_{reunion.pk}.pdf"'
-        return response
+    filename = f"Acta_{slugify(getattr(reunion, 'titulo', f'reunion-{reunion.pk}'))}.pdf"
+    
+    response = HttpResponse(pdf_bytes, content_type='application/pdf')
+    response['Content-Disposition'] = f'inline; filename="{filename}"'
+    return response
 
-    return HttpResponse("Error al generar el PDF", status=500)
 
-
-@login_required
-@permission_required("reuniones.change_acta", raise_exception=True)
 @require_POST
-def aprobar_acta(request, pk):
-    reunion = get_object_or_404(Reunion, pk=pk)
-    acta = get_object_or_404(Acta, pk=reunion.pk)
-
-    if not acta.aprobada:
-        acta.aprobada = True
-        acta.save(update_fields=["aprobada"])
-        messages.success(request, "Acta aprobada correctamente.")
-    else:
-        messages.info(request, "El acta ya estaba aprobada.")
-
-    next_url = request.POST.get("next")
-    if next_url:
-        return redirect(next_url)
-    return redirect("reuniones:detalle_reunion", pk=pk)
-
-
 @login_required
-@permission_required("reuniones.change_acta", raise_exception=True)
-@require_POST
-def rechazar_acta(request, pk):
-    reunion = get_object_or_404(Reunion, pk=pk)
-    acta = get_object_or_404(Acta, pk=reunion.pk)
-
-    if acta.aprobada:
-        acta.aprobada = False
-        acta.save(update_fields=["aprobada"])
-        messages.success(request, "Acta marcada como no aprobada.")
-    else:
-        messages.info(request, "El acta ya estaba como no aprobada.")
-
-    next_url = request.POST.get("next")
-    if next_url:
-        return redirect(next_url)
-    return redirect("reuniones:detalle_reunion", pk=pk)
-
-
-# =========================
-# Borrador de Acta (transcripción)
-# =========================
-@login_required
-@require_POST
-def guardar_borrador_acta(request, pk):
-    """
-    Guarda texto en Acta.transcripcion_borrador de la reunión pk.
-    Crea el Acta si no existe.
-    Espera body JSON: {"contenido":"..."}
-    """
-    try:
-        data = json.loads(request.body.decode("utf-8"))
-    except Exception:
-        return HttpResponseBadRequest("JSON inválido")
-
-    contenido = (data.get("contenido") or "").strip()
-
-    reunion = get_object_or_404(Reunion, pk=pk)
-    acta, _ = Acta.objects.get_or_create(reunion=reunion)
-    acta.transcripcion_borrador = contenido
-    # Si tu modelo tiene timestamps específicos, ajusta los nombres:
-    if hasattr(acta, "borrador_actualizado"):
-        acta.borrador_actualizado = timezone.now()
-        acta.save(update_fields=["transcripcion_borrador", "borrador_actualizado"])
-    else:
-        acta.save(update_fields=["transcripcion_borrador"])
-
-    return JsonResponse({"ok": True, "updated": timezone.now().isoformat()})
-
-
-@login_required
-@require_POST
-def aprobar_borrador_acta(request, pk):
-    """
-    Copia Acta.transcripcion_borrador -> Acta.contenido y limpia el borrador.
-    """
-    reunion = get_object_or_404(Reunion, pk=pk)
-    acta, _ = Acta.objects.get_or_create(reunion=reunion)
-
-    acta.contenido = acta.transcripcion_borrador or ""
-    acta.transcripcion_borrador = ""
-    if hasattr(acta, "aprobada"):
-        acta.aprobada = True
-    acta.save()
-
-    return JsonResponse({"ok": True})
-
-
-# =========================
-# Enviar Acta por correo (PDF adjunto)
-# =========================
-@login_required
-@role_required("actas", "view")
-@require_POST
+@role_required("actas", "send")
 @csrf_protect
 def enviar_acta_pdf_por_correo(request, pk):
-    """
-    Recibe pk de la REUNIÓN.
-    POST:
-      - 'correos' como string "a@b.com, c@d.com"  O  'correos[]' como lista
-    Envía el PDF del acta como adjunto.
-    """
     reunion = get_object_or_404(Reunion, pk=pk)
     try:
         acta = reunion.acta
     except Acta.DoesNotExist:
         return HttpResponseBadRequest("Esta reunión no tiene acta.")
 
-    # 1) Parsear destinatarios
     correos = request.POST.getlist("correos[]")
     if not correos:
         correos_str = (request.POST.get("correos") or "").strip()
@@ -301,7 +327,6 @@ def enviar_acta_pdf_por_correo(request, pk):
     if not correos:
         return HttpResponseBadRequest("Debes ingresar al menos un correo válido.")
 
-    # 2) Generar PDF (mismo template que exportación)
     template_path = 'reuniones/acta_pdf_template.html'
     pdf_bytes = _pdf_bytes_desde_xhtml(template_path, {"reunion": reunion, "acta": acta})
     if not pdf_bytes:
@@ -309,11 +334,125 @@ def enviar_acta_pdf_por_correo(request, pk):
 
     filename = f"Acta_{slugify(getattr(reunion, 'titulo', f'reunion-{reunion.pk}'))}.pdf"
 
-    # 3) Enviar correo (from_email usa DEFAULT_FROM_EMAIL de settings con tus variables .env)
-    asunto = f"Acta: {getattr(reunion, 'titulo', 'Reunión')}"
-    cuerpo  = "Se adjunta el acta en formato PDF."
-    email = EmailMessage(subject=asunto, body=cuerpo, to=correos)
-    email.attach(filename, pdf_bytes, "application/pdf")
-    email.send(fail_silently=False)
+    asunto = f"Acta de Reunión: {reunion.titulo}"
+    cuerpo = f"""
+    Estimado(a) vecino(a),
 
-    return JsonResponse({"ok": True, "mensaje": "Acta enviada por correo correctamente."})
+    Adjuntamos el acta oficial de la reunión "{reunion.titulo}", realizada el {reunion.fecha.strftime('%d/%m/%Y')}.
+
+    Saludos cordiales,
+    La Directiva
+    """
+    
+    try:
+        email = EmailMessage(
+            asunto,
+            cuerpo,
+            to=correos,
+        )
+        email.attach(filename, pdf_bytes, 'application/pdf')
+        email.send()
+        
+        return JsonResponse({"ok": True, "message": f"Correo enviado a {len(correos)} destinatario(s)."})
+    
+    except Exception as e:
+        print(f"Error al enviar correo: {e}")
+        return HttpResponseBadRequest(f"Error al enviar correo: {e}")
+
+
+# =================================================
+# --- VISTAS DE ESTADO DE REUNIÓN ---
+# =================================================
+
+@require_POST
+@login_required
+@role_required("reuniones", "change_estado")
+def iniciar_reunion(request, pk):
+    reunion = get_object_or_404(Reunion, pk=pk)
+    
+    if reunion.estado == EstadoReunion.PROGRAMADA:
+        reunion.estado = EstadoReunion.EN_CURSO
+        reunion.save()
+        messages.success(request, f"La reunión '{reunion.titulo}' ha sido iniciada.")
+    else:
+        messages.warning(request, "Esta reunión no se puede iniciar.")
+        
+    return redirect('reuniones:detalle_reunion', pk=reunion.pk)
+
+
+@require_POST
+@login_required
+@role_required("reuniones", "change_estado")
+def finalizar_reunion(request, pk):
+    reunion = get_object_or_404(Reunion, pk=pk)
+    
+    if reunion.estado == EstadoReunion.EN_CURSO:
+        reunion.estado = EstadoReunion.REALIZADA
+        reunion.save()
+        messages.success(request, f"La reunión '{reunion.titulo}' ha finalizado.")
+    else:
+        messages.warning(request, "Esta reunión no se puede finalizar.")
+        
+    return redirect('reuniones:detalle_reunion', pk=reunion.pk)
+
+
+@require_POST
+@login_required
+@role_required("reuniones", "cancel")
+def cancelar_reunion(request, pk):
+    reunion = get_object_or_404(Reunion, pk=pk)
+    
+    if reunion.estado == EstadoReunion.PROGRAMADA:
+        reunion.estado = EstadoReunion.CANCELADA
+        reunion.save()
+        messages.warning(request, f"La reunión '{reunion.titulo}' ha sido cancelada.")
+    else:
+        messages.error(request, "Solo se pueden cancelar reuniones que están 'Programadas'.")
+        
+    return redirect('reuniones:detalle_reunion', pk=reunion.pk)
+
+# =================================================
+# --- NUEVA VISTA DE API PARA EL CALENDARIO ---
+# =================================================
+
+@login_required
+@role_required("reuniones", "view")
+def reuniones_json_feed(request):
+    """
+    Esta vista genera el JSON que FullCalendar necesita.
+    Filtra por estado (programada, en_curso, realizada, cancelada).
+    """
+    estado_query = request.GET.get('estado', 'programada').upper()
+    
+    # Mapeo de estados a valores del modelo
+    estados_validos = {
+        'PROGRAMADA': EstadoReunion.PROGRAMADA,
+        'EN_CURSO': EstadoReunion.EN_CURSO,
+        'REALIZADA': EstadoReunion.REALIZADA,
+        'CANCELADA': EstadoReunion.CANCELADA,
+    }
+    
+    # Si el estado no es válido, usa PROGRAMADA por defecto
+    estado_filtro = estados_validos.get(estado_query, EstadoReunion.PROGRAMADA)
+    
+    reuniones = Reunion.objects.filter(estado=estado_filtro)
+    
+    # Mapeo de colores para el calendario
+    color_map = {
+        'PROGRAMADA': '#0d6efd', # Azul (Bootstrap Primary)
+        'EN_CURSO': '#198754',   # Verde (Bootstrap Success)
+        'REALIZADA': '#6c757d',  # Gris (Bootstrap Secondary)
+        'CANCELADA': '#dc3545',  # Rojo (Bootstrap Danger)
+    }
+    
+    # Formateamos los eventos para FullCalendar
+    eventos = []
+    for reunion in reuniones:
+        eventos.append({
+            'title': reunion.titulo,
+            'start': reunion.fecha.isoformat(), # Formato ISO (ej. 2025-11-13T21:00:00)
+            'url': redirect('reuniones:detalle_reunion', pk=reunion.pk).url,
+            'color': color_map.get(reunion.estado),
+        })
+        
+    return JsonResponse(eventos, safe=False)
