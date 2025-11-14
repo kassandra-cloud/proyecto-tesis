@@ -6,31 +6,40 @@ from .models import Reunion, Acta,Asistencia
 from .serializers import ReunionSerializer, ActaSerializer,AsistenciaSerializer
 from django.utils import timezone
 from datetime import timedelta
+from django.db.models import Q, Count
 class DefaultPagination(PageNumberPagination):
     page_size = 20
     page_size_query_param = "page_size"
     max_page_size = 100
 
 class ReunionViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = Reunion.objects.all().order_by("-fecha")
+    # 💡 ELIMINAR ESTA LÍNEA o se usa un QuerySet que no se anota y el serializer fallará.
+    # queryset = Reunion.objects.all().order_by("-fecha") 
+    
     serializer_class = ReunionSerializer
-    permission_classes = [permissions.AllowAny]   # sólo lectura pública
-    pagination_class = DefaultPagination          # si ya la tienes
+    permission_classes = [permissions.AllowAny]
+    pagination_class = DefaultPagination
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ["titulo", "tabla", "tipo"]
     ordering_fields = ["fecha", "titulo"]
 
     def get_queryset(self):
-        qs = super().get_queryset()
+        # 💡 CORRECCIÓN CLAVE: ANOTAR el QuerySet base
+        qs = Reunion.objects.all().order_by("-fecha").annotate(
+            # Calcula el campo que espera el ReunionSerializer
+            asistentes_count=Count('asistentes') 
+        )
+
+        # A partir de aquí, el código de filtrado por estado es correcto, pero debe aplicarse a 'qs'
         estado = self.request.query_params.get("estado")
         if not estado:
             return qs
 
+        # ... (Lógica de filtrado por estado, que se mantiene igual)
         now = timezone.now()
         if estado == "programada":
             return qs.filter(fecha__gt=now)
         if estado == "en_curso":
-            # ajusta la ventana si quieres
             return qs.filter(fecha__lte=now, fecha__gte=now - timedelta(hours=2))
         if estado == "realizada":
             return qs.filter(fecha__lt=now - timedelta(hours=2))
