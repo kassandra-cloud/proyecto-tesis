@@ -1,11 +1,15 @@
 from django.db import models
 from django.contrib.auth.models import User
 
-# --- 1. CLASE TALLER (Debe ir primero) ---
+# --- 1. CLASE TALLER  ---
 class Taller(models.Model):
     nombre = models.CharField(max_length=200)
     descripcion = models.TextField()
     cupos_totales = models.PositiveIntegerField(default=20)
+    
+  
+    fecha_inicio = models.DateTimeField(null=True, blank=True) # Puede usar DateField si no requiere hora
+    fecha_termino = models.DateTimeField(null=True, blank=True)
     
     def __str__(self):
         return self.nombre
@@ -19,8 +23,7 @@ class Taller(models.Model):
     def cupos_disponibles(self):
         """Calcula los cupos restantes."""
         return self.cupos_totales - self.inscritos_count
-
-# --- 2. CLASE INSCRIPCION (Debe ir después de Taller) ---
+# --- 2. CLASE INSCRIPCION  ---
 class Inscripcion(models.Model):
     vecino = models.ForeignKey(User, on_delete=models.CASCADE)
     # Esta línea necesita que 'Taller' ya haya sido definido
