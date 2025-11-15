@@ -8,7 +8,11 @@ Este repositorio contiene el código fuente del backend para el proyecto de tesi
 
 Estas son las instrucciones para que cada integrante del equipo configure su entorno de desarrollo local.
 
-### 1. Preparar el Entorno Virtual (`venv`)
+
+
+
+### 1. ANTES DE TODO VERIFICAR TENER EL "ffmpeg.exe" EN EL PATH
+TUTORIAL EN EL GRUPO DE WSP YA LUEGO Preparar el Entorno Virtual (`venv`)
 
 Cada vez que clones el proyecto en una nueva máquina, o si empiezas desde cero, debes crear un entorno virtual. Esto aísla las librerías del proyecto para no crear conflictos.
 
@@ -38,14 +42,13 @@ Con el `venv` activado, instala todas las librerías que el proyecto necesita.
 pip install -r requirements.txt
 ```
 
-### 3. Configurar y Ejecutar el Proyecto
+### 3. para configurar el lanzamiento de tanto la pagina web como el worker (necesario para la transcripcion en la nube)
+Pueden verificar el archivo "Procfile" y ahi configurar el lanzamiento, luego hacer
 
 ```bash
-
-# 1. Inicia el servidor de desarrollo
-python manage.py runserver
+honcho start 
 ```
-
+se lanzaran los dos en un solo cmd Y
 ¡Listo! Ya puedes acceder a la aplicación en `http://127.0.0.1:8000/`.
 
 ---
@@ -91,10 +94,4 @@ Para evitar conflictos y no borrar el trabajo de los demás, sigan siempre este 
 
 Hemos añadido un archivo llamado `.gitignore`. Su propósito es **decirle a Git qué archivos y carpetas debe ignorar y NUNCA subir al repositorio**.
 
-**¿Por qué es importante?**
-
-* **Evita subir el `venv`:** La razón principal por la que lo agregamos. La carpeta `venv` contiene cientos de archivos que son específicos de tu sistema operativo y que no deben compartirse. El archivo `requirements.txt` ya cumple la función de decirle a los demás qué instalar.
-* **Mantiene el repositorio limpio:** Evita que se suban archivos temporales, bases de datos locales (`db.sqlite3`) o carpetas de caché (`__pycache__/`) que se generan automáticamente y no son parte del código fuente.
-
-Al ignorar estos archivos, mantenemos el repositorio ligero, limpio y evitamos conflictos innecesarios.
 
