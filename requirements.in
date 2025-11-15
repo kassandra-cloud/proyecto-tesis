@@ -23,6 +23,13 @@ requests       # Para hacer peticiones HTTP
 
 # Reconocimiento de voz
 vosk
+ffmpeg-python
+celery
+redis
+django-storages
+boto3
+eventlet
+honcho
 
 # Generación y manejo de PDFs
 pypdf          # Manipulación general de PDF

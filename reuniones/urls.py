@@ -18,6 +18,8 @@ urlpatterns = [
     path("actas/<int:pk>/enviar-pdf/", views.enviar_acta_pdf_por_correo, name="enviar_acta_pdf_por_correo"),
     path("<int:pk>/borrador/guardar/", views.guardar_borrador_acta, name="guardar_borrador_acta"),
     path("<int:pk>/borrador/aprobar/", views.aprobar_borrador_acta, name="aprobar_borrador_acta"),
+    path("<int:pk>/acta/subir-audio/", views.subir_audio_acta, name="subir_audio_acta"),
+    path("api/acta/<int:pk>/estado/", views.get_acta_estado, name="get_acta_estado"),
 
     # --- NUEVAS RUTAS DE ESTADO ---
     path('<int:pk>/iniciar/', views.iniciar_reunion, name='iniciar_reunion'),

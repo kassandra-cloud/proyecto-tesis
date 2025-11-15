@@ -1,3 +1,4 @@
+from asgiref.sync import sync_to_async
 from django.http import HttpResponse, JsonResponse, HttpResponseBadRequest
 from django.template.loader import get_template
 from xhtml2pdf import pisa
@@ -18,6 +19,10 @@ from .forms import ReunionForm, ActaForm
 from core.authz import role_required
 from core.models import Perfil
 import json
+from .tasks import procesar_audio_vosk
+
+
+
 
 User = get_user_model()
 
@@ -47,14 +52,14 @@ def _pdf_bytes_desde_xhtml(template_path: str, context: dict) -> bytes:
 
 @login_required
 @role_required("reuniones", "view")
-def reunion_list(request):
+def reunion_list(request):  # <-- Vuelve a ser un 'def' normal
     estado_query = request.GET.get('estado', 'programada')
 
     if estado_query == 'realizada':
         reuniones = Reunion.objects.filter(estado=EstadoReunion.REALIZADA).order_by('-fecha')
         titulo = "Reuniones Realizadas"
     elif estado_query == 'en_curso':
-        reuniones = Reunion.objects.filter(estado=EstadoReunion.EN_CURSO).order_by('-fecha')
+        reuniones = Reunion.objects.filter(estado=EstadoReunion.EN_CURSO).order_by('-fecha') # <- Corregido
         titulo = "Reuniones En Curso"
     elif estado_query == 'cancelada':
         reuniones = Reunion.objects.filter(estado=EstadoReunion.CANCELADA).order_by('-fecha')
@@ -69,8 +74,8 @@ def reunion_list(request):
         'titulo': titulo,
         'estado_actual': estado_query
     }
-    return render(request, "reuniones/reunion_list.html", context)
 
+    return render(request, "reuniones/reunion_list.html", context)
 
 @login_required
 @role_required("reuniones", "create")
@@ -100,7 +105,7 @@ def reunion_detail(request, pk):
         acta = None
         acta_form = ActaForm(initial={'reunion': reunion})
 
-    asistentes = Asistencia.objects.filter(reunion=reunion)
+    asistentes = Asistencia.objects.filter(reunion=reunion, presente=True)
     
     # --- CORRECCIÓN 1 (para el modal de email) ---
     id_asistentes_usuarios = asistentes.values_list('vecino__id', flat=True)
@@ -456,3 +461,73 @@ def reuniones_json_feed(request):
         })
         
     return JsonResponse(eventos, safe=False)
+
+# =================================================
+# --- PASO 3: NUEVA VISTA PARA SUBIR AUDIO ---
+# =================================================
+
+@require_POST  # Solo permite peticiones POST
+@login_required
+@role_required("actas", "edit") # Asegura que solo quien puede editar actas, pueda subir
+def subir_audio_acta(request, pk):
+    reunion = get_object_or_404(Reunion, pk=pk)
+    
+    # Validaciones de seguridad
+    if reunion.estado != EstadoReunion.REALIZADA:
+        messages.error(request, "Solo se pueden subir audios a reuniones finalizadas.")
+        return redirect("reuniones:detalle_reunion", pk=pk)
+        
+    try:
+        acta = reunion.acta
+    except Acta.DoesNotExist:
+        messages.error(request, "La reunión no tiene un acta asociada.")
+        return redirect("reuniones:detalle_reunion", pk=pk)
+
+    if acta.aprobada:
+        messages.error(request, "No se puede procesar un audio para un acta que ya está aprobada.")
+        return redirect("reuniones:detalle_reunion", pk=pk)
+
+    # Validación del archivo
+    archivo = request.FILES.get("archivo_audio")
+    if not archivo:
+        messages.error(request, "No se seleccionó ningún archivo de audio.")
+        return redirect("reuniones:detalle_reunion", pk=pk)
+
+    # Validación de estado (para no procesar dos veces)
+    if acta.estado_transcripcion == Acta.ESTADO_PENDIENTE or acta.estado_transcripcion == Acta.ESTADO_PROCESANDO:
+        messages.warning(request, "Ya hay un audio procesándose para esta acta.")
+        return redirect("reuniones:detalle_reunion", pk=pk)
+
+    # --- ¡ÉXITO! AQUÍ GUARDAMOS Y LLAMAMOS A CELERY ---
+    
+    # 1. Guardamos el archivo en el modelo (esto lo sube a Cellar/S3)
+    acta.archivo_audio = archivo
+    
+    # 2. Marcamos el estado como "Pendiente"
+    acta.estado_transcripcion = Acta.ESTADO_PENDIENTE
+    acta.save()
+
+    # 3. ¡Llamamos a la tarea de Celery!
+    # Le pasamos el ID del acta para que el worker la busque.
+    procesar_audio_vosk.delay(acta.pk)
+
+    messages.success(request, f"¡Audio subido! El procesamiento ha comenzado en segundo plano. El acta se actualizará al finalizar.")
+    return redirect("reuniones:detalle_reunion", pk=pk)
+
+# =================================================
+# --- PASO 1: NUEVA VISTA DE API PARA POLLING ---
+# =================================================
+@login_required
+def get_acta_estado(request, pk):
+    """
+    Una simple vista de API que devuelve el estado de transcripción
+    de un acta para que el frontend pueda hacer polling.
+    """
+    # Usamos get_object_or_404 para manejar si el acta no existe
+    # (Aunque usamos la 'pk' de la reunión, que es la misma del acta)
+    acta = get_object_or_404(Acta, pk=pk)
+    
+    return JsonResponse({
+        'estado': acta.estado_transcripcion,
+        'estado_display': acta.get_estado_transcripcion_display()
+    })

@@ -9,7 +9,7 @@ from django.utils import timezone
 from django.db.models import Count, F
 from datetime import timedelta
 import calendar
-from recursos.models import Reserva
+from recursos.models import SolicitudReserva
 
 def home(request):
     return render(request, "core/home.html", {"titulo": "Proyecto de Tesis funcionando"})
@@ -58,8 +58,8 @@ def home(request):
     ).count()
 
     # Tarjeta 6: Solicitudes de Recursos Pendientes (NUEVA)
-    solicitudes_pendientes = Reserva.objects.filter(
-        estado=Reserva.Estado.PENDIENTE
+    solicitudes_pendientes = SolicitudReserva.objects.filter(
+        estado="PENDIENTE"
     ).count()
 
     # --- 2. Secciones de Actividad ---

@@ -120,6 +120,17 @@
             <button id="btnStopSTT"  class="btn btn-outline-secondary" disabled>⏹️ Detener</button>
             <span id="sttStatus" class="text-muted small">Micrófono inactivo</span>
         </div>
+        <div id="audioPreviewContainer" class="mt-3 p-3 border rounded bg-light" style="display: none;">
+            <h6 class="mb-2">Previsualización del Audio Grabado</h6>
+            
+            <audio id="audioPlayer" controls class="w-100 mb-2"></audio>
+            
+            <a id="downloadAudioLink" class="btn btn-success btn-sm" href="#" download>
+                <i class="fas fa-download me-1"></i>
+                Descargar Audio Grabado
+            </a>
+            <small id="audioFileName" class="text-muted ms-2"></small>
+        </div>
         {% elif not acta.aprobada %}
         <div class="alert alert-info small">
             La transcripción en vivo solo está disponible mientras la reunión está "En Curso".
@@ -145,7 +156,54 @@
                 </div>
             {% endif %}
         </form>
-        
+        {% if reunion.estado == 'REALIZADA' and not acta.aprobada %}
+        <div class="card bg-light mt-4">
+            <div class="card-body">
+                <h5 class="card-title">🤖 Procesar Audio de Respaldo (Vosk)</h5>
+                <p class="small text-muted">
+                    Si el borrador actual no es bueno, puedes subir el archivo de audio (`.webm`, `.ogg`) 
+                    que descargaste. El sistema lo procesará en segundo plano y 
+                    reemplazará el contenido del acta con la transcripción completa.
+                </p>
+
+                {# --- FORMULARIO DE SUBIDA --- #}
+                <form action="{% url 'reuniones:subir_audio_acta' reunion.pk %}" method="POST" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <div class="input-group">
+                        <input type="file" class="form-control" name="archivo_audio" id="audio_file_input" accept=".webm,.ogg,.wav,.mp3">
+                        <button class="btn btn-outline-danger" type="submit" id="btnSubirAudio">
+                            <i class="fas fa-upload me-1"></i> Subir y Procesar
+                        </button>
+                    </div>
+                </form>
+
+                {# --- ESTADO DEL PROCESAMIENTO --- #}
+                {% if acta.estado_transcripcion == 'PENDIENTE' or acta.estado_transcripcion == 'PROCESANDO' %}
+                <div id="transcripcion-pendiente" class="alert alert-warning small mt-3" role="alert">
+                    <div class="spinner-border spinner-border-sm me-1" role="status">
+                        <span class="visually-hidden">Procesando...</span>
+                    </div>
+                    <strong>Estado: {{ acta.get_estado_transcripcion_display }}</strong>
+                    <p class="mb-0 mt-1">
+                        El audio se está procesando en el servidor. El acta se actualizará automáticamente 
+                        cuando termine. Puedes recargar esta página para ver el estado.
+                    </p>
+                </div>
+                {% elif acta.estado_transcripcion == 'COMPLETADO' %}
+                <div class="alert alert-success small mt-3" role="alert">
+                    <strong>Estado: {{ acta.get_estado_transcripcion_display }}</strong>
+                    <p class="mb-0 mt-1">El acta se ha actualizado con la transcripción del audio.</p>
+                </div>
+                {% elif acta.estado_transcripcion == 'ERROR' %}
+                <div class="alert alert-danger small mt-3" role="alert">
+                    <strong>Estado: {{ acta.get_estado_transcripcion_display }}</strong>
+                    <p class="mb-0 mt-1">Hubo un error al procesar el audio.</p>
+                </div>
+                {% endif %}
+
+            </div>
+        </div>
+        {% endif %}
         <hr class="my-4">
 
         <div class="d-flex flex-wrap gap-2">
@@ -271,54 +329,52 @@ function getCSRF() {
     return document.querySelector('[name=csrfmiddlewaretoken]').value;
 }
 
-// 1. Lógica de Transcripción (STT) y AUTOGUARDADO
+// 1. Lógica de Transcripción (STT), GRABACIÓN y AUTOGUARDADO
 document.addEventListener('DOMContentLoaded', () => {
     const btnStart = document.getElementById('btnStartSTT');
     const btnStop = document.getElementById('btnStopSTT');
     const sttStatus = document.getElementById('sttStatus');
     const actaTextarea = document.getElementById('actaContenido');
 
+    // --- NUEVOS ELEMENTOS DEL DOM PARA EL PREVIEW ---
+    const audioPreviewContainer = document.getElementById('audioPreviewContainer');
+    const audioPlayer = document.getElementById('audioPlayer');
+    const downloadAudioLink = document.getElementById('downloadAudioLink');
+    const audioFileName = document.getElementById('audioFileName');
+
     // SI NO EXISTE EL BOTÓN (porque la reunión no está en curso), no hacemos nada.
     if (!btnStart) {
         return;
     }
 
-    // --- INICIO CÓDIGO AUTOGUARDADO ---
+    // --- CÓDIGO AUTOGUARDADO (INTACTO) ---
     const autosaveStatus = document.getElementById('autosave-status');
     let autosaveTimer = null;
-    const AUTOSAVE_DELAY = 2500; // 2.5 segundos de espera
+    const AUTOSAVE_DELAY = 2500; 
 
-    // Función que guarda el borrador usando Fetch
     async function guardarBorrador() {
         if (!actaTextarea || !autosaveStatus) return;
-
-        // 1. Muestra "Guardando..."
         autosaveStatus.textContent = 'Guardando...';
         autosaveStatus.classList.remove('text-success', 'text-danger');
         autosaveStatus.classList.add('text-muted');
 
-        // 2. Prepara los datos del formulario
         const formData = new FormData();
         formData.append('contenido', actaTextarea.value);
-        // (No necesitamos el csrf_token en el form, lo pasamos en el header)
 
         try {
-            // 3. Envía los datos a la vista que YA EXISTE
             const response = await fetch("{% url 'reuniones:guardar_borrador_acta' reunion.pk %}", {
                 method: 'POST',
                 headers: {
-                    'X-CSRFToken': getCSRF(), // Usamos la función que ya existe
-                    'X-Requested-With': 'XMLHttpRequest' // Para que Django sepa que es AJAX
+                    'X-CSRFToken': getCSRF(),
+                    'X-Requested-With': 'XMLHttpRequest'
                 },
                 body: formData
             });
 
             if (response.ok) {
-                // 4. Muestra "Guardado"
                 autosaveStatus.textContent = 'Borrador guardado.';
                 autosaveStatus.classList.add('text-success');
             } else {
-                // 5. Muestra error
                 autosaveStatus.textContent = 'Error al guardar.';
                 autosaveStatus.classList.add('text-danger');
             }
@@ -329,13 +385,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Función "Debounce": espera a que el usuario deje de hablar
     function triggerAutosave() {
-        // Si ya hay un timer, lo cancela
         if (autosaveTimer) {
             clearTimeout(autosaveTimer);
         }
-        // Crea un nuevo timer
         autosaveTimer = setTimeout(guardarBorrador, AUTOSAVE_DELAY);
     }
     // --- FIN CÓDIGO AUTOGUARDADO ---
@@ -348,6 +401,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if(sttStatus) sttStatus.textContent = "Transcripción no soportada en este navegador.";
         return;
     }
+
+    // --- INICIO LÓGICA DE GRABACIÓN Y TRANSCRIPCIÓN ---
+
+    // Variables "maestras"
+    let micStream = null;
+    let mediaRecorder = null;
+    let audioChunks = [];
 
     const recognition = new SpeechRecognition();
     recognition.lang = 'es-ES';
@@ -366,11 +426,7 @@ document.addEventListener('DOMContentLoaded', () => {
         sttStatus.textContent = 'Micrófono inactivo';
         btnStart.disabled = false;
         btnStop.disabled = true;
-        
-        // --- HOOK AUTOGUARDADO ---
-        // Guarda una última vez al detener la transcripción
         triggerAutosave();
-        // ------------------------
     };
 
     recognition.onresult = (event) => {
@@ -385,11 +441,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (actaTextarea) {
             actaTextarea.value = finalTranscript + interimTranscript;
             actaTextarea.scrollTop = actaTextarea.scrollHeight;
-
-            // --- HOOK AUTOGUARDADO ---
-            // Cada vez que hay un resultado de voz, reinicia el timer
             triggerAutosave();
-            // ------------------------
         }
     };
 
@@ -398,18 +450,96 @@ document.addEventListener('DOMContentLoaded', () => {
         sttStatus.textContent = 'Error: ' + event.error;
     };
 
+    // --- BOTÓN INICIAR (MODIFICADO) ---
     if(btnStart) {
-        btnStart.addEventListener('click', () => {
-            if (actaTextarea) {
-                finalTranscript = actaTextarea.value + '\\n';
+        btnStart.addEventListener('click', async () => {
+
+            // --- OCULTAR Y LIMPIAR PREVIEW ANTERIOR ---
+            if (audioPlayer.src) {
+                // Revoca la URL del Blob anterior para liberar memoria
+                URL.revokeObjectURL(audioPlayer.src);
+                audioPlayer.src = null;
             }
-            recognition.start();
+            if(audioPreviewContainer) audioPreviewContainer.style.display = 'none';
+            if(audioFileName) audioFileName.textContent = '';
+            // ------------------------------------------
+
+            try {
+                // 1. Pedir el stream del micrófono
+                micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+                // 2. Configurar el GRABADOR (MediaRecorder)
+                audioChunks = []; // Limpiar chunks
+                mediaRecorder = new MediaRecorder(micStream);
+                
+                // 2a. Cuando el grabador tenga datos, los guarda
+                mediaRecorder.ondataavailable = (event) => {
+                    audioChunks.push(event.data);
+                };
+
+                // --- 2b. LÓGICA DE PREVISUALIZACIÓN (MODIFICADO) ---
+                // Se activa al llamar a mediaRecorder.stop()
+                mediaRecorder.onstop = () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    const audioUrl = URL.createObjectURL(audioBlob);
+
+                    // 1. Asignar el audio al reproductor
+                    if(audioPlayer) audioPlayer.src = audioUrl;
+
+                    // 2. Asignar la URL al botón de descarga
+                    const nombreArchivo = `grabacion-reunion-{{ reunion.pk }}-${new Date().toISOString().split('T')[0]}.webm`;
+                    if(downloadAudioLink) {
+                        downloadAudioLink.href = audioUrl;
+                        downloadAudioLink.download = nombreArchivo;
+                    }
+                    if(audioFileName) audioFileName.textContent = nombreArchivo;
+
+                    // 3. Mostrar el contenedor del preview
+                    if(audioPreviewContainer) audioPreviewContainer.style.display = 'block';
+
+                    console.log(`Audio listo para previsualizar. URL: ${audioUrl}`);
+                    
+                    audioChunks = []; // Limpia chunks para la próxima
+                };
+                
+                // 3. Iniciar la GRABACIÓN de audio
+                mediaRecorder.start();
+
+                // 4. Configurar e iniciar la TRANSCRIPCIÓN
+                if (actaTextarea) {
+                    finalTranscript = actaTextarea.value + '\\n';
+                }
+                recognition.start(); 
+
+            } catch (err) {
+                console.error("Error al iniciar la grabación/transcripción:", err);
+                sttStatus.textContent = "Error: No se pudo acceder al micrófono.";
+                if (micStream) {
+                    micStream.getTracks().forEach(track => track.stop());
+                    micStream = null;
+                }
+            }
         });
     }
 
+    // --- BOTÓN DETENER (MODIFICADO) ---
     if(btnStop) {
         btnStop.addEventListener('click', () => {
-            recognition.stop();
+            // 1. Detener la transcripción
+            if (recognition) {
+                recognition.stop();
+            }
+
+            // 2. Detener la grabación (esto disparará 'mediaRecorder.onstop' para el PREVIEW)
+            if (mediaRecorder && mediaRecorder.state === "recording") {
+                mediaRecorder.stop();
+            }
+
+            // 3. "Colgar" y liberar el micrófono
+            if (micStream) {
+                micStream.getTracks().forEach(track => track.stop());
+                micStream = null;
+            }
         });
     }
 });
@@ -417,6 +547,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // 2. Lógica de Envío de Email (INTACTA)
 document.addEventListener('DOMContentLoaded', () => {
+    // ... (Tu código de envío de email va aquí, no se toca) ...
+    // ... (Lo he omitido de esta respuesta por brevedad, pero
+    //      en tu archivo debe quedar intacto) ...
     const form = document.getElementById('formEnviarEmail');
     if (!form) return;
 
@@ -518,6 +651,53 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 });
+// ===================================================
+// --- PASO 4: PEGA ESTE NUEVO SCRIPT AQUÍ ---
+// ===================================================
+document.addEventListener('DOMContentLoaded', () => {
+    // 1. Busca el cuadro de alerta de "Pendiente" o "Procesando"
+    const barraEstado = document.getElementById('transcripcion-pendiente');
 
+    // Si la barra no existe (porque está "Completado" o "No Subido"), no hace nada.
+    if (!barraEstado) {
+        return;
+    }
+
+    // 2. Si existe, define la función que consulta el estado
+    const urlConsulta = "{% url 'reuniones:get_acta_estado' reunion.pk %}";
+    let pollInterval = null; // Variable para guardar el 'timer'
+
+    async function checkStatus() {
+        try {
+            const response = await fetch(urlConsulta);
+            if (!response.ok) {
+                console.error("Error de red al consultar estado.");
+                clearInterval(pollInterval); // Detiene el polling si hay error
+                return;
+            }
+
+            const data = await response.json();
+            console.log("Consultando estado:", data.estado);
+
+            // 3. Revisa si el estado cambió
+            if (data.estado === 'COMPLETADO' || data.estado === 'ERROR') {
+                console.log("¡Proceso terminado! Recargando página...");
+                clearInterval(pollInterval); // Detiene el polling
+                window.location.reload(); // ¡Recarga la página!
+            }
+            // Si sigue en 'PENDIENTE' o 'PROCESANDO', no hace nada y espera al siguiente ciclo.
+
+        } catch (error) {
+            console.error("Error en polling:", error);
+            clearInterval(pollInterval); // Detiene el polling si hay error
+        }
+    }
+
+    // 4. Inicia el "sondeo" cada 5 segundos (5000 ms)
+    pollInterval = setInterval(checkStatus, 5000);
+});
+// ===================================================
+// --- FIN DEL NUEVO SCRIPT ---
+// ===================================================
 </script>
 {% endblock %}

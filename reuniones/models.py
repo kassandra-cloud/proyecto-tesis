@@ -1,6 +1,8 @@
 from django.db import models
+from django.contrib.auth import get_user_model
 from django.conf import settings
 
+User = get_user_model()
 
 # --- CLASE MODIFICADA ---
 class EstadoReunion(models.TextChoices):
@@ -34,26 +36,58 @@ class Reunion(models.Model):
         return f"{self.titulo} - {self.fecha.strftime('%d/%m/%Y')}"
 
 class Acta(models.Model):
-    reunion = models.OneToOneField(Reunion, on_delete=models.CASCADE, primary_key=True)
-    contenido = models.TextField(blank=True, default='')
-    aprobada = models.BooleanField(default=False)
+     # --- AÑADIR ESTOS ESTADOS DE TRANSCRIPCIÓN ---
+    ESTADO_NO_SUBIDO = "NO_SUBIDO"
+    ESTADO_PENDIENTE = "PENDIENTE"
+    ESTADO_PROCESANDO = "PROCESANDO"
+    ESTADO_COMPLETADO = "COMPLETADO"
+    ESTADO_ERROR = "ERROR"
     
-    def __str__(self):
-        return f"Acta de la reunión: {self.reunion.titulo}"
+    ESTADO_TRANSCRIPCION_CHOICES = [
+        (ESTADO_NO_SUBIDO, "No Subido"),
+        (ESTADO_PENDIENTE, "Pendiente"),
+        (ESTADO_PROCESANDO, "Procesando"),
+        (ESTADO_COMPLETADO, "Completado"),
+        (ESTADO_ERROR, "Error"),
+    ]
+    # -----------------------------------------------
 
-    # (El resto de tus campos de Acta...)
-    transcripcion_borrador    = models.TextField(blank=True, default='')
-    estado_transcripcion      = models.CharField(
+    reunion = models.OneToOneField(
+        Reunion,
+        on_delete=models.CASCADE,
+        related_name="acta",
+        primary_key=True  # <-- ¡AÑADE ESTA LÍNEA!
+    )
+    contenido = models.TextField(blank=True, default="Borrador del acta...")
+    
+    aprobada = models.BooleanField(default=False)
+    aprobado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="actas_aprobadas"
+    )
+    aprobado_en = models.DateTimeField(null=True, blank=True)
+
+    # --- CAMPOS NUEVOS Y ACTUALIZADOS ---
+    # (Asegúrate de que los campos 'transcripcion_borrador' y 
+    # 'transcripcion_actualizado' ya NO estén aquí)
+
+    archivo_audio = models.FileField(
+        upload_to="audios_reuniones/",  # Esto se guardará en Cellar/S3
+        null=True,
+        blank=True,
+        help_text="Archivo de audio (.webm, .ogg) subido por la directiva."
+    )
+    estado_transcripcion = models.CharField(
         max_length=20,
-        choices=[('BORRADOR','Borrador'), ('APROBADA','Aprobada')],
-        default='BORRADOR'
+        choices=ESTADO_TRANSCRIPCION_CHOICES, # Usamos la nueva lista
+        default=ESTADO_NO_SUBIDO # Usamos el nuevo default
     )
-    transcripcion_actualizado = models.DateTimeField(auto_now=True)
-    aprobado_por              = models.ForeignKey(
-        settings.AUTH_USER_MODEL, null=True, blank=True,
-        on_delete=models.SET_NULL, related_name='actas_aprobadas'
-    )
-    aprobado_en               = models.DateTimeField(null=True, blank=True)
+    # --- FIN DE CAMPOS NUEVOS ---
+
+    def __str__(self):
+        return f"Acta de {self.reunion.titulo}"
 
 class Asistencia(models.Model):
     reunion = models.ForeignKey(Reunion, on_delete=models.CASCADE, related_name="asistentes")

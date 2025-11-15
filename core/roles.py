@@ -72,6 +72,7 @@ ROLE_MATRIX: Dict[str, Dict[str, List[str]]] = {
         "cancel_own": ROL_VECINO,
         "approve":    ROL_DIRECTIVA,
         "reject":     ROL_DIRECTIVA,
+        "manage_all": ROL_DIRECTIVA,
     },
     "foro": {
         "view":    ROL_DIRECTIVA + ROL_VECINO,

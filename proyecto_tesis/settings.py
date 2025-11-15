@@ -40,7 +40,7 @@ CSRF_TRUSTED_ORIGINS = [
 # Apps
 # -----------------------------------------------------------------------------
 INSTALLED_APPS = [
-    "daphne",
+    # "daphne",  #
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -214,3 +214,37 @@ CHANNEL_LAYERS = {
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 MODEL_PATH_RELATIVO= Path(r"vosk-model-small-es-0.42")
 MODEL_PATH = os.path.join(settings.BASE_DIR, MODEL_PATH_RELATIVO)
+
+# =================================================
+# --- CONFIGURACIÓN DE CELERY (CON REDIS) ---
+# =================================================
+# Lee la variable 'REDIS_URL' que pusiste en tu .env
+CELERY_BROKER_URL = os.environ.get('REDIS_URL')
+CELERY_RESULT_BACKEND = os.environ.get('REDIS_URL')
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = TIME_ZONE
+
+# =================================================
+# --- CONFIGURACIÓN DE CLEVER CLOUD STORAGE (CELLAR) ---
+# =================================================
+# Lee las variables de Cellar que pusiste en tu .env
+AWS_ACCESS_KEY_ID = os.environ.get('CELLAR_KEY_ID')
+AWS_SECRET_ACCESS_KEY = os.environ.get('CELLAR_SECRET_KEY')
+AWS_STORAGE_BUCKET_NAME = os.environ.get('CELLAR_BUCKET_NAME')
+AWS_S3_REGION_NAME = 'US' 
+AWS_S3_ENDPOINT_URL = f"https://{os.environ.get('CELLAR_HOST')}"
+
+# Configuración de django-storages
+AWS_DEFAULT_ACL = None
+AWS_S3_USE_SSL = True
+AWS_S3_VERIFY = True
+
+# Define el backend de almacenamiento
+DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+
+# (Opcional) Si quieres que tus archivos estáticos (CSS/JS) también
+# se sirvan desde Cellar en producción (¡recomendado!):
+# if not DEBUG:
+#     STATICFILES_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'

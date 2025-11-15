@@ -1,16 +1,24 @@
-# Entorno virtual de Python
+# Archivos de configuración de editores
+.vscode/
+.idea/
+
+# Ignorar el entorno virtual
+venv/
 /venv
 env/
+# ¡El más importante! Ignorar secretos
 .env
+
+# Archivos compilados de Python
+__pycache__/
+*.pyc
+
+# Archivos de media (que deben estar en S3 o database no en Git)
+media/
+
+# Archivos estáticos recolectados (se generan en el servidor)
+static_root/
 
 # Archivos de base de datos de desarrollo
 *.sqlite3
 db.sqlite3
-
-# Carpetas de caché de Python
-__pycache__/
-*.pyc
-
-# Archivos de configuración de editores
-.vscode/
-.idea/
