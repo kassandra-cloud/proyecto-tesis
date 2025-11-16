@@ -8,7 +8,8 @@ venv/
 env/
 # ¡El más importante! Ignorar secretos
 .env
-
+# Credenciales Firebase
+firebase-service-account.json
 # Archivos compilados de Python
 __pycache__/
 *.pyc

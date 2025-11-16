@@ -10,15 +10,33 @@ from django.conf import settings
 # -----------------------------------------------------------------------------
 # Paths & .env
 # -----------------------------------------------------------------------------
+# -------------------------------------------------------------------
+# Paths & .env
+# -------------------------------------------------------------------
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Cargar variables desde .env en la raíz del proyecto
 load_dotenv(BASE_DIR / ".env")
-FIREBASE_CREDENTIALS_JSON = os.environ.get("FIREBASE_CREDENTIALS", "{}")
-# -----------------------------------------------------------------------------
+
+# -------------------------------------------------------------------
 # Seguridad / Debug
-# -----------------------------------------------------------------------------
-# Usa la clave desde .env; genera una para prod. La que sigue es solo fallback DEV.
+# -------------------------------------------------------------------
+# Clave secreta (debe venir desde .env en producción)
 SECRET_KEY = os.getenv("SECRET_KEY", "DEV-ONLY-CHANGE-ME")
+
+# DEBUG=True/False en .env
 DEBUG = os.getenv("DEBUG", "True").lower() == "true"
+
+# Hosts permitidos (coma separada en .env)
+ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
+
+# -------------------------------------------------------------------
+# Firebase (para Admin SDK, usado por inicializar_firebase())
+# -------------------------------------------------------------------
+FIREBASE_PROJECT_ID = os.getenv("FIREBASE_PROJECT_ID")
+FIREBASE_CLIENT_EMAIL = os.getenv("FIREBASE_CLIENT_EMAIL")
+FIREBASE_PRIVATE_KEY = os.getenv("FIREBASE_PRIVATE_KEY")
+FIREBASE_PRIVATE_KEY_ID = os.getenv("FIREBASE_PRIVATE_KEY_ID", "")
 
 ALLOWED_HOSTS = [
     # Desarrollo local / emuladores / dispositivos en tu Wi-Fi

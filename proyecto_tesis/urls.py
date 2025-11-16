@@ -21,7 +21,8 @@ from django.conf.urls.static import static
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path("", include("core.urls")),
+    path("", include("core.urls")),  
+    path("api/core/", include("core.urls")),
     path("usuarios/", include("usuarios.urls")),  # módulo de gestión de usuarios
     path("accounts/", include("django.contrib.auth.urls")), 
     path("reuniones/", include("reuniones.urls")),

@@ -5,69 +5,175 @@ import time
 import os
 import json
 import wave
-import ffmpeg # Para convertir .webm a .wav
-import tempfile # Para guardar archivos temporalmente
-import traceback # Para ver errores completos
+import ffmpeg  # Para convertir .webm a .wav
+import tempfile  # Para guardar archivos temporalmente
+import traceback  # Para ver errores completos
+
 from django.conf import settings
-from .models import Acta
+
+from .models import Acta, Reunion  # Modelos de esta app
+from core.models import Perfil      # Para obtener fcm_token desde Perfil
+
 # --- LIBRERÍAS DE VOSK ---
 from vosk import Model, KaldiRecognizer
 
-# --- IMPORTS FCM (CORREGIDOS) ---
-# Se elimina 'apps' ya que causa el error de importación.
-from firebase_admin import messaging, initialize_app, credentials, get_app
-from firebase_admin.exceptions import FirebaseError
-from core.models import Perfil 
-from .models import Reunion 
-# -----------------------------
-# --- CONFIGURACIÓN DE FCM ---
-FIREBASE_APP_NAME = 'default_reuniones_sender'
-# --- 1. CONFIGURA LA RUTA A TU MODELO VOSK ---
-VOSK_MODEL_PATH = os.path.join(settings.BASE_DIR, "vosk-model-small-es-0.42")
+# --- IMPORTS FCM ---
+import firebase_admin
+from firebase_admin import messaging, credentials
+from django.utils import timezone
+import logging
 
-# --- 2. ¡ARREGLO! NO CARGUES EL MODELO AQUÍ ---
+# -----------------------------
+# --- LOGGING / VOSK MODEL ---
+logger = logging.getLogger(__name__)
+
+VOSK_MODEL_PATH = os.path.join(settings.BASE_DIR, "vosk-model-small-es-0.42")
 vosk_model = None
+
+# -----------------------------
+# --- CACHE PARA FIREBASE ---
+firebase_app = None
+
+
 def inicializar_firebase():
     """
-    Inicializa la app de Firebase Admin SDK leyendo el JSON de credenciales
-    desde la variable de entorno de Django settings.
+    Inicializa Firebase Admin usando variables de settings (que vienen de .env).
+    Si ya está inicializado, solo devuelve la app existente.
     """
+    global firebase_app
+
+    # 1) Si ya la tenemos cacheada, la usamos
+    if firebase_app is not None:
+        return firebase_app
+
+    # 2) Si ya hay alguna app por defecto creada, la reutilizamos
     try:
-        get_app(FIREBASE_APP_NAME)
+        firebase_app = firebase_admin.get_app()
+        return firebase_app
     except ValueError:
+        # No había app, la creamos más abajo
+        pass
+
+    # 3) Leemos las variables desde settings (que tú cargarás desde .env)
+    project_id = getattr(settings, "FIREBASE_PROJECT_ID", None)
+    client_email = getattr(settings, "FIREBASE_CLIENT_EMAIL", None)
+    private_key = getattr(settings, "FIREBASE_PRIVATE_KEY", None)
+    private_key_id = getattr(settings, "FIREBASE_PRIVATE_KEY_ID", "dummy")
+
+    if not project_id or not client_email or not private_key:
+        logger.error(
+            "Faltan credenciales de Firebase. "
+            "Debes configurar FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL y FIREBASE_PRIVATE_KEY "
+            "en settings/.env."
+        )
+        raise RuntimeError(
+            "Faltan credenciales de Firebase (FIREBASE_*). Revisa tu .env y settings."
+        )
+
+    cred_info = {
+        "type": "service_account",
+        "project_id": project_id,
+        "private_key_id": private_key_id,
+        # En el .env suele ir con '\\n', aquí lo convertimos a saltos de línea reales
+        "private_key": private_key.replace("\\n", "\n"),
+        "client_email": client_email,
+        "client_id": "dummy",
+        "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+        "token_uri": "https://oauth2.googleapis.com/token",
+        "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+        "client_x509_cert_url": f"https://www.googleapis.com/robot/v1/metadata/x509/{client_email}",
+    }
+
+    cred = credentials.Certificate(cred_info)
+    firebase_app = firebase_admin.initialize_app(cred)
+    logger.info("Firebase Admin SDK inicializado desde variables de entorno/.env.")
+    return firebase_app
+
+
+# -----------------------------------------------------------------
+# NOTIFICACIONES FCM
+# -----------------------------------------------------------------
+@shared_task
+def enviar_notificacion_nueva_reunion(reunion_id):
+    """
+    Envía una notificación FCM a todos los perfiles que tengan fcm_token,
+    usando messaging.send() uno por uno (compatible con versiones antiguas).
+    """
+    # 0) Inicializar Firebase
+    try:
+        inicializar_firebase()
+    except Exception as e:
+        logger.error(f"ERROR al inicializar Firebase en Celery: {e}", exc_info=True)
+        return
+
+    # 1) Leer tokens FCM
+    tokens = list(
+        Perfil.objects
+        .exclude(fcm_token__isnull=True)
+        .exclude(fcm_token="")
+        .values_list("fcm_token", flat=True)
+    )
+
+    if not tokens:
+        logger.warning("No hay tokens de FCM registrados para enviar la notificación.")
+        return
+
+    # 2) Obtener la reunión
+    try:
+        reunion = Reunion.objects.get(pk=reunion_id)
+    except Reunion.DoesNotExist:
+        logger.error(f"Reunión con id={reunion_id} no existe. No se envía notificación.")
+        return
+
+    # 3) Enviar una notificación por token
+    title = "Nueva reunión agendada"
+    fecha_local = timezone.localtime(reunion.fecha)
+    body = f"{reunion.titulo} el {fecha_local.strftime('%d/%m/%Y %H:%M')}"
+
+    exito = 0
+    fallo = 0
+
+    for token in tokens:
+        message = messaging.Message(
+            notification=messaging.Notification(
+                title=title,
+                body=body,
+            ),
+            token=token,
+            data={
+                "tipo": "nueva_reunion",
+                "reunion_id": str(reunion.id),
+            },
+        )
         try:
-            # 1. Obtener la cadena JSON de settings
-            credentials_json_string = settings.FIREBASE_CREDENTIALS_JSON
-            
-            # Verificar que la cadena exista y no esté vacía
-            if not credentials_json_string or credentials_json_string == "{}":
-                # Si no está configurado, levantamos una excepción clara
-                raise Exception("FIREBASE_CREDENTIALS_JSON no está configurado o está vacío en settings.")
-
-            # 2. Deserializar la cadena JSON a un diccionario de Python
-            credentials_data = json.loads(credentials_json_string) 
-
-            # 3. Inicializar Firebase desde el objeto de Python
-            cred = credentials.Certificate(credentials_data)
-            initialize_app(cred, name=FIREBASE_APP_NAME)
-            print("Firebase Admin SDK inicializado desde credenciales de ambiente.")
-            
+            messaging.send(message)
+            exito += 1
         except Exception as e:
-            print(f"ERROR CRÍTICO: Falló la inicialización de Firebase desde el ambiente. Detalle: {e}")
-            raise # Re-lanza el error
-# TAREA DE PRUEBA (ya la tenías)
+            fallo += 1
+            logger.error(
+                f"Error al enviar notificación a token {token}: {e}", exc_info=True
+            )
+
+    logger.info(f"Notificaciones enviadas. Éxito: {exito}, Fallos: {fallo}")
+
+
+# -----------------------------------------------------------------
+# TAREA DE PRUEBA (Suma)
 # -----------------------------------------------------------------
 @shared_task(name="test_celery_suma")
 def test_celery_suma(x, y):
-    # ... (tu tarea de suma) ...
+    """
+    Tarea de prueba para verificar que Celery está funcionando.
+    """
     print(f"[TAREA RECIBIDA]: Sumando {x} + {y}...")
-    time.sleep(3) 
+    time.sleep(3)
     resultado = x + y
     print(f"[TAREA COMPLETADA]: Resultado = {resultado}")
     return resultado
 
+
 # -----------------------------------------------------------------
-# ¡TAREA DE TRANSCRIPCIÓN (CORREGIDA)!
+# TAREA DE TRANSCRIPCIÓN CON VOSK
 # -----------------------------------------------------------------
 @shared_task(name="procesar_audio_vosk")
 def procesar_audio_vosk(acta_pk):
@@ -75,33 +181,41 @@ def procesar_audio_vosk(acta_pk):
     Tarea de Celery para procesar un archivo de audio de un acta
     usando VOSK y actualizar el contenido del acta.
     """
-    global vosk_model 
+    global vosk_model
 
     # --- CARGA PEREZOSA DEL MODELO ---
     if vosk_model is None:
         try:
             print(f"[Worker {acta_pk}]: Cargando modelo VOSK (solo esta vez)...")
             if not os.path.exists(VOSK_MODEL_PATH):
-                print(f"ERROR: No se pudo cargar el modelo VOSK. Ruta no encontrada: {VOSK_MODEL_PATH}")
-                raise FileNotFoundError(f"Ruta de modelo VOSK no encontrada: {VOSK_MODEL_PATH}")
-                
+                print(
+                    f"ERROR: No se pudo cargar el modelo VOSK. "
+                    f"Ruta no encontrada: {VOSK_MODEL_PATH}"
+                )
+                raise FileNotFoundError(
+                    f"Ruta de modelo VOSK no encontrada: {VOSK_MODEL_PATH}"
+                )
+
             vosk_model = Model(VOSK_MODEL_PATH)
             print(f"[Worker {acta_pk}]: Modelo VOSK cargado en memoria.")
-            
+
         except Exception as e:
-            print(f"ERROR CRÍTICO: No se pudo cargar el modelo VOSK desde {VOSK_MODEL_PATH}.")
+            print(
+                f"ERROR CRÍTICO: No se pudo cargar el modelo VOSK desde "
+                f"{VOSK_MODEL_PATH}."
+            )
             print(f"Error original: {e}")
             try:
-                acta_error = Acta.objects.get(pk=acta_pk) 
+                acta_error = Acta.objects.get(pk=acta_pk)
                 acta_error.estado_transcripcion = Acta.ESTADO_ERROR
                 acta_error.save()
             except Acta.DoesNotExist:
-                pass 
+                pass
             return f"Error: Modelo VOSK no pudo ser cargado."
-    
+
     # --- Búsqueda de Acta ---
     try:
-        acta = Acta.objects.get(pk=acta_pk) 
+        acta = Acta.objects.get(pk=acta_pk)
     except Acta.DoesNotExist:
         print(f"Error en tarea: No se encontró el Acta con pk={acta_pk}. Abortando.")
         return f"Error: Acta {acta_pk} no encontrada."
@@ -111,88 +225,93 @@ def procesar_audio_vosk(acta_pk):
     acta.save()
     print(f"[TAREA INICIADA]: Procesando audio para Acta {acta_pk}...")
 
-    # --- MANEJO DE ARCHIVOS TEMPORALES (CORREGIDO PARA WINDOWS) ---
+    # --- MANEJO DE ARCHIVOS TEMPORALES ---
     input_webm_path = None
     output_wav_path = None
 
     try:
         # 2. Archivo de entrada (.webm)
-        #    Creamos, escribimos, y CERRAMOS (para desbloquearlo)
         with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as f_in:
             f_in.write(acta.archivo_audio.read())
             input_webm_path = f_in.name
-        
-        print(f"[Acta {acta_pk}]: Audio de S3 guardado en {input_webm_path}")
+
+        print(f"[Acta {acta_pk}]: Audio guardado en {input_webm_path}")
 
         # 3. Archivo de salida (.wav)
-        #    Solo creamos un nombre de archivo temporal y lo cerramos.
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f_out:
             output_wav_path = f_out.name
-            
+
         print(f"[Acta {acta_pk}]: Archivo de salida temporal: {output_wav_path}")
 
-        # 4. Convertir .webm a .wav (¡Archivos desbloqueados!)
+        # 4. Convertir .webm a .wav
         print(f"[Acta {acta_pk}]: Iniciando conversión de .webm a .wav...")
         (
             ffmpeg
-            .input(input_webm_path) # Usamos la RUTA
-            .output(output_wav_path, format='wav', acodec='pcm_s16le', ac=1, ar='16000') # Usamos la RUTA
+            .input(input_webm_path)
+            .output(
+                output_wav_path,
+                format="wav",
+                acodec="pcm_s16le",
+                ac=1,
+                ar="16000",
+            )
             .run(capture_stdout=True, capture_stderr=True, overwrite_output=True)
         )
         print(f"[Acta {acta_pk}]: Conversión a .wav completada.")
 
         # 5. Abrir el .wav y transcribir con VOSK
         print(f"[Acta {acta_pk}]: Iniciando transcripción VOSK...")
-        wf = wave.open(output_wav_path, "rb") # Leemos el WAV convertido
-        if wf.getnchannels() != 1 or wf.getsampwidth() != 2 or wf.getcomptype() != "NONE":
-            print(f"Error: El archivo WAV no está en formato mono 16-bit PCM.")
+        wf = wave.open(output_wav_path, "rb")
+        if (
+            wf.getnchannels() != 1
+            or wf.getsampwidth() != 2
+            or wf.getcomptype() != "NONE"
+        ):
+            print("Error: El archivo WAV no está en formato mono 16-bit PCM.")
             raise Exception("Formato de audio incorrecto, se requiere mono 16-bit PCM.")
 
         recognizer = KaldiRecognizer(vosk_model, wf.getframerate())
-        recognizer.SetWords(True) 
+        recognizer.SetWords(True)
 
         full_text = ""
-        
+
         while True:
             data = wf.readframes(4000)
             if len(data) == 0:
                 break
             if recognizer.AcceptWaveform(data):
                 result = json.loads(recognizer.Result())
-                full_text += result.get('text', '') + " "
+                full_text += result.get("text", "") + " "
 
         final_result = json.loads(recognizer.FinalResult())
-        full_text += final_result.get('text', '')
-        
+        full_text += final_result.get("text", "")
+
         wf.close()
         print(f"[Acta {acta_pk}]: Transcripción VOSK finalizada.")
 
-        # 6. Actualizar el acta en la Base de Datos
+        # 6. Actualizar el acta
         acta.contenido = full_text
         acta.estado_transcripcion = Acta.ESTADO_COMPLETADO
         acta.save()
-        
+
         print(f"[TAREA COMPLETADA]: Acta {acta_pk} actualizada con éxito.")
         return f"Acta {acta_pk} procesada con éxito."
 
     except Exception as e:
-        # 7. Manejo de Errores
         print(f"!!! ERROR en Tarea {acta_pk}: {e} !!!")
-        
-        # Imprimir detalles si fue un error de FFMPEG
+
         if isinstance(e, ffmpeg.Error):
             print(f"STDOUT FFMPEG: {e.stdout.decode('utf8', errors='ignore')}")
             print(f"STDERR FFMPEG: {e.stderr.decode('utf8', errors='ignore')}")
         else:
-            # Imprimir el error completo si fue de Python (ej. Vosk, DB)
             traceback.print_exc()
 
         acta.estado_transcripcion = Acta.ESTADO_ERROR
         acta.save()
         return f"Error procesando Acta {acta_pk}: {e}"
-    
+
     finally:
-        # 8. Limpieza de archivos temporales (¡MUY IMPORTANTE!)
+        # 8. Limpieza
         print(f"[Acta {acta_pk}]: Limpiando archivos temporales...")
         try:
             if input_webm_path and os.path.exists(input_webm_path):
@@ -203,53 +322,3 @@ def procesar_audio_vosk(acta_pk):
                 print(f" - Borrado: {output_wav_path}")
         except Exception as e:
             print(f"Error durante la limpieza de archivos: {e}")
-@shared_task
-def enviar_notificacion_nueva_reunion(reunion_id):
-    
-    # 1. Inicializar Firebase (Se usa la función corregida)
-    try:
-        inicializar_firebase()
-    except Exception:
-        return 
-
-    # 2. Obtener la Reunión
-    try:
-        reunion = Reunion.objects.get(pk=reunion_id)
-    except Reunion.DoesNotExist:
-        print(f"Advertencia: Reunión ID {reunion_id} no encontrada para notificar.")
-        return
-
-    # 3. Obtener tokens y enviar
-    perfiles = Perfil.objects.filter(fcm_token__isnull=False).exclude(fcm_token__exact='')
-    tokens = [p.fcm_token for p in perfiles]
-
-    if not tokens:
-        print("No hay tokens de FCM registrados para enviar la notificación.")
-        return
-
-    # Definición y envío del mensaje
-    titulo = "¡Nueva Reunión Programada!"
-    fecha_formateada = reunion.fecha.strftime('%d-%m-%Y a las %H:%M')
-    cuerpo = f"Se ha agendado: {reunion.titulo} para el {fecha_formateada}."
-
-    message = messaging.MulticastMessage(
-        notification=messaging.Notification(title=titulo, body=cuerpo),
-        data={'tipo': 'nueva_reunion', 'reunion_id': str(reunion.id), 'titulo': reunion.titulo},
-        tokens=tokens,
-    )
-
-    try:
-        # Utilizamos get_app() para obtener la instancia inicializada
-        response = messaging.send_multicast(message, app=get_app(FIREBASE_APP_NAME))
-        print(f"FCM: {response.success_count} notificaciones enviadas con éxito. {response.failure_count} fallidas.")
-        
-        if response.failure_count > 0:
-            for i, result in enumerate(response.responses):
-                if not result.success and result.exception.code == 'not-registered':
-                    Perfil.objects.filter(fcm_token=tokens[i]).update(fcm_token=None)
-                    print(f"Token inválido eliminado: {tokens[i]}")
-                    
-    except FirebaseError as e:
-        print(f"Error de Firebase al enviar: {e}")
-        
-    return f"FCM process complete for Reunion {reunion_id}"
