@@ -29,21 +29,32 @@ VOSK_MODEL_PATH = os.path.join(settings.BASE_DIR, "vosk-model-small-es-0.42")
 vosk_model = None
 def inicializar_firebase():
     """
-    Inicializa la app de Firebase Admin SDK usando un chequeo a través de get_app().
+    Inicializa la app de Firebase Admin SDK leyendo el JSON de credenciales
+    desde la variable de entorno de Django settings.
     """
     try:
-        # Verifica si la app ya existe (get_app lanza ValueError si no existe)
         get_app(FIREBASE_APP_NAME)
     except ValueError:
-        # Si la app no existe, la inicializamos.
         try:
-            cred = credentials.Certificate(settings.FIREBASE_CREDENTIALS_PATH)
+            # 1. Obtener la cadena JSON de settings
+            credentials_json_string = settings.FIREBASE_CREDENTIALS_JSON
+            
+            # Verificar que la cadena exista y no esté vacía
+            if not credentials_json_string or credentials_json_string == "{}":
+                # Si no está configurado, levantamos una excepción clara
+                raise Exception("FIREBASE_CREDENTIALS_JSON no está configurado o está vacío en settings.")
+
+            # 2. Deserializar la cadena JSON a un diccionario de Python
+            credentials_data = json.loads(credentials_json_string) 
+
+            # 3. Inicializar Firebase desde el objeto de Python
+            cred = credentials.Certificate(credentials_data)
             initialize_app(cred, name=FIREBASE_APP_NAME)
-            print("Firebase Admin SDK inicializado para notificaciones.")
+            print("Firebase Admin SDK inicializado desde credenciales de ambiente.")
             
         except Exception as e:
-            print(f"ERROR CRÍTICO: No se pudo inicializar Firebase Admin SDK. Detalle: {e}")
-            raise
+            print(f"ERROR CRÍTICO: Falló la inicialización de Firebase desde el ambiente. Detalle: {e}")
+            raise # Re-lanza el error
 # TAREA DE PRUEBA (ya la tenías)
 # -----------------------------------------------------------------
 @shared_task(name="test_celery_suma")

@@ -12,7 +12,7 @@ from django.conf import settings
 # -----------------------------------------------------------------------------
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
-FIREBASE_CREDENTIALS_PATH = os.path.join(BASE_DIR, 'firebase-admin.json')
+FIREBASE_CREDENTIALS_JSON = os.environ.get("FIREBASE_CREDENTIALS", "{}")
 # -----------------------------------------------------------------------------
 # Seguridad / Debug
 # -----------------------------------------------------------------------------
