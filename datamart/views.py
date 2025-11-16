@@ -2,16 +2,15 @@
 from django.shortcuts import render, redirect
 from django.core.management import call_command
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required, user_passes_test
+from django.contrib.auth.decorators import login_required # <-- AHORA SOLO PEDIMOS LOGIN
 from django.db.models import Count
 from datamart.models import FactInscripcionTaller, DimTaller, FactConsultaActa, FactParticipacionVotacion, DimVecino
 import json
 
-def es_directiva(user):
-    return user.is_staff
+# ¡HEMOS ELIMINADO LA FUNCIÓN 'es_directiva'!
 
 @login_required(login_url='/') 
-@user_passes_test(es_directiva, login_url='/')
+# ¡HEMOS ELIMINADO LA LÍNEA '@user_passes_test'!
 def panel_bi_view(request):
     
     # --- 1. Gráfico Ocupación de Talleres ---
@@ -35,7 +34,7 @@ def panel_bi_view(request):
     data_consulta_actas = list(FactConsultaActa.objects
         .values('acta__titulo')
         .annotate(consultas=Count('id'))
-        .order_by('-consultas')[:10]) # Top 10 más vistas
+        .order_by('-consultas')[:10])
 
     # --- 3. Gráfico Participación (Gauge) ---
     total_vecinos = DimVecino.objects.count()
@@ -49,7 +48,7 @@ def panel_bi_view(request):
         'porcentaje_meta': meta_participacion * 100
     }
 
-    # --- 4. NUEVO GRÁFICO: Distribución Demográfica (Sector) ---
+    # --- 4. Gráfico: Distribución Demográfica (Sector) ---
     data_demografia_sector = list(DimVecino.objects
         .values('direccion_sector')
         .annotate(total_vecinos=Count('id'))
@@ -60,20 +59,25 @@ def panel_bi_view(request):
         'data_ocupacion_talleres': json.dumps(data_ocupacion_talleres),
         'data_consulta_actas': json.dumps(data_consulta_actas),
         'data_participacion': json.dumps(data_participacion),
-        'data_demografia_sector': json.dumps(data_demografia_sector), # <-- ¡Nueva línea!
+        'data_demografia_sector': json.dumps(data_demografia_sector),
     }
     
     return render(request, 'datamart/panel_bi.html', context)
 
 # --- VISTA PARA EL BOTÓN DE ACTUALIZAR ---
 @login_required(login_url='/')
-@user_passes_test(es_directiva, login_url='/')
+# ¡HEMOS ELIMINADO LA LÍNEA '@user_passes_test'!
 def ejecutar_etl_view(request):
     
+    # ¡AÑADIMOS UNA NUEVA SEGURIDAD!
+    # Ahora, solo los 'staff' pueden PRESIONAR EL BOTÓN,
+    # pero TODOS pueden VER el panel.
+    if not request.user.is_staff:
+        messages.error(request, 'No tienes permisos para actualizar los datos.')
+        return redirect('panel_bi')
+
     if request.method == 'POST':
         try:
-            # NOTA: call_command() puede ser lento. 
-            # Considera mover esto a Celery/Redis en el futuro
             call_command('procesar_etl') 
             messages.success(request, '¡Datos del panel actualizados con éxito!')
         
