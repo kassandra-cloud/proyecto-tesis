@@ -30,6 +30,7 @@ urlpatterns = [
     path('foro/', include('foro.urls', namespace='foro')),
     path('anuncios/', include('anuncios.urls', namespace='anuncios')),
     path('recursos/', include('recursos.urls', namespace='recursos')),
+    path('analitica/', include('datamart.urls')),
 ]
 
 # esto es para que los archivos subidos (MEDIA) funcionen

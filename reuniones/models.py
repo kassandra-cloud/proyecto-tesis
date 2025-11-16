@@ -110,3 +110,15 @@ class ActaEmailLog(models.Model):
 
     def __str__(self):
         return f"Email de acta {self.acta_id} enviado a {self.destinatarios[:50]}..."
+
+class LogConsultaActa(models.Model):
+    acta = models.ForeignKey(Acta, on_delete=models.CASCADE, related_name="consultas")
+    vecino = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="consultas_de_actas")
+    fecha_consulta = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Log de Consulta de Acta"
+        verbose_name_plural = "Logs de Consultas de Actas"
+
+    def __str__(self):
+        return f"{self.vecino.username} consultó {self.acta.reunion.titulo}"

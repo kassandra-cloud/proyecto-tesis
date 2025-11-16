@@ -57,6 +57,7 @@ INSTALLED_APPS = [
     "foro",
     "anuncios",
     "recursos",
+    "datamart",
 
     # Terceros
     "widget_tweaks",

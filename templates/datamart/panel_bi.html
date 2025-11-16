@@ -1,0 +1,180 @@
+{% extends 'base.html' %} 
+{% load static %}
+
+{% block content %}
+<div class="container-fluid px-4">
+
+    <div class="d-flex justify-content-between align-items-center mt-4">
+        <h1 class="mb-0">Panel de Analítica (BI)</h1>
+        
+        <form action="{% url 'ejecutar_etl' %}" method="POST" onsubmit="this.querySelector('button').disabled = true; this.querySelector('button').innerHTML = 'Actualizando...';">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-sync-alt"></i> Actualizar Datos
+            </button>
+        </form>
+    </div>
+    
+    <p class="mb-4">Cuadro de Mando Integral para la Directiva.</p>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="row">
+        <div class="col-xl-6">
+            <div class="card mb-4">
+                <div class="card-header"><i class="fas fa-tachometer-alt me-1"></i>Participación General vs. Meta (50%)</div>
+                <div class="card-body">
+                    <canvas id="graficoParticipacionGauge" width="100%" height="40"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-6">
+            <div class="card mb-4">
+                <div class="card-header"><i class="fas fa-map-marker-alt me-1"></i>Distribución de Vecinos por Sector</div>
+                <div class="card-body">
+                    <canvas id="graficoDemografiaSector" width="100%" height="40"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-xl-6">
+            <div class="card mb-4">
+                <div class="card-header"><i class="fas fa-chart-area me-1"></i>Ocupación de Talleres</div>
+                <div class="card-body">
+                    <canvas id="graficoOcupacionTalleres" width="100%" height="40"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-6">
+            <div class="card mb-4">
+                <div class="card-header"><i class="fas fa-chart-bar me-1"></i>Tasa de Consulta de Actas (Top 10)</div>
+                <div class="card-body">
+                    <canvas id="graficoConsultaActas" width="100%" height="40"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    
+    // --- Datos pasados desde la Vista de Django ---
+    const dataTalleres = JSON.parse('{{ data_ocupacion_talleres|safe }}' || "[]");
+    const dataActas = JSON.parse('{{ data_consulta_actas|safe }}' || "[]");
+    const dataParticipacion = JSON.parse('{{ data_participacion|safe }}' || "{}");
+    const dataDemografia = JSON.parse('{{ data_demografia_sector|safe }}' || "[]");
+
+    // --- 1. Gráfico Participación (Gauge/Doughnut) ---
+    // ¡CAMBIO 1: LÓGICA DEL GAUGE ACTUALIZADA!
+    // Ahora el semicírculo completo representa el 50% de la meta.
+    if (dataParticipacion.porcentaje_actual != null) {
+        const ctxGauge = document.getElementById('graficoParticipacionGauge').getContext('2d');
+        const pctActual = dataParticipacion.porcentaje_actual;
+        const pctMeta = dataParticipacion.porcentaje_meta; // Esto es 50
+        
+        new Chart(ctxGauge, {
+            type: 'doughnut',
+            data: {
+                // Ahora los labels solo son 2: lo alcanzado y lo faltante
+                labels: ['Alcanzado', 'Faltante para Meta'],
+                datasets: [{
+                    // Los datos ahora suman 50 (la meta), no 100.
+                    data: [
+                        pctActual, // Lo que se ha alcanzado
+                        Math.max(0, pctMeta - pctActual), // Lo que falta para llegar a 50
+                    ],
+                    backgroundColor: [
+                        'rgba(75, 192, 192, 0.6)', // Turquesa (Alcanzado)
+                        'rgba(255, 99, 132, 0.6)', // Rosa (Faltante)
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                circumference: 180, // Media torta
+                rotation: -90,      // Empezar desde la izquierda
+                plugins: {
+                    tooltip: { enabled: true }, // Habilitamos el tooltip
+                    legend: { display: true }
+                }
+            }
+        });
+    }
+
+    // --- 2. Gráfico: Distribución Demográfica (Torta) ---
+    // ¡CAMBIO 2: ELIMINADO EL 'if' PARA QUE EL GRÁFICO VACÍO SE MUESTRE!
+    const ctxDemografia = document.getElementById('graficoDemografiaSector').getContext('2d');
+    new Chart(ctxDemografia, {
+        type: 'pie',
+        data: {
+            labels: dataDemografia.map(d => d.direccion_sector || 'No especificado'),
+            datasets: [{
+                label: 'Total Vecinos',
+                data: dataDemografia.map(d => d.total_vecinos),
+                backgroundColor: dataDemografia.map(() => `rgba(${Math.floor(Math.random() * 255)}, ${Math.floor(Math.random() * 255)}, ${Math.floor(Math.random() * 255)}, 0.6)`)
+            }]
+        },
+        options: { 
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'top',
+                }
+            }
+        }
+    });
+    
+    // --- 3. Gráfico Ocupación Talleres (Barras) ---
+    // ¡CAMBIO 3: ELIMINADO EL 'if' PARA QUE EL GRÁFICO VACÍO SE MUESTRE!
+    const ctxTalleres = document.getElementById('graficoOcupacionTalleres').getContext('2d');
+    new Chart(ctxTalleres, {
+        type: 'bar',
+        data: {
+            labels: dataTalleres.map(d => d.nombre),
+            datasets: [
+                {
+                    label: 'Inscritos',
+                    data: dataTalleres.map(d => d.inscritos),
+                    backgroundColor: 'rgba(255, 159, 64, 0.6)'
+                },
+                {
+                    label: 'Cupos Totales',
+                    data: dataTalleres.map(d => d.cupos),
+                    backgroundColor: 'rgba(201, 203, 207, 0.6)'
+                }
+            ]
+        },
+        options: { responsive: true }
+    });
+    
+    // --- 4. Gráfico Tasa de Consulta de Actas (Barras) ---
+    // ¡CAMBIO 4: ELIMINADO EL 'if' PARA QUE EL GRÁFICO VACÍO SE MUESTRE!
+    const ctxActas = document.getElementById('graficoConsultaActas').getContext('2d');
+    new Chart(ctxActas, {
+        type: 'bar',
+        data: {
+            labels: dataActas.map(d => d.acta__titulo),
+            datasets: [{
+                label: 'Total Consultas',
+                data: dataActas.map(d => d.consultas),
+                backgroundColor: 'rgba(153, 102, 255, 0.6)'
+            }]
+        },
+        options: { responsive: true }
+    });
+});
+</script>
+{% endblock %}

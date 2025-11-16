@@ -136,9 +136,14 @@
                         <span>Recursos</span>
                     </a>
                 </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'panel_bi' %}">
+                        <i class="fas fa-chart-line icon"></i> 
+                        <span>Panel de BI</span>
+                    </a>
+                </li>
                 {% endif %}
                 {% endif %} 		
-                
                 {% user_can 'votaciones' 'view' as puede_ver_votaciones %}
                 {% if puede_ver_votaciones %}
                 <li class="nav-item">
