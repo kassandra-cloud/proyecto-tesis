@@ -21,4 +21,5 @@ static_root/
 
 # Archivos de base de datos de desarrollo
 *.sqlite3
-db.sqlite3
+db.sqlite3"firebase-admin.json" 
+"firebase-admin.json" 
