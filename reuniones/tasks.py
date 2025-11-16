@@ -1,8 +1,7 @@
-# reuniones/tasks.py
 from celery import shared_task
 import time
 
-# --- ¡AÑADE TODOS ESTOS IMPORTS NUEVOS! ---
+# --- IMPORTS EXISTENTES (VOSK/Audio) ---
 import os
 import json
 import wave
@@ -11,17 +10,40 @@ import tempfile # Para guardar archivos temporalmente
 import traceback # Para ver errores completos
 from django.conf import settings
 from .models import Acta
-
 # --- LIBRERÍAS DE VOSK ---
 from vosk import Model, KaldiRecognizer
 
+# --- IMPORTS FCM (CORREGIDOS) ---
+# Se elimina 'apps' ya que causa el error de importación.
+from firebase_admin import messaging, initialize_app, credentials, get_app
+from firebase_admin.exceptions import FirebaseError
+from core.models import Perfil 
+from .models import Reunion 
+# -----------------------------
+# --- CONFIGURACIÓN DE FCM ---
+FIREBASE_APP_NAME = 'default_reuniones_sender'
 # --- 1. CONFIGURA LA RUTA A TU MODELO VOSK ---
 VOSK_MODEL_PATH = os.path.join(settings.BASE_DIR, "vosk-model-small-es-0.42")
 
 # --- 2. ¡ARREGLO! NO CARGUES EL MODELO AQUÍ ---
 vosk_model = None
-
-# -----------------------------------------------------------------
+def inicializar_firebase():
+    """
+    Inicializa la app de Firebase Admin SDK usando un chequeo a través de get_app().
+    """
+    try:
+        # Verifica si la app ya existe (get_app lanza ValueError si no existe)
+        get_app(FIREBASE_APP_NAME)
+    except ValueError:
+        # Si la app no existe, la inicializamos.
+        try:
+            cred = credentials.Certificate(settings.FIREBASE_CREDENTIALS_PATH)
+            initialize_app(cred, name=FIREBASE_APP_NAME)
+            print("Firebase Admin SDK inicializado para notificaciones.")
+            
+        except Exception as e:
+            print(f"ERROR CRÍTICO: No se pudo inicializar Firebase Admin SDK. Detalle: {e}")
+            raise
 # TAREA DE PRUEBA (ya la tenías)
 # -----------------------------------------------------------------
 @shared_task(name="test_celery_suma")
@@ -170,3 +192,53 @@ def procesar_audio_vosk(acta_pk):
                 print(f" - Borrado: {output_wav_path}")
         except Exception as e:
             print(f"Error durante la limpieza de archivos: {e}")
+@shared_task
+def enviar_notificacion_nueva_reunion(reunion_id):
+    
+    # 1. Inicializar Firebase (Se usa la función corregida)
+    try:
+        inicializar_firebase()
+    except Exception:
+        return 
+
+    # 2. Obtener la Reunión
+    try:
+        reunion = Reunion.objects.get(pk=reunion_id)
+    except Reunion.DoesNotExist:
+        print(f"Advertencia: Reunión ID {reunion_id} no encontrada para notificar.")
+        return
+
+    # 3. Obtener tokens y enviar
+    perfiles = Perfil.objects.filter(fcm_token__isnull=False).exclude(fcm_token__exact='')
+    tokens = [p.fcm_token for p in perfiles]
+
+    if not tokens:
+        print("No hay tokens de FCM registrados para enviar la notificación.")
+        return
+
+    # Definición y envío del mensaje
+    titulo = "¡Nueva Reunión Programada!"
+    fecha_formateada = reunion.fecha.strftime('%d-%m-%Y a las %H:%M')
+    cuerpo = f"Se ha agendado: {reunion.titulo} para el {fecha_formateada}."
+
+    message = messaging.MulticastMessage(
+        notification=messaging.Notification(title=titulo, body=cuerpo),
+        data={'tipo': 'nueva_reunion', 'reunion_id': str(reunion.id), 'titulo': reunion.titulo},
+        tokens=tokens,
+    )
+
+    try:
+        # Utilizamos get_app() para obtener la instancia inicializada
+        response = messaging.send_multicast(message, app=get_app(FIREBASE_APP_NAME))
+        print(f"FCM: {response.success_count} notificaciones enviadas con éxito. {response.failure_count} fallidas.")
+        
+        if response.failure_count > 0:
+            for i, result in enumerate(response.responses):
+                if not result.success and result.exception.code == 'not-registered':
+                    Perfil.objects.filter(fcm_token=tokens[i]).update(fcm_token=None)
+                    print(f"Token inválido eliminado: {tokens[i]}")
+                    
+    except FirebaseError as e:
+        print(f"Error de Firebase al enviar: {e}")
+        
+    return f"FCM process complete for Reunion {reunion_id}"

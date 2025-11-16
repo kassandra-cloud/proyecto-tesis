@@ -39,6 +39,13 @@ class Perfil(models.Model):
         default=0 # Por defecto 0
     )
     # --- FIN DE CAMPOS DEMOGRÁFICOS ---
+    # Nuevo campo para almacenar el Token de Firebase Cloud Messaging
+    fcm_token = models.CharField(
+        max_length=255, 
+        blank=True, 
+        null=True, 
+        verbose_name='Token FCM'
+    )
 
     def save(self, *args, **kwargs):
         # ... (función save sin cambios) ...
