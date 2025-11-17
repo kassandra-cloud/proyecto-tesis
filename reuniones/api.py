@@ -14,36 +14,31 @@ class DefaultPagination(PageNumberPagination):
     max_page_size = 100
 class ReunionViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = ReunionSerializer
-    # Ideal: proteger con autenticación (cuando ya tengas login de la app Android integrado)
-    # permission_classes = [permissions.IsAuthenticated]
     permission_classes = [permissions.AllowAny]
-
     pagination_class = DefaultPagination
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ["titulo", "tabla", "tipo"]
     ordering_fields = ["fecha", "titulo"]
 
     def get_queryset(self):
-        # Base: todas las reuniones anotadas con asistentes_count
-        qs = Reunion.objects.all().annotate(
-            asistentes_count=Count('asistentes')
-        ).order_by("-fecha")
+        qs = (
+            Reunion.objects.all()
+            .select_related("acta")
+            .annotate(asistentes_count=Count("asistentes"))
+            .order_by("-fecha")
+        )
 
-        # Leer parámetro ?estado=...
-        estado_param = self.request.query_params.get("estado")
-
-        if not estado_param:
-            # Sin filtro → devolver todo
+        estado = self.request.query_params.get("estado")
+        if not estado:
             return qs
 
-        # Aceptar tanto "PROGRAMADA" como "programada"
-        estado_normalizado = estado_param.upper()
-
-        # Validar que el valor exista en los choices del modelo
-        estados_validos = {choice[0] for choice in EstadoReunion.choices}
-        if estado_normalizado in estados_validos:
-            qs = qs.filter(estado=estado_normalizado)
-
+        # 👇 AHORA filtramos por el campo estado, no solo por fecha
+        if estado == "programada":
+            return qs.filter(estado=EstadoReunion.PROGRAMADA)
+        if estado == "en_curso":
+            return qs.filter(estado=EstadoReunion.EN_CURSO)
+        if estado == "realizada":
+            return qs.filter(estado=EstadoReunion.REALIZADA)
         return qs
 class ActaViewSet(viewsets.ReadOnlyModelViewSet):
     """
