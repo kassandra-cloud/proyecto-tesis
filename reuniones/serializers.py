@@ -2,6 +2,10 @@ from rest_framework import serializers
 from .models import Reunion, Acta, Asistencia 
 from django.utils import timezone
 from datetime import timedelta
+from rest_framework import serializers
+from .models import Reunion, Acta  # asegúrate de tener Acta importada
+
+
 class ReunionSerializer(serializers.ModelSerializer):
     """
     Serializer para la API de Reuniones.
@@ -11,13 +15,19 @@ class ReunionSerializer(serializers.ModelSerializer):
     tipo_reunion = serializers.CharField(source="tipo", read_only=True)
     asistentes_count = serializers.SerializerMethodField()
 
-    # 👇 NUEVOS CAMPOS: info del acta
+    # 👇 Campos relacionados al acta
     acta_contenido = serializers.CharField(
-        source="acta.contenido", read_only=True, allow_null=True
+        source="acta.contenido",
+        read_only=True,
+        allow_null=True
     )
     acta_estado_transcripcion = serializers.CharField(
-        source="acta.estado_transcripcion", read_only=True, allow_null=True
+        source="acta.estado_transcripcion",
+        read_only=True,
+        allow_null=True
     )
+    acta_aprobada = serializers.SerializerMethodField()
+    acta_id = serializers.SerializerMethodField()
 
     class Meta:
         model = Reunion
@@ -32,16 +42,45 @@ class ReunionSerializer(serializers.ModelSerializer):
             "fecha_inicio",
             "tipo_reunion",
             "asistentes_count",
-            # 👇 NUEVOS CAMPOS
+            # info de acta
             "acta_contenido",
             "acta_estado_transcripcion",
+            "acta_aprobada",
+            "acta_id",
         ]
 
     def get_asistentes_count(self, obj):
         try:
+            # si tienes related_name="asistentes" en Asistencia
             return obj.asistentes.filter(presente=True).count()
         except Exception:
             return 0
+
+    def get_acta_aprobada(self, obj):
+        """
+        Devuelve:
+        - True  si el acta existe y está aprobada
+        - False si el acta existe pero no está aprobada
+        - None  si no hay acta
+        """
+        acta = getattr(obj, "acta", None)
+        if acta is None:
+            return None
+        return bool(getattr(acta, "aprobada", False))
+
+    def get_acta_id(self, obj):
+        """
+        Devuelve el PK del acta, o None si no existe.
+
+        IMPORTANTE:
+        - NO usamos acta.id porque tu modelo Acta no tiene campo id.
+        - En su lugar, usamos acta.pk, que siempre existe.
+        """
+        acta = getattr(obj, "acta", None)
+        if acta is None:
+            return None
+        return acta.pk
+
 class ActaSerializer(serializers.ModelSerializer):
     # Acta usa OneToOne(primary_key=True) con Reunion
     reunion = serializers.PrimaryKeyRelatedField(read_only=True)
