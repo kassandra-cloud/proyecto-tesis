@@ -7,45 +7,69 @@ class ReunionSerializer(serializers.ModelSerializer):
     """
     Serializer para la API de Reuniones.
     """
+
     # 1. Mapea creada_por (FK) a autor (ID)
     autor = serializers.IntegerField(source="creada_por.id", read_only=True)
-    
-    # 2. Mapea Reunion.fecha a 'fecha_inicio'. ELIMINAMOS EL ARGUMENTO 'format'.
-    # Django ahora usará el formato ISO 8601 estándar con zona horaria.
+
+    # 2. Mapea Reunion.fecha a 'fecha_inicio'
     fecha_inicio = serializers.DateTimeField(source="fecha", read_only=True)
-    
+
     # 3. Mapea Reunion.tipo a 'tipo_reunion'
-    tipo_reunion = serializers.CharField(source="tipo", read_only=True) 
+    tipo_reunion = serializers.CharField(source="tipo", read_only=True)
 
     # 4. Campo calculado: Asistentes
     asistentes_count = serializers.SerializerMethodField()
 
+
     class Meta:
         model = Reunion
         fields = [
-            "id", 
-            "titulo", 
-            "tabla", 
-            "estado", 
+            "id",
+            "titulo",
+            "tabla",
+            "estado",
             "creada_el",
-            # Campos mapeados/calculados
+            # Campos mapeados / calculados
             "autor",
             "fecha_inicio",
             "tipo_reunion",
-            "asistentes_count"
+            "asistentes_count",
+            # Campos del Acta
+            "acta_contenido",
+            "acta_estado_transcripcion",
         ]
 
     def get_asistentes_count(self, obj):
         """
-        Calcula el número de asistentes confirmados (presente=True) 
-        usando el related_name correcto: 'asistentes'.
+        Número de asistentes confirmados (presente=True)
+        usando el related_name 'asistentes'.
         """
         try:
             return obj.asistentes.filter(presente=True).count()
-        except Exception as e:
-            # En caso de error inesperado, devuelve 0
-            print(f"Error al calcular asistentes: {e}")
+        except Exception:
             return 0
+
+    def get_acta_contenido(self, obj):
+        """
+        Devuelve el contenido del acta si existe, si no, None.
+        """
+        try:
+            return obj.acta.contenido
+        except Acta.DoesNotExist:
+            return None
+        except AttributeError:
+            return None
+
+    def get_acta_estado_transcripcion(self, obj):
+        """
+        Devuelve el estado de transcripción del acta si existe, si no, None.
+        """
+        try:
+            return obj.acta.estado_transcripcion
+        except Acta.DoesNotExist:
+            return None
+        except AttributeError:
+            return None
 
 
 class ActaSerializer(serializers.ModelSerializer):
