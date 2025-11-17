@@ -11,16 +11,14 @@
     </a>
 </div>
 
+{# ... (Las pestañas <ul class="nav nav-tabs mb-3">...</ul> quedan igual) ... #}
 <ul class="nav nav-tabs mb-3">
     {% for estado_val, estado_label in estados_posibles %}
-      {# Solo mostramos las pestañas relevantes para la gestión #}
       {% if estado_val == 'PENDIENTE' or estado_val == 'APROBADA' or estado_val == 'RECHAZADA' %}
       <li class="nav-item">
           <a class="nav-link {% if filtro_actual == estado_val %}active{% endif %}" 
              href="{% url 'recursos:gestionar_reservas' %}?estado={{ estado_val }}">
              {{ estado_label }}
-             
-             {# Añadimos una insignia de conteo solo a PENDIENTE #}
              {% if estado_val == 'PENDIENTE' and conteo_pendientes > 0 %}
                <span class="badge bg-danger rounded-pill ms-1">{{ conteo_pendientes }}</span>
              {% endif %}
@@ -57,23 +55,86 @@
                                     hasta {{ reserva.fecha_fin|date:"d/m/Y" }}
                                 </span>
                             </td>
-                            <td class="small" style="min-width: 200px;">{{ reserva.motivo|linebreaksbr }}</td>
+                            <td class="small" style="min-width: 200px;">{{ reserva.motivo|truncatechars:100 }}</td>
 
                             <td class="text-end text-nowrap">
-                            {% if reserva.estado == 'PENDIENTE' %}
-                                <form action="{% url 'recursos:actualizar_estado_reserva' reserva.pk %}" method="post" class="d-inline">
-                                {% csrf_token %}
-                                <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                                <button type="submit" name="accion" value="APROBADA" class="btn btn-sm btn-success">Aprobar</button>
-                                <button type="submit" name="accion" value="RECHAZADA" class="btn btn-sm btn-outline-danger ms-1">Rechazar</button>
-                                </form>
-                            {% else %}
-                                <span class="badge {% if reserva.estado == 'APROBADA' %}bg-success{% else %}bg-danger{% endif %}">
-                                {{ reserva.estado|title }}
-                                </span>
-                            {% endif %}
+                                
+                                <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#detalleModal-{{ reserva.pk }}">
+                                    Detalles
+                                </button>
+                                {% if reserva.estado == 'PENDIENTE' %}
+                                    <form action="{% url 'recursos:actualizar_estado_reserva' reserva.pk %}" method="post" class="d-inline ms-1">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                    <button type="submit" name="accion" value="APROBADA" class="btn btn-sm btn-success">Aprobar</button>
+                                    <button type="submit" name="accion" value="RECHAZADA" class="btn btn-sm btn-outline-danger ms-1">Rechazar</button>
+                                    </form>
+                                
+                                {% else %}
+                                    <span class="badge {% if reserva.estado == 'APROBADA' %}bg-success{% else %}bg-danger{% endif %} ms-1">
+                                    {{ reserva.estado|title }}
+                                    </span>
+                                    
+                                    <form action="{% url 'recursos:actualizar_estado_reserva' reserva.pk %}" method="post" class="d-inline ms-1">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                        <button type="submit" name="accion" value="PENDIENTE" class="btn btn-sm btn-outline-warning" title="Deshacer y mover a Pendiente">
+                                            Deshacer
+                                        </button>
+                                    </form>
+                                {% endif %}
                             </td>
                         </tr>
+
+                        <div class="modal fade" id="detalleModal-{{ reserva.pk }}" tabindex="-1" aria-labelledby="detalleModalLabel-{{ reserva.pk }}" aria-hidden="true">
+                            <div class="modal-dialog modal-lg">
+                                <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="detalleModalLabel-{{ reserva.pk }}">Detalles de la Solicitud #{{ reserva.pk }}</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body">
+                                    
+                                    <h6 class="text-primary">Detalles del Solicitante (Vecino)</h6>
+                                    <dl class="row">
+                                        {# Usamos los campos del Perfil que ya cargamos en la vista #}
+                                        <dt class="col-sm-3">Nombre Completo</dt>
+                                        <dd class="col-sm-9">{{ reserva.solicitante.perfil.nombre_completo|default:reserva.solicitante.username }}</dd>
+                                        
+                                        <dt class="col-sm-3">RUT</dt>
+                                        <dd class="col-sm-9">{{ reserva.solicitante.perfil.rut|default:"No especificado" }}</dd>
+                                        
+                                        <dt class="col-sm-3">Dirección</dt>
+                                        <dd class="col-sm-9">{{ reserva.solicitante.perfil.direccion|default:"No especificada" }}</dd>
+                                        
+                                        <dt class="col-sm-3">Email</dt>
+                                        <dd class="col-sm-9">{{ reserva.solicitante.email|default:"No especificado" }}</dd>
+                                    </dl>
+                                    
+                                    <hr>
+                                    
+                                    <h6 class="text-primary">Detalles de la Solicitud</h6>
+                                    <dl class="row">
+                                        <dt class="col-sm-3">Recurso</dt>
+                                        <dd class="col-sm-9">{{ reserva.recurso.nombre }}</dd>
+                                        
+                                        <dt class="col-sm-3">Desde</dt>
+                                        <dd class="col-sm-9">{{ reserva.fecha_inicio|date:"l, d \d\e F \d\e Y" }}</dd>
+                                        
+                                        <dt class="col-sm-3">Hasta</dt>
+                                        <dd class="col-sm-9">{{ reserva.fecha_fin|date:"l, d \d\e F \d\e Y" }}</dd>
+                                        
+                                        <dt class="col-sm-3">Motivo</dt>
+                                        <dd class="col-sm-9">{{ reserva.motivo|linebreaksbr }}</dd>
+                                    </dl>
+
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                                </div>
+                                </div>
+                            </div>
+                        </div>
                         {% empty %}
                         <tr>
                             <td colspan="5" class="text-center text-muted py-4">No hay solicitudes en estado "{{ filtro_actual }}".</td>

@@ -2,7 +2,6 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from core.authz import role_required
-from .models import Recurso, Reserva 
 from .forms import RecursoForm
 from django.views.decorators.http import require_POST
 from django.utils import timezone
@@ -128,7 +127,7 @@ def actualizar_estado_reserva(request, pk):
     # Ahora opera sobre SOLICITUD
     sol = get_object_or_404(SolicitudReserva, pk=pk)
     accion = request.POST.get('accion')
-
+    estado_anterior = sol.estado
     if accion == 'APROBADA':
         sol.estado = "APROBADA"
         sol.save(update_fields=["estado"])
@@ -146,6 +145,25 @@ def actualizar_estado_reserva(request, pk):
         sol.estado = "RECHAZADA"
         sol.save(update_fields=["estado"])
         messages.warning(request, f"Solicitud #{sol.id} RECHAZADA.")
+    elif accion == 'PENDIENTE':
+        sol.estado = "PENDIENTE"
+        sol.save(update_fields=["estado"])
+        
+        # Si la estábamos "deshaciendo" desde APROBADA, debemos borrar la Reserva espejo
+        if estado_anterior == 'APROBADA':
+            # Buscamos la reserva espejo que coincida
+            Reserva.objects.filter(
+                recurso=sol.recurso,
+                vecino=sol.solicitante,
+                fecha_inicio=sol.fecha_inicio,
+                fecha_fin=sol.fecha_fin,
+                estado=Reserva.Estado.APROBADA # Por seguridad
+            ).delete()
+            messages.info(request, f"Solicitud #{sol.id} devuelta a Pendiente. La reserva aprobada fue eliminada.")
+        else:
+            # Si era RECHAZADA, solo la movemos a pendiente
+            messages.info(request, f"Solicitud #{sol.id} devuelta a Pendiente.")
+    # --- FIN NUEVA LÓGICA ---
     else:
         messages.error(request, "Acción no válida.")
 

@@ -1,6 +1,5 @@
 {% extends 'base.html' %}
 {% load static %}
-
 {% block content %}
 
 <div class="container mt-5">
@@ -12,21 +11,13 @@
                         {% if taller %}
                             ✏️ Editar Taller: {{ taller.nombre }}
                         {% else %}
-                            ✨ Crear Nuevo Taller
+                            ✨ Programar Nuevo Taller
                         {% endif %}
                     </h4>
                 </div>
                 <div class="card-body">
                     
-                    {% if taller %}
-                        {# Si existe 'taller', es para EDITAR. Apunta a la URL de edición con el ID. #}
-                        {% url 'talleres:editar_taller' taller_id=taller.id as form_action_url %}
-                    {% else %}
-                        {# Si no existe 'taller', es para CREAR. Apunta a la URL de creación. #}
-                        {% url 'talleres:crear_taller' as form_action_url %}
-                    {% endif %}
-                    
-                    <form method="post" action="{{ form_action_url }}">
+                    <form method="post">
                         {% csrf_token %}
 
                         {% if form.non_field_errors %}
@@ -37,15 +28,49 @@
                             </div>
                         {% endif %}
 
-                        {% for field in form %}
-                            <div class="mb-3">
-                                <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
-                                {{ field }}
-                                {% for error in field.errors %}
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.nombre.id_for_label }}" class="form-label">{{ form.nombre.label }}</label>
+                                {{ form.nombre }}
+                                {% for error in form.nombre.errors %}
                                     <div class="form-text text-danger">{{ error }}</div>
                                 {% endfor %}
                             </div>
-                        {% endfor %}
+
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.cupos_totales.id_for_label }}" class="form-label">{{ form.cupos_totales.label }}</label>
+                                {{ form.cupos_totales }}
+                                {% for error in form.cupos_totales.errors %}
+                                    <div class="form-text text-danger">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.fecha_inicio.id_for_label }}" class="form-label">{{ form.fecha_inicio.label }}</label>
+                                {{ form.fecha_inicio }}
+                                {% for error in form.fecha_inicio.errors %}
+                                    <div class="form-text text-danger">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.fecha_termino.id_for_label }}" class="form-label">{{ form.fecha_termino.label }}</label>
+                                {{ form.fecha_termino }}
+                                {% for error in form.fecha_termino.errors %}
+                                    <div class="form-text text-danger">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="{{ form.descripcion.id_for_label }}" class="form-label">{{ form.descripcion.label }}</label>
+                            {{ form.descripcion }}
+                            {% for error in form.descripcion.errors %}
+                                <div class="form-text text-danger">{{ error }}</div>
+                            {% endfor %}
+                        </div>
 
                         <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
                             <a href="{% url 'talleres:lista_talleres' %}" class="btn btn-secondary">Cancelar</a>
@@ -53,7 +78,7 @@
                                 {% if taller %}
                                     Guardar Cambios
                                 {% else %}
-                                    Crear Taller
+                                    Programar Taller
                                 {% endif %}
                             </button>
                         </div>
