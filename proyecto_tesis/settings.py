@@ -43,7 +43,7 @@ ALLOWED_HOSTS = [
     "127.0.0.1",
     "localhost",
     "10.0.2.2",
-    "192.168.0.101",   # IP de tu PC en la red (ajústala si cambia)
+    "10.4.17.141",   # IP de tu PC en la red (ajústala si cambia)
 ]
 
 # Si usas login vía sesión desde Android/web, conviene permitir CSRF
@@ -51,7 +51,7 @@ CSRF_TRUSTED_ORIGINS = [
     "http://127.0.0.1",
     "http://localhost",
     "http://10.0.2.2",
-    "http://192.168.0.107:8000",
+    "http://10.4.17.141:8000",
 ]
 
 # -----------------------------------------------------------------------------

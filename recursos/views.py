@@ -6,6 +6,7 @@ from .forms import RecursoForm
 from django.views.decorators.http import require_POST
 from django.utils import timezone
 from .models import Recurso, SolicitudReserva, Reserva
+from datetime import datetime, time
 @login_required
 @role_required("recursos", "view")
 def lista_recursos(request):
@@ -124,14 +125,16 @@ def gestionar_reservas(request):
 @role_required("reservas", "manage_all")
 @require_POST
 def actualizar_estado_reserva(request, pk):
-    # Ahora opera sobre SOLICITUD
     sol = get_object_or_404(SolicitudReserva, pk=pk)
     accion = request.POST.get('accion')
     estado_anterior = sol.estado
+
     if accion == 'APROBADA':
+        # 1. Aprobar la solicitud actual
         sol.estado = "APROBADA"
         sol.save(update_fields=["estado"])
-        # Crear la Reserva “espejo”
+
+        # 2. Crear la Reserva “espejo” (para mantener tu lógica actual)
         Reserva.objects.create(
             recurso=sol.recurso,
             vecino=sol.solicitante,
@@ -140,30 +143,57 @@ def actualizar_estado_reserva(request, pk):
             motivo=sol.motivo,
             estado=Reserva.Estado.APROBADA,
         )
-        messages.success(request, f"Solicitud #{sol.id} APROBADA. Reserva creada.")
+
+        # -------------------------------------------------------
+        # 🔥 NUEVO: Rechazo Automático de Conflictos
+        # -------------------------------------------------------
+        # Buscamos todas las solicitudes PENDIENTES para el MISMO recurso
+        # que se solapen en fechas con la que acabamos de aprobar.
+        conflictos = SolicitudReserva.objects.filter(
+            recurso=sol.recurso,
+            estado="PENDIENTE"
+        ).filter(
+            # Lógica de solapamiento:
+            # (InicioCandidata < FinAprobada) AND (FinCandidata > InicioAprobada)
+            fecha_inicio__lt=sol.fecha_fin,
+            fecha_fin__gt=sol.fecha_inicio
+        ).exclude(pk=sol.pk)  # Importante: no excluirse a sí misma (aunque ya no es pendiente)
+
+        cantidad_rechazada = conflictos.count()
+        
+        if cantidad_rechazada > 0:
+            # Actualizamos todas de un golpe
+            conflictos.update(estado="RECHAZADA")
+            messages.warning(
+                request, 
+                f"⚠️ Se han rechazado automáticamente otras {cantidad_rechazada} solicitudes por conflicto de fechas."
+            )
+        # -------------------------------------------------------
+
+        messages.success(request, f"Solicitud #{sol.id} APROBADA exitosamente.")
+
     elif accion == 'RECHAZADA':
         sol.estado = "RECHAZADA"
         sol.save(update_fields=["estado"])
         messages.warning(request, f"Solicitud #{sol.id} RECHAZADA.")
+
     elif accion == 'PENDIENTE':
         sol.estado = "PENDIENTE"
         sol.save(update_fields=["estado"])
         
-        # Si la estábamos "deshaciendo" desde APROBADA, debemos borrar la Reserva espejo
+        # Si venía de APROBADA, borramos la reserva espejo
         if estado_anterior == 'APROBADA':
-            # Buscamos la reserva espejo que coincida
             Reserva.objects.filter(
                 recurso=sol.recurso,
                 vecino=sol.solicitante,
                 fecha_inicio=sol.fecha_inicio,
                 fecha_fin=sol.fecha_fin,
-                estado=Reserva.Estado.APROBADA # Por seguridad
+                estado=Reserva.Estado.APROBADA
             ).delete()
-            messages.info(request, f"Solicitud #{sol.id} devuelta a Pendiente. La reserva aprobada fue eliminada.")
+            messages.info(request, f"Solicitud #{sol.id} devuelta a Pendiente. Reserva eliminada.")
         else:
-            # Si era RECHAZADA, solo la movemos a pendiente
             messages.info(request, f"Solicitud #{sol.id} devuelta a Pendiente.")
-    # --- FIN NUEVA LÓGICA ---
+
     else:
         messages.error(request, "Acción no válida.")
 

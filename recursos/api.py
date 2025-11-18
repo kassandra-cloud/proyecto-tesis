@@ -38,36 +38,43 @@ class RecursoViewSet(viewsets.ReadOnlyModelViewSet):
         # El ViewSet ahora simplemente devuelve todos los recursos (filtrados por search si se usa).
         return qs
 class SolicitudReservaViewSet(viewsets.ModelViewSet):
-    # ... (propiedades existentes)
+    queryset = SolicitudReserva.objects.all() # Definición base necesaria
+    permission_classes = [permissions.IsAuthenticated] # Asegura que esté logueado
+    serializer_class = SolicitudReservaSerializer 
     
+    def get_queryset(self):
+        """
+        Filtra las solicitudes para que cada usuario vea SOLO las suyas.
+        Si es admin y envía ?todas=1, puede ver todo.
+        """
+        user = self.request.user
+        qs = SolicitudReserva.objects.select_related('recurso', 'solicitante').order_by("-creado_el")
+
+        # 1. Verificar si la app envía el parámetro 'todas' (para admins)
+        # Tu app Android envía: @Query("todas") todas: Int?
+        ver_todas = self.request.query_params.get('todas')
+
+        # 2. Lógica de filtrado
+        if ver_todas == '1' and (user.is_superuser or user.is_staff):
+            # Si es admin y explícitamente pide ver todas, devolvemos todo
+            return qs
+        
+        # 3. Por defecto: DEVOLVER SOLO LO DEL USUARIO ACTUAL
+        return qs.filter(solicitante=user)
+
     def get_serializer_class(self):
         if self.action == "create":
-            # Usar CrearSolicitudSerializer para la ENTRADA (Validación)
             return CrearSolicitudSerializer 
-        # Usar SolicitudReservaSerializer para el resto (GET, SALIDA)
         return SolicitudReservaSerializer
 
     def perform_create(self, serializer):
-        # El serializador de entrada (CrearSolicitudSerializer) no tiene el solicitante.
         serializer.save(solicitante=self.request.user)
 
     def create(self, request, *args, **kwargs):
-        """
-        Sobrescribe el método create para usar SolicitudReservaSerializer 
-        (el completo) en la serialización de la respuesta 201.
-        """
-        # 1. Usar el serializador de ENTRADA para validar y crear.
+        # ... (Tu código create existente se mantiene igual) ...
         input_serializer = self.get_serializer(data=request.data) 
         input_serializer.is_valid(raise_exception=True)
-        
-        # 2. Guardar la instancia (esto llama a perform_create)
         self.perform_create(input_serializer)
-
-        # 3. Serializar la SALIDA con el serializador COMPLETO (SolicitudReservaSerializer).
-        # input_serializer.instance es la SolicitudReserva recién creada.
         output_serializer = SolicitudReservaSerializer(input_serializer.instance)
-
-        # 4. Devolver la respuesta 201 Created con el objeto completo
         headers = self.get_success_headers(output_serializer.data)
-        # Cambiamos input_serializer.data por output_serializer.data
         return Response(output_serializer.data, status=status.HTTP_201_CREATED, headers=headers)
