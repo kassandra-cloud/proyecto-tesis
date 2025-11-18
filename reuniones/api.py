@@ -8,6 +8,9 @@ from django.utils import timezone
 from datetime import timedelta
 from django.db.models import Q, Count
 from .models import Reunion, EstadoReunion
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.decorators import action
+from rest_framework.response import Response 
 class DefaultPagination(PageNumberPagination):
     page_size = 20
     page_size_query_param = "page_size"
@@ -66,18 +69,35 @@ class ActaViewSet(viewsets.ReadOnlyModelViewSet):
             qs = qs.filter(Q(contenido__icontains=search) | Q(reunion__titulo__icontains=search))
         return qs
 class AsistenciaViewSet(viewsets.ReadOnlyModelViewSet):
-    """
-    GET /reuniones/api/asistencias/?reunion=<id>
-    """
-    serializer_class   = AsistenciaSerializer
-    permission_classes = [permissions.AllowAny]
-    filter_backends    = [filters.OrderingFilter]
-    ordering_fields    = ["id"]
+    queryset = Asistencia.objects.select_related("reunion", "vecino")
+    serializer_class = AsistenciaSerializer
+    permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-
-        qs = Asistencia.objects.select_related("vecino", "reunion")
+        qs = super().get_queryset()
         reunion_id = self.request.query_params.get("reunion")
         if reunion_id:
             qs = qs.filter(reunion_id=reunion_id)
-        return qs.order_by("id")
+        return qs
+
+    @action(detail=False, methods=["get"], url_path="mis")
+    def mis_asistencias(self, request):
+        """
+        Devuelve las asistencias donde el 'vecino' es el usuario logueado.
+        """
+        user = request.user
+
+        if not user.is_authenticated:
+            # Por seguridad: si no está logueado, devolvemos lista vacía
+            qs = self.get_queryset().none()
+        else:
+
+            qs = self.get_queryset().filter(vecino=user)
+
+        page = self.paginate_queryset(qs)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(qs, many=True)
+        return Response(serializer.data)
