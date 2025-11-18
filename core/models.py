@@ -1,8 +1,10 @@
-# core/models.py
 from django.db import models
 from django.db.models import Q
 from django.contrib.auth import get_user_model
 from .rut import normalizar_rut, validar_rut
+from django.utils import timezone  
+import datetime                    
+import random                      
 
 User = get_user_model()
 
@@ -21,25 +23,25 @@ class Perfil(models.Model):
     apellido_paterno = models.CharField(max_length=100, blank=True)
     apellido_materno = models.CharField(max_length=100, blank=True)
 
-    # --- INICIO DE CAMPOS DEMOGRÁFICOS ---
+    # --- CAMPOS DEMOGRÁFICOS ---
     direccion = models.CharField(
         max_length=255, 
         verbose_name="Dirección Completa",
-        blank=False, # Obligatorio en formularios
-        default=""   # Valor para registros existentes
+        blank=False,
+        default=""
     )
     
     total_residentes = models.PositiveIntegerField(
         verbose_name="Total de Residentes",
-        default=1 # Asumimos al menos 1 (el propio vecino)
+        default=1
     )
     
     total_ninos = models.PositiveIntegerField(
         verbose_name="Número de Niños (< 18 años)",
-        default=0 # Por defecto 0
+        default=0
     )
-    # --- FIN DE CAMPOS DEMOGRÁFICOS ---
-    # Nuevo campo para almacenar el Token de Firebase Cloud Messaging
+
+    # Token FCM
     fcm_token = models.CharField(
         max_length=255, 
         blank=True, 
@@ -47,8 +49,13 @@ class Perfil(models.Model):
         verbose_name='Token FCM'
     )
 
+    # =========================================================================
+    #  NUEVOS CAMPOS MFA (Esto es lo que faltaba)
+    # =========================================================================
+    mfa_code = models.CharField(max_length=6, blank=True, null=True)
+    mfa_expires = models.DateTimeField(blank=True, null=True)
+
     def save(self, *args, **kwargs):
-        # ... (función save sin cambios) ...
         if not self.rut or not self.rut.strip():
             from django.core.exceptions import ValidationError
             raise ValidationError("El RUT no puede estar vacío.")
@@ -57,9 +64,26 @@ class Perfil(models.Model):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        # ... (función __str__ sin cambios) ...
         return f"{self.usuario.username} - {self.get_rol_display()} - {self.rut}"
 
+    # =========================================================================
+    # 🔥 MÉTODOS MFA (Esto faltaba y causaba el error)
+    # =========================================================================
+    def generar_mfa(self):
+        """Genera un código de 6 dígitos y le da 5 minutos de vida."""
+        code = f"{random.randint(100000, 999999)}"
+        self.mfa_code = code
+        self.mfa_expires = timezone.now() + datetime.timedelta(minutes=5)
+        self.save()
+        return code
+
+    def validar_mfa(self, code):
+        """Valida si el código es correcto y no ha expirado."""
+        if not self.mfa_code or not self.mfa_expires:
+            return False
+        if timezone.now() > self.mfa_expires:
+            return False
+        return self.mfa_code == code
+
     class Meta:
-        # ... (Meta sin cambios) ...
         constraints = [models.CheckConstraint(name="rut_not_empty", check=~Q(rut=""))]

@@ -7,6 +7,7 @@ from pathlib import Path
 import os
 from dotenv import load_dotenv
 from django.conf import settings
+
 # -----------------------------------------------------------------------------
 # Paths & .env
 # -----------------------------------------------------------------------------
@@ -16,7 +17,8 @@ from django.conf import settings
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Cargar variables desde .env en la raíz del proyecto
-load_dotenv(BASE_DIR / ".env")
+load_dotenv(os.path.join(BASE_DIR, '.env'))
+
 
 # -------------------------------------------------------------------
 # Seguridad / Debug
@@ -205,14 +207,20 @@ REST_FRAMEWORK = {
 # -----------------------------------------------------------------------------
 # Email (SMTP) — usa variables de entorno
 # -----------------------------------------------------------------------------
-EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.gmail.com")
-EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
-EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "True").lower() == "true"
-EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
-EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
-DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER)
+# Puerto: Lo lee como cadena y lo convierte a entero (int)
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", "465")) 
 
+# SSL/TLS: Lo lee como cadena y lo convierte a booleano (bool)
+# Usamos un valor por defecto (False) en caso de que la variable no exista en .env
+# La forma más segura de leer booleanos desde cadenas es:
+EMAIL_USE_SSL = os.getenv("EMAIL_USE_SSL", "False").lower() == "true"
+EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "False").lower() == "true"
+
+# Host y Credenciales (se leen como cadenas - str)
+EMAIL_HOST = os.getenv("EMAIL_HOST")
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER)
 # -----------------------------------------------------------------------------
 # Producción (sugerencias, descomenta cuando pases a HTTPS/CDN)
 # -----------------------------------------------------------------------------

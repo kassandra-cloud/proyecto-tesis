@@ -15,6 +15,9 @@ from rest_framework.response import Response
 from rest_framework.views import APIView  # ← IMPORTANTE
 from rest_framework.authentication import TokenAuthentication, SessionAuthentication  # ← AÑADE ESTO
 from .models import Votacion, Opcion, Voto
+from django.db import transaction
+from django.core.mail import send_mail 
+from django.conf import settings
 def _dto_votacion(v, user):
     # ¿ya votó este usuario?
     voto = Voto.objects.filter(votante=user, opcion__votacion=v).select_related('opcion').first()
@@ -42,23 +45,83 @@ def abiertas(request):
 @api_view(["POST"])
 @authentication_classes([TokenAuthentication])
 @permission_classes([IsAuthenticated])
+def solicitar_codigo_voto(request):
+    user = request.user
+    
+    # Generar el código
+    codigo = user.perfil.generar_mfa()
+    
+    # --- ACTIVACIÓN DEL ENVÍO DE CORREO REAL ---
+    subject = f"Tu código de votación: {codigo}"
+    message = f"""
+    Hola {user.first_name},
+    
+    Estás a punto de emitir un voto en la plataforma vecinal.
+    Tu código de seguridad es:
+    
+    {codigo}
+    
+    Este código expira en 5 minutos.
+    Si no fuiste tú, por favor ignora este correo.
+    """
+    
+    try:
+        send_mail(
+            subject,
+            message,
+            settings.DEFAULT_FROM_EMAIL, # Remitente (ej: tu_correo@gmail.com)
+            [user.email],                # Destinatario (correo del usuario registrado)
+            fail_silently=False,
+        )
+        print(f"✅ Correo enviado a {user.email} con el código {codigo}") 
+        return Response({"ok": True, "mensaje": f"Código enviado a {user.email}"})
+        
+    except Exception as e:
+        print(f"❌ Error al intentar enviar correo: {e}")
+        # Retorna 500 y un mensaje descriptivo para la App
+        return Response({"ok": False, "mensaje": "Error en el servidor al enviar el correo. Revise la configuración SMTP."}, status=500)
+
+@api_view(["POST"])
+@authentication_classes([TokenAuthentication])
+@permission_classes([IsAuthenticated])
+@transaction.atomic
 def votar(request, pk: int):
+    """
+    Ahora requiere 'opcion_id' Y 'codigo' para procesar el voto.
+    """
     v = get_object_or_404(Votacion, pk=pk)
-    if not (v.activa and v.fecha_cierre > timezone.now()):
-        return Response({"ok": False, "mensaje": "Votación cerrada"}, status=400)
-
+    user = request.user
+    
+    # 1. Validar datos de entrada
     opcion_id = request.data.get("opcion_id")
+    codigo = request.data.get("codigo") # <--- NUEVO CAMPO
+    
     if not opcion_id:
-        return Response({"ok": False, "mensaje": "Falta opcion_id"}, status=400)
+        return Response({"ok": False, "mensaje": "Falta seleccionar una opción"}, status=400)
+    
+    if not codigo:
+        return Response({"ok": False, "mensaje": "Falta el código de verificación"}, status=400)
 
+    # 2. VALIDAR EL CÓDIGO DE SEGURIDAD
+    if not user.perfil.validar_mfa(codigo):
+        return Response({"ok": False, "mensaje": "Código incorrecto o expirado"}, status=400)
+
+    # 3. Validar votación abierta
+    if not (v.activa and v.fecha_cierre > timezone.now()):
+        return Response({"ok": False, "mensaje": "La votación ya cerró"}, status=400)
+
+    # 4. Registrar el voto
     opcion = get_object_or_404(Opcion, pk=opcion_id, votacion=v)
+    
+    # Borrar voto anterior si existe (permite cambiar de opinión)
+    Voto.objects.filter(votante=user, opcion__votacion=v).delete()
+    Voto.objects.create(votante=user, opcion=opcion)
+    
+    # Quemar el código para que no se use de nuevo
+    user.perfil.mfa_code = None
+    user.perfil.save()
 
-    # Asegurar 1 voto por usuario en la votación:
-    Voto.objects.filter(votante=request.user, opcion__votacion=v).delete()
-    Voto.objects.create(votante=request.user, opcion=opcion)
-
-    return Response({"ok": True, "mensaje": "Voto registrado"})
-
+    return Response({"ok": True, "mensaje": "Voto registrado exitosamente"})
 class ResultadosView(APIView):
     # Fuerza autenticación por Token (y opcionalmente sesión)
     authentication_classes = [TokenAuthentication, SessionAuthentication]  # ← CLAVE
