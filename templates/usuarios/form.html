@@ -136,7 +136,7 @@
                 <div class="text-danger small">{{ form.password1.errors|striptags }}</div>
               {% endif %}
               <ul class="list-unstyled small mt-2" id="pw-checklist" aria-live="polite">
-                <li id="pm-create-len"   class="text-danger"><span class="pm-icon">✖</span> Mínimo 12 caracteres</li>
+                <li id="pm-create-len"   class="text-danger"><span class="pm-icon">✖</span> Mínimo 14 caracteres</li>
                 <li id="pm-create-upper" class="text-danger"><span class="pm-icon">✖</span> Al menos 1 mayúscula</li>
                 <li id="pm-create-lower" class="text-danger"><span class="pm-icon">✖</span> Al menos 1 minúscula</li>
                 <li id="pm-create-sym"   class="text-danger"><span class="pm-icon">✖</span> Al menos 1 símbolo</li>
@@ -222,7 +222,7 @@
       function checkStrength() {
         if (!pw1) return;
         const v = pw1.value || '';
-        setOk(elLen, v.length >= 12);
+        setOk(elLen, v.length >= 14);
         setOk(elUp, /[A-ZÁÉÍÓÚÑ]/.test(v));
         setOk(elLow, /[a-záéíóúñ]/.test(v));
         setOk(elSym, /[^A-Za-z0-9]/.test(v));
