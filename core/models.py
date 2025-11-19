@@ -30,7 +30,7 @@ class Perfil(models.Model):
         blank=False,
         default=""
     )
-    
+    telefono = models.CharField(max_length=15, blank=True, null=True, verbose_name="Teléfono")
     total_residentes = models.PositiveIntegerField(
         verbose_name="Total de Residentes",
         default=1

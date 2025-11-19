@@ -61,6 +61,8 @@ class UsuarioCrearForm(forms.ModelForm):
     # --- CAMPOS DEMOGRÁFICOS ---
     direccion = forms.CharField(label="Dirección Completa", max_length=255, required=True,
                                 widget=forms.TextInput(attrs={'placeholder': 'Ej: Av. Principal 123, Depto 45'}))
+
+    telefono = forms.CharField(label="Teléfono de Contacto", max_length=15, required=False,widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "+569XXXXXXXX"}))
     total_residentes = forms.IntegerField(label="Total Residentes", min_value=1, initial=1, required=True)
     total_ninos = forms.IntegerField(label="N° de Niños (< 18)", min_value=0, initial=0, required=True)
     
@@ -173,6 +175,7 @@ class UsuarioCrearForm(forms.ModelForm):
             apellido_materno=am,
             # --- Campos demográficos ---
             direccion=self.cleaned_data.get("direccion", "").strip(),
+            telefono=self.cleaned_data['telefono'],
             total_residentes=self.cleaned_data.get("total_residentes", 1),
             total_ninos=self.cleaned_data.get("total_ninos", 0),
         )
@@ -196,6 +199,7 @@ class UsuarioEditarForm(forms.ModelForm):
     # --- CAMPOS DEMOGRÁFICOS ---
     direccion = forms.CharField(label="Dirección Completa", max_length=255, required=True,
                                 widget=forms.TextInput(attrs={'placeholder': 'Ej: Av. Principal 123, Depto 45'}))
+    telefono = forms.CharField(label="Teléfono de Contacto", max_length=15, required=False,widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "+569XXXXXXXX"}))
     total_residentes = forms.IntegerField(label="Total Residentes", min_value=1, required=True)
     total_ninos = forms.IntegerField(label="N° de Niños (< 18)", min_value=0, required=True)
 

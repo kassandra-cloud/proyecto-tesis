@@ -103,7 +103,13 @@
               <div class="text-danger small">{{ form.direccion.errors|striptags }}</div>
             {% endif %}
           </div>
-
+          <div class="mb-3">
+               <label for="{{ form.telefono.id_for_label }}" class="form-label"> {{ form.telefono.label }} </label>
+                        {{ form.telefono }}
+                         {% if form.telefono.errors %}
+                       <div class="text-danger small">{{ form.telefono.errors|striptags }}</div>
+                       {% endif %}
+          </div>
           <div class="row g-3">
             <div class="col-md-6">
               <label for="{{ form.total_residentes.id_for_label }}" class="form-label">
