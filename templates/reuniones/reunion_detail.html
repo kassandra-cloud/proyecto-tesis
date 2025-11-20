@@ -408,6 +408,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let micStream = null;
     let mediaRecorder = null;
     let audioChunks = [];
+    let isRecording = false;
 
     const recognition = new SpeechRecognition();
     recognition.lang = 'es-ES';
@@ -423,17 +424,26 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     recognition.onend = () => {
-        sttStatus.textContent = 'Micrófono inactivo';
-        btnStart.disabled = false;
-        btnStop.disabled = true;
-        triggerAutosave();
+    // Si la variable sigue en true, significa que el navegador lo cortó, 
+    // pero el usuario NO ha presionado detener.
+    if (isRecording) {
+        console.log('Reiniciando reconocimiento de voz automáticamente...');
+        recognition.start();
+        return; // Salimos para no ejecutar la lógica de apagado
+    }
+
+    // Si llegamos aquí, es porque isRecording es false (el usuario lo detuvo manualmente)
+    sttStatus.textContent = 'Micrófono inactivo';
+    btnStart.disabled = false;
+    btnStop.disabled = true;
+    triggerAutosave();
     };
 
     recognition.onresult = (event) => {
         let interimTranscript = '';
         for (let i = event.resultIndex; i < event.results.length; ++i) {
             if (event.results[i].isFinal) {
-                finalTranscript += event.results[i][0].transcript + '.\\n';
+                finalTranscript += event.results[i][0].transcript + '.\\';
             } else {
                 interimTranscript += event.results[i][0].transcript;
             }
@@ -505,9 +515,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 // 3. Iniciar la GRABACIÓN de audio
                 mediaRecorder.start();
 
+                isRecording = true;
                 // 4. Configurar e iniciar la TRANSCRIPCIÓN
                 if (actaTextarea) {
-                    finalTranscript = actaTextarea.value + '\\n';
+                    finalTranscript = actaTextarea.value + '\\';
                 }
                 recognition.start(); 
 
@@ -525,6 +536,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- BOTÓN DETENER (MODIFICADO) ---
     if(btnStop) {
         btnStop.addEventListener('click', () => {
+            isRecording = false;
             // 1. Detener la transcripción
             if (recognition) {
                 recognition.stop();
