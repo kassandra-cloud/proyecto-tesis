@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% load can %}
+{% load static %}
 {% load widget_tweaks %}
 
 {% block title %}Detalle de Reunión{% endblock %}
@@ -65,12 +66,9 @@
             {% endif %}
             
             {% if puede_cancelar %}
-            <form action="{% url 'reuniones:cancelar_reunion' reunion.pk %}" method="POST" class="d-inline" onsubmit="return confirm('¿Estás seguro de que quieres CANCELAR esta reunión?');">
-                {% csrf_token %}
-                <button type="submit" class="btn btn-danger btn-lg">
-                    <i class="fas fa-ban me-1"></i> Cancelar Reunión
-                </button>
-            </form>
+            <button type="button" class="btn btn-danger btn-lg" data-bs-toggle="modal" data-bs-target="#modalCancelarReunion">
+                <i class="fas fa-ban me-1"></i> Cancelar Reunión
+            </button>
             {% endif %}
         
         {% elif reunion.estado == 'EN_CURSO' %}
@@ -210,25 +208,20 @@
             
             {# LÓGICA 3: Aprobar SOLO si la reunión está REALIZADA #}
             {% if not acta.aprobada and reunion.estado == 'REALIZADA' %}
-            <form method="POST" action="{% url 'reuniones:aprobar_borrador_acta' reunion.pk %}" onsubmit="return confirm('¿Estás seguro de que quieres APROBAR esta acta? Ya no podrás editarla.');" class="d-inline">
-                {% csrf_token %}
-                <button type="submit" class="btn btn-success">
+                <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#modalAprobarActa">
                     <i class="fas fa-check me-1"></i> Aprobar Acta
                 </button>
-            </form>
+            
             {% elif not acta.aprobada and reunion.estado == 'EN_CURSO' %}
-            <button type="button" class="btn btn-success" disabled title="Debes finalizar la reunión para poder aprobar el acta.">
-                <i class="fas fa-check me-1"></i> Aprobar Acta
-            </button>
+                <button type="button" class="btn btn-success" disabled title="Debes finalizar la reunión para poder aprobar el acta.">
+                    <i class="fas fa-check me-1"></i> Aprobar Acta
+                </button>
             {% endif %}
 
             {% if acta.aprobada %}
-            <form method="POST" action="{% url 'reuniones:rechazar_acta' reunion.pk %}" onsubmit="return confirm('¿Estás seguro de que quieres QUITAR LA APROBACIÓN de esta acta? Volverá a ser un borrador editable.');" class="d-inline">
-                {% csrf_token %}
-                <button type="submit" class="btn btn-warning">
+                <button type="button" class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#modalQuitarAprobacion">
                     <i class="fas fa-undo me-1"></i> Quitar Aprobación
                 </button>
-            </form>
             {% endif %}
 
             <a href="{% url 'reuniones:exportar_acta_pdf' reunion.pk %}" target="_blank" class="btn btn-outline-danger">
@@ -318,398 +311,99 @@
     </div>
   </div>
 </div>
+<div class="modal fade" id="modalCancelarReunion" tabindex="-1" aria-labelledby="modalCancelarLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-danger">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title" id="modalCancelarLabel">
+            <i class="fas fa-exclamation-triangle me-2"></i>¿Cancelar Reunión?
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body text-center py-4">
+        <h5 class="mb-3">Estás a punto de cancelar:</h5>
+        <p class="lead fw-bold text-dark">"{{ reunion.titulo }}"</p>
+        <p class="text-muted">
+            Esta acción cambiará el estado a <strong>CANCELADA</strong>.<br>
+            ¿Estás completamente seguro?
+        </p>
+      </div>
+      <div class="modal-footer bg-light justify-content-center">
+        <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">No, Volver</button>
+        
+        <form action="{% url 'reuniones:cancelar_reunion' reunion.pk %}" method="POST" class="m-0">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-danger px-4">Sí, Cancelar Reunión</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="modalAprobarActa" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-success">
+      <div class="modal-header bg-success text-white">
+        <h5 class="modal-title"><i class="fas fa-file-signature me-2"></i>Aprobar Acta</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body text-center py-4">
+        <h5 class="mb-3">¿Confirmar Aprobación?</h5>
+        <p class="text-muted px-3">
+            Al aprobar el acta, esta se marcará como <strong>oficial</strong> y el contenido se bloqueará para edición.<br>
+            <small>Siempre podrás revertir esto después si es necesario.</small>
+        </p>
+      </div>
+      <div class="modal-footer bg-light justify-content-center">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <form method="POST" action="{% url 'reuniones:aprobar_borrador_acta' reunion.pk %}" class="m-0">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-success px-4">Sí, Aprobar Acta</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="modalQuitarAprobacion" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-warning">
+      <div class="modal-header bg-warning text-dark">
+        <h5 class="modal-title"><i class="fas fa-exclamation-triangle me-2"></i>Quitar Aprobación</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body text-center py-4">
+        <h5 class="mb-3">¿Volver a Borrador?</h5>
+        <p class="text-muted px-3">
+            El acta dejará de ser oficial y volverá a ser un <strong>borrador editable</strong>.
+        </p>
+      </div>
+      <div class="modal-footer bg-light justify-content-center">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <form method="POST" action="{% url 'reuniones:rechazar_acta' reunion.pk %}" class="m-0">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-warning px-4">Sí, Quitar Aprobación</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
 
 {% endblock %}
 
-
 {% block extra_js %}
+{# 1. Script Externo #}
+<script src="{% static 'js/reunion_detail.js' %}"></script>
+
+{# 2. Configuración y Variables de Django para JS #}
 <script>
-// Función CSRF
-function getCSRF() {
-    return document.querySelector('[name=csrfmiddlewaretoken]').value;
-}
-
-// 1. Lógica de Transcripción (STT), GRABACIÓN y AUTOGUARDADO
-document.addEventListener('DOMContentLoaded', () => {
-    const btnStart = document.getElementById('btnStartSTT');
-    const btnStop = document.getElementById('btnStopSTT');
-    const sttStatus = document.getElementById('sttStatus');
-    const actaTextarea = document.getElementById('actaContenido');
-
-    // --- NUEVOS ELEMENTOS DEL DOM PARA EL PREVIEW ---
-    const audioPreviewContainer = document.getElementById('audioPreviewContainer');
-    const audioPlayer = document.getElementById('audioPlayer');
-    const downloadAudioLink = document.getElementById('downloadAudioLink');
-    const audioFileName = document.getElementById('audioFileName');
-
-    // SI NO EXISTE EL BOTÓN (porque la reunión no está en curso), no hacemos nada.
-    if (!btnStart) {
-        return;
-    }
-
-    // --- CÓDIGO AUTOGUARDADO (INTACTO) ---
-    const autosaveStatus = document.getElementById('autosave-status');
-    let autosaveTimer = null;
-    const AUTOSAVE_DELAY = 2500; 
-
-    async function guardarBorrador() {
-        if (!actaTextarea || !autosaveStatus) return;
-        autosaveStatus.textContent = 'Guardando...';
-        autosaveStatus.classList.remove('text-success', 'text-danger');
-        autosaveStatus.classList.add('text-muted');
-
-        const formData = new FormData();
-        formData.append('contenido', actaTextarea.value);
-
-        try {
-            const response = await fetch("{% url 'reuniones:guardar_borrador_acta' reunion.pk %}", {
-                method: 'POST',
-                headers: {
-                    'X-CSRFToken': getCSRF(),
-                    'X-Requested-With': 'XMLHttpRequest'
-                },
-                body: formData
-            });
-
-            if (response.ok) {
-                autosaveStatus.textContent = 'Borrador guardado.';
-                autosaveStatus.classList.add('text-success');
-            } else {
-                autosaveStatus.textContent = 'Error al guardar.';
-                autosaveStatus.classList.add('text-danger');
-            }
-        } catch (error) {
-            console.error('Error en autoguardado:', error);
-            autosaveStatus.textContent = 'Error de red.';
-            autosaveStatus.classList.add('text-danger');
-        }
-    }
-
-    function triggerAutosave() {
-        if (autosaveTimer) {
-            clearTimeout(autosaveTimer);
-        }
-        autosaveTimer = setTimeout(guardarBorrador, AUTOSAVE_DELAY);
-    }
-    // --- FIN CÓDIGO AUTOGUARDADO ---
-
-
-    // Verificamos si el navegador soporta la API
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-        if(btnStart) btnStart.disabled = true;
-        if(sttStatus) sttStatus.textContent = "Transcripción no soportada en este navegador.";
-        return;
-    }
-
-    // --- INICIO LÓGICA DE GRABACIÓN Y TRANSCRIPCIÓN ---
-
-    // Variables "maestras"
-    let micStream = null;
-    let mediaRecorder = null;
-    let audioChunks = [];
-    let isRecording = false;
-
-    const recognition = new SpeechRecognition();
-    recognition.lang = 'es-ES';
-    recognition.continuous = true;
-    recognition.interimResults = true; 
-
-    let finalTranscript = actaTextarea ? actaTextarea.value : '';
-
-    recognition.onstart = () => {
-        sttStatus.textContent = '🎙️ Escuchando...';
-        btnStart.disabled = true;
-        btnStop.disabled = false;
-    };
-
-    recognition.onend = () => {
-    // Si la variable sigue en true, significa que el navegador lo cortó, 
-    // pero el usuario NO ha presionado detener.
-    if (isRecording) {
-        console.log('Reiniciando reconocimiento de voz automáticamente...');
-        recognition.start();
-        return; // Salimos para no ejecutar la lógica de apagado
-    }
-
-    // Si llegamos aquí, es porque isRecording es false (el usuario lo detuvo manualmente)
-    sttStatus.textContent = 'Micrófono inactivo';
-    btnStart.disabled = false;
-    btnStop.disabled = true;
-    triggerAutosave();
-    };
-
-    recognition.onresult = (event) => {
-        let interimTranscript = '';
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
-            if (event.results[i].isFinal) {
-                finalTranscript += event.results[i][0].transcript + '.\\';
-            } else {
-                interimTranscript += event.results[i][0].transcript;
-            }
-        }
-        if (actaTextarea) {
-            actaTextarea.value = finalTranscript + interimTranscript;
-            actaTextarea.scrollTop = actaTextarea.scrollHeight;
-            triggerAutosave();
+    window.REUNION_CONFIG = {
+        reunionId: "{{ reunion.pk }}",
+        urls: {
+            guardarBorrador: "{% url 'reuniones:guardar_borrador_acta' reunion.pk %}",
+            enviarCorreo: "{% url 'reuniones:enviar_acta_pdf_por_correo' reunion.pk %}",
+            estadoActa: "{% url 'reuniones:get_acta_estado' reunion.pk %}"
         }
     };
-
-    recognition.onerror = (event) => {
-        console.error('Error de reconocimiento:', event.error);
-        sttStatus.textContent = 'Error: ' + event.error;
-    };
-
-    // --- BOTÓN INICIAR (MODIFICADO) ---
-    if(btnStart) {
-        btnStart.addEventListener('click', async () => {
-
-            // --- OCULTAR Y LIMPIAR PREVIEW ANTERIOR ---
-            if (audioPlayer.src) {
-                // Revoca la URL del Blob anterior para liberar memoria
-                URL.revokeObjectURL(audioPlayer.src);
-                audioPlayer.src = null;
-            }
-            if(audioPreviewContainer) audioPreviewContainer.style.display = 'none';
-            if(audioFileName) audioFileName.textContent = '';
-            // ------------------------------------------
-
-            try {
-                // 1. Pedir el stream del micrófono
-                micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-
-                // 2. Configurar el GRABADOR (MediaRecorder)
-                audioChunks = []; // Limpiar chunks
-                mediaRecorder = new MediaRecorder(micStream);
-                
-                // 2a. Cuando el grabador tenga datos, los guarda
-                mediaRecorder.ondataavailable = (event) => {
-                    audioChunks.push(event.data);
-                };
-
-                // --- 2b. LÓGICA DE PREVISUALIZACIÓN (MODIFICADO) ---
-                // Se activa al llamar a mediaRecorder.stop()
-                mediaRecorder.onstop = () => {
-                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                    const audioUrl = URL.createObjectURL(audioBlob);
-
-                    // 1. Asignar el audio al reproductor
-                    if(audioPlayer) audioPlayer.src = audioUrl;
-
-                    // 2. Asignar la URL al botón de descarga
-                    const nombreArchivo = `grabacion-reunion-{{ reunion.pk }}-${new Date().toISOString().split('T')[0]}.webm`;
-                    if(downloadAudioLink) {
-                        downloadAudioLink.href = audioUrl;
-                        downloadAudioLink.download = nombreArchivo;
-                    }
-                    if(audioFileName) audioFileName.textContent = nombreArchivo;
-
-                    // 3. Mostrar el contenedor del preview
-                    if(audioPreviewContainer) audioPreviewContainer.style.display = 'block';
-
-                    console.log(`Audio listo para previsualizar. URL: ${audioUrl}`);
-                    
-                    audioChunks = []; // Limpia chunks para la próxima
-                };
-                
-                // 3. Iniciar la GRABACIÓN de audio
-                mediaRecorder.start();
-
-                isRecording = true;
-                // 4. Configurar e iniciar la TRANSCRIPCIÓN
-                if (actaTextarea) {
-                    finalTranscript = actaTextarea.value + '\\';
-                }
-                recognition.start(); 
-
-            } catch (err) {
-                console.error("Error al iniciar la grabación/transcripción:", err);
-                sttStatus.textContent = "Error: No se pudo acceder al micrófono.";
-                if (micStream) {
-                    micStream.getTracks().forEach(track => track.stop());
-                    micStream = null;
-                }
-            }
-        });
-    }
-
-    // --- BOTÓN DETENER (MODIFICADO) ---
-    if(btnStop) {
-        btnStop.addEventListener('click', () => {
-            isRecording = false;
-            // 1. Detener la transcripción
-            if (recognition) {
-                recognition.stop();
-            }
-
-            // 2. Detener la grabación (esto disparará 'mediaRecorder.onstop' para el PREVIEW)
-            if (mediaRecorder && mediaRecorder.state === "recording") {
-                mediaRecorder.stop();
-            }
-
-            // 3. "Colgar" y liberar el micrófono
-            if (micStream) {
-                micStream.getTracks().forEach(track => track.stop());
-                micStream = null;
-            }
-        });
-    }
-});
-
-
-// 2. Lógica de Envío de Email (INTACTA)
-document.addEventListener('DOMContentLoaded', () => {
-    // ... (Tu código de envío de email va aquí, no se toca) ...
-    // ... (Lo he omitido de esta respuesta por brevedad, pero
-    //      en tu archivo debe quedar intacto) ...
-    const form = document.getElementById('formEnviarEmail');
-    if (!form) return;
-
-    const btnSubmit = document.getElementById('btnEnviarCorreo');
-    const btnTexto = document.getElementById('btnEnviarTexto');
-    const btnSpinner = document.getElementById('btnEnviarSpinner');
-    const chkAll = document.getElementById('chkTodosVecinos');
-    const lista = document.getElementById('lista-correos-vecinos');
-    const txtAdicionales = document.getElementById('correos_adicionales');
-    const msgErr = document.getElementById('email-error-msg');
-    const msgOk = document.getElementById('email-success-msg');
-
-    const setSend = (msg, isSuccess = false) => {
-        btnTexto.style.display = 'inline';
-        btnSpinner.style.display = 'none';
-        btnSubmit.disabled = false;
-        msgErr.style.display = 'none';
-        msgOk.style.display = 'none';
-        
-        if (!msg) return;
-        
-        const target = isSuccess ? msgOk : msgErr;
-        target.textContent = msg;
-        target.style.display = 'block';
-    }
-
-    // Checkbox "Todos"
-    if(chkAll && lista) {
-        chkAll.addEventListener('change', (e) => {
-            lista.querySelectorAll('.chk-email').forEach(cb => {
-                cb.checked = e.target.checked;
-            });
-        });
-    }
-
-    // Form submit
-    form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        btnSubmit.disabled = true;
-        btnTexto.style.display = 'none';
-        btnSpinner.style.display = 'inline';
-        
-        let marcados = [];
-        if (lista) {
-            marcados = Array.from(lista.querySelectorAll('.chk-email:checked')).map(cb => cb.value);
-        }
-        
-        let extras = [];
-        if (txtAdicionales) {
-            extras = txtAdicionales.value.split(',')
-                .map(e => e.trim())
-                .filter(Boolean);
-        }
-
-        const todos = [...new Set([...marcados, ...extras])];
-        if (!todos.length){
-          setSend('Selecciona al menos un correo (o escribe uno adicional).', false);
-          return;
-        }
-
-        const fd = new FormData();
-        todos.forEach(c => fd.append('correos[]', c));
-
-        try {
-          const resp = await fetch("{% url 'reuniones:enviar_acta_pdf_por_correo' reunion.pk %}", {
-            method:'POST',
-            headers:{'X-CSRFToken': getCSRF()},
-            body: fd
-          });
-          
-          if (!resp.ok){
-            const txt = await resp.text();
-            setSend('Error: ' + (txt || 'No se pudo enviar'), false);
-            return;
-          }
-          
-          const data = await resp.json();
-          if (data.ok){
-            setSend('¡Acta enviada correctamente!', true);
-            setTimeout(()=> {
-              const modalEl = document.getElementById('modalEnviarActa');
-              if (modalEl && window.bootstrap){
-                const modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
-                modal.hide();
-              }
-              setSend('');
-              form.reset();
-              if (lista) {
-                  lista.querySelectorAll('.chk-email').forEach(cb => cb.checked = false);
-              }
-              if (chkAll) chkAll.checked = false;
-            }, 1200);
-          } else {
-            setSend(data.message || 'Error desconocido', false);
-          }
-        } catch(err) {
-            console.error('Fetch error:', err);
-            setSend('Error de red. Revisa la consola.', false);
-        }
-    });
-});
-// ===================================================
-// --- PASO 4: PEGA ESTE NUEVO SCRIPT AQUÍ ---
-// ===================================================
-document.addEventListener('DOMContentLoaded', () => {
-    // 1. Busca el cuadro de alerta de "Pendiente" o "Procesando"
-    const barraEstado = document.getElementById('transcripcion-pendiente');
-
-    // Si la barra no existe (porque está "Completado" o "No Subido"), no hace nada.
-    if (!barraEstado) {
-        return;
-    }
-
-    // 2. Si existe, define la función que consulta el estado
-    const urlConsulta = "{% url 'reuniones:get_acta_estado' reunion.pk %}";
-    let pollInterval = null; // Variable para guardar el 'timer'
-
-    async function checkStatus() {
-        try {
-            const response = await fetch(urlConsulta);
-            if (!response.ok) {
-                console.error("Error de red al consultar estado.");
-                clearInterval(pollInterval); // Detiene el polling si hay error
-                return;
-            }
-
-            const data = await response.json();
-            console.log("Consultando estado:", data.estado);
-
-            // 3. Revisa si el estado cambió
-            if (data.estado === 'COMPLETADO' || data.estado === 'ERROR') {
-                console.log("¡Proceso terminado! Recargando página...");
-                clearInterval(pollInterval); // Detiene el polling
-                window.location.reload(); // ¡Recarga la página!
-            }
-            // Si sigue en 'PENDIENTE' o 'PROCESANDO', no hace nada y espera al siguiente ciclo.
-
-        } catch (error) {
-            console.error("Error en polling:", error);
-            clearInterval(pollInterval); // Detiene el polling si hay error
-        }
-    }
-
-    // 4. Inicia el "sondeo" cada 5 segundos (5000 ms)
-    pollInterval = setInterval(checkStatus, 5000);
-});
-// ===================================================
-// --- FIN DEL NUEVO SCRIPT ---
-// ===================================================
 </script>
 {% endblock %}

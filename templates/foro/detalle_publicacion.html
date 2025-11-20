@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 {% load can %}
-
+{% load static %}
 {% block content %}
 
 <div class="row justify-content-center">
@@ -253,17 +253,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
-  document.addEventListener('click', function (e) {
-    const btn = e.target.closest('[data-reply]');
-    if (!btn) return;
-    e.preventDefault();
-    const id = btn.getAttribute('data-reply');
-    const form = document.getElementById('reply-form-' + id);
-    if (form) {
-        form.style.display =
-          (form.style.display === 'none' || !form.style.display) ? 'block' : 'none';
-    }
-  });
-</script>
+<script src="{% static 'js/foro_detalle.js' %}"></script>
 {% endblock %}

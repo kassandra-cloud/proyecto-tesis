@@ -9,6 +9,9 @@ djangorestframework
 # Apps de Django y utilidades
 django-filter
 django-widget-tweaks
+django-storages
+# Se agrega Pillow para manejo de imágenes
+Pillow
 
 # Servidor ASGI (para WebSockets/Channels)
 channels
@@ -21,18 +24,33 @@ PyMySQL
 python-dotenv  # Para leer el archivo .env
 requests       # Para hacer peticiones HTTP
 
-# Reconocimiento de voz
+# Reconocimiento de voz y Tareas en segundo plano
 vosk
 ffmpeg-python
 celery
 redis
-django-storages
-boto3
 eventlet
 honcho
+
+# Integraciones Cloud (AWS / Firebase)
+boto3
+# Se agrega firebase-admin para notificaciones FCM
+firebase_admin
 
 # Generación y manejo de PDFs
 pypdf          # Manipulación general de PDF
 xhtml2pdf      # Crear PDF desde HTML
 pyHanko        # Para firmas digitales en PDF
 reportlab      # Dependencia para xhtml2pdf
+
+# -------------------------------------
+# Entorno de Pruebas (Testing)
+# -------------------------------------
+selenium==4.34.0
+
+# -------------------------------------
+# Resolución de Conflictos
+# -------------------------------------
+# Estas versiones se fijan manualmente para evitar conflictos con Selenium
+typing-extensions==4.14.0
+urllib3==2.4.0

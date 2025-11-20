@@ -15,7 +15,7 @@ class ReunionSerializer(serializers.ModelSerializer):
     tipo_reunion = serializers.CharField(source="tipo", read_only=True)
     asistentes_count = serializers.SerializerMethodField()
 
-    # 👇 Campos relacionados al acta
+    # Campos relacionados al acta
     acta_contenido = serializers.CharField(
         source="acta.contenido",
         read_only=True,

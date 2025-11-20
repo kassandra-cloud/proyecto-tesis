@@ -35,7 +35,6 @@
         </div>
         
         <div class="col-md-6 col-lg-2 mb-4">
-            {# CORREGIDO: Se añadió el namespace 'foro:' #}
             <a href="{% url 'foro:lista_publicaciones' %}" class="dashboard-card-link">
                 <div class="dashboard-card card-publicaciones">
                     <i class="fas fa-comments icon"></i>
@@ -56,7 +55,6 @@
         </div>
         
         <div class="col-md-6 col-lg-2 mb-4">
-            {# CORREGIDO: Se añadió el namespace 'talleres:' #}
             <a href="{% url 'talleres:lista_talleres' %}" class="dashboard-card-link">
                 <div class="dashboard-card card-talleres">
                     <i class="fas fa-chalkboard-teacher icon"></i>
@@ -79,76 +77,105 @@
     </div>
     {# FIN TOP CARDS #}
 
-    {# SECCIONES CENTRALES #}
+    {# SECCIONES CENTRALES (AHORA CON VOTACIONES/TALLERES AQUÍ) #}
     <div class="row mb-5">
         <div class="col-lg-6 mb-4">
             <div class="activity-section">
-                <h4>Última Actividad en el Foro</h4>
-                {% if ultimas_publicaciones_foro %}
-                    {% for publicacion in ultimas_publicaciones_foro %}
-                        <div class="activity-item">
-                            <i class="fas fa-bullhorn icon"></i> <strong>{{ publicacion.autor.username }} publicó:</strong>
-                            <small>{{ publicacion.contenido|truncatechars:50 }}</small>
-                            <small><i>Hace {{ publicacion.fecha_creacion|timesince }}</i></small>
+                <h4>Estado Votaciones y Talleres</h4>
+                
+                <h5 class="mt-4 mb-3">Votaciones Activas:</h5>
+                {% if votaciones_activas_list %}
+                    {% for votacion in votaciones_activas_list %}
+                        <div class="activity-item d-flex align-items-start">
+                            <i class="fas fa-poll icon mt-1 me-2"></i>
+                            <div>
+                                <strong class="d-block mb-1">{{ votacion.pregunta }}</strong>
+                                <small class="text-muted">
+                                    Cierra el {{ votacion.fecha_cierre|date:"d/m/Y" }} 
+                                    - <a href="{% url 'votaciones:detalle_votacion' votacion.id %}">Gestionar</a>
+                                </small>
+                            </div>
                         </div>
                     {% endfor %}
                 {% else %}
-                    <p>No hay publicaciones recientes en el foro.</p>
+                    <p class="text-muted">No hay votaciones activas.</p>
                 {% endif %}
-                {# CORREGIDO: Se añadió el namespace 'foro:' #}
-                <a href="{% url 'foro:lista_publicaciones' %}" class="btn btn-link mt-3">Ver / Moderar Foro</a>
+
+                <h5 class="mt-4 mb-3">Talleres con Cupos Disponibles:</h5>
+                {% if talleres_con_cupos_list %}
+                    {% for taller in talleres_con_cupos_list %}
+                        <div class="activity-item d-flex align-items-start">
+                            <i class="fas fa-chalkboard icon mt-1 me-2"></i>
+                            <div>
+                                <strong class="d-block mb-1">{{ taller.nombre }}</strong>
+                                <small class="text-muted d-block">
+                                    Cierre inscripciones: <strong>{{ taller.fecha_termino|date:"d/m/Y" }}</strong>
+                                </small>
+                                <small class="text-muted">
+                                    Disponibles: <strong>{{ taller.cupos_remanentes }}</strong> de {{ taller.cupos_totales }} 
+                                    - <a href="{% url 'talleres:detalle_taller' taller.id %}">Ver Inscritos</a>
+                                </small>
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="text-muted">No hay talleres con cupos disponibles.</p>
+                {% endif %}
             </div>
         </div>
+        
         <div class="col-lg-6 mb-4">
             <div class="activity-section">
                 <h4>Próximas Reuniones</h4>
                 {% if proximas_reuniones %}
                     {% for reunion in proximas_reuniones %}
-                        <div class="activity-item">
-                            <i class="fas fa-calendar-check icon"></i> <strong>{{ reunion.titulo }}</strong>
-                            <small>{{ reunion.fecha|date:"d M, H:i" }}</small>
-                            <a href="{% url 'reuniones:detalle_reunion' reunion.id %}" class="btn btn-link btn-sm">Ver Detalles</a>
+                        <div class="activity-item d-flex align-items-start">
+                            <i class="fas fa-calendar-check icon mt-1 me-2"></i>
+                            <div>
+                                <strong class="d-block mb-1">{{ reunion.titulo }}</strong>
+                                <span class="d-block small text-muted mb-1">
+                                    {{ reunion.fecha|date:"l d \d\e F, H:i" }} hrs
+                                </span>
+                                <small>
+                                    <a href="{% url 'reuniones:detalle_reunion' reunion.id %}" class="text-decoration-none">
+                                        Ver Detalles →
+                                    </a>
+                                </small>
+                            </div>
                         </div>
                     {% endfor %}
                 {% else %}
-                    <p>No hay reuniones próximas programadas.</p>
+                    <p class="text-muted">No hay reuniones próximas programadas.</p>
                 {% endif %}
                 <a href="{% url 'reuniones:lista_reuniones' %}" class="btn btn-link mt-3">Ver Todas las Reuniones</a>
             </div>
         </div>
     </div>
 
-    {# SECCIONES INFERIORES #}
+    {# SECCIONES INFERIORES (AHORA CON EL FORO AQUÍ) #}
     <div class="row mb-5">
         <div class="col-lg-6 mb-4">
             <div class="activity-section">
-                <h4>Estado Votaciones y Talleres</h4>
-                <h5 class="mt-4">Votaciones Activas:</h5>
-                {% if votaciones_activas_list %}
-                    {% for votacion in votaciones_activas_list %}
-                        <div class="activity-item">
-                            <i class="fas fa-poll icon"></i> <strong>{{ votacion.pregunta }}</strong>
-                            <small>Cierra {{ votacion.fecha_cierre|date:"d M" }} - <a href="{% url 'votaciones:detalle_votacion' votacion.id %}">Gestionar Votación</a></small>
+                <h4>Última Actividad en el Foro</h4>
+                {% if ultimas_publicaciones_foro %}
+                    {% for publicacion in ultimas_publicaciones_foro %}
+                        <div class="activity-item d-flex align-items-start">
+                            <i class="fas fa-bullhorn icon mt-1 me-2"></i>
+                            <div>
+                                <strong class="d-block text-primary">@{{ publicacion.autor.username }}</strong>
+                                <p class="mb-1 text-muted small fst-italic">
+                                    "{{ publicacion.contenido|truncatechars:60 }}"
+                                </p>
+                                <small class="text-muted" style="font-size: 0.8em;">
+                                    Hace {{ publicacion.fecha_creacion|timesince }}
+                                </small>
+                            </div>
                         </div>
                     {% endfor %}
                 {% else %}
-                    <p>No hay votaciones activas.</p>
+                    <p class="text-muted">No hay publicaciones recientes en el foro.</p>
                 {% endif %}
-
-                <h5 class="mt-4">Talleres con Cupos Disponibles:</h5>
-                {% if talleres_con_cupos_list %}
-                    {% for taller in talleres_con_cupos_list %}
-                        <div class="activity-item">
-                            <i class="fas fa-chalkboard icon"></i> <strong>{{ taller.nombre }}</strong>
-                            <small>Cupos: {{ taller.cupos_disponibles }} / {{ taller.cupos_totales }} - 
-                                {# CORREGIDO: Se añadió el namespace 'talleres:' #}
-                                <a href="{% url 'talleres:detalle_taller' taller.id %}">Ver Inscritos</a>
-                            </small>
-                        </div>
-                    {% endfor %}
-                {% else %}
-                    <p>No hay talleres con cupos disponibles.</p>
-                {% endif %}
+                <a href="{% url 'foro:lista_publicaciones' %}" class="btn btn-link mt-3">Ver / Moderar Foro</a>
             </div>
         </div>
         
@@ -179,7 +206,7 @@
                     </a>
                 </div>
                 <div class="col-6 mb-4">
-                    <a href="{% url 'recursos:lista_recursos' %}" class="action-button btn-anuncio"> {# Reutilizamos el color 'anuncio' #}
+                    <a href="{% url 'recursos:lista_recursos' %}" class="action-button btn-anuncio">
                         <i class="fas fa-calendar-check icon"></i>
                         <h5>Revisar Recursos</h5>
                     </a>
