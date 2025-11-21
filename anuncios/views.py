@@ -3,7 +3,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from .models import Anuncio
 from .forms import AnuncioForm
-# Ya no necesitamos importar Perfil ni la función 'es_directiva'
+from firebase_admin import messaging
 
 @login_required
 def lista_anuncios(request):
@@ -12,20 +12,16 @@ def lista_anuncios(request):
     """
     anuncios = Anuncio.objects.all()
 
-    # --- LÍNEA AÑADIDA ---
     form = AnuncioForm() # Formulario vacío para el modal de "Crear"
 
     context = {
         'anuncios': anuncios,
-        'form': form, # --- LÍNEA AÑADIDA ---
+        'form': form, 
     }
     return render(request, 'anuncios/lista_anuncios.html', context)
 
 @login_required
 def crear_anuncio(request):
-    """
-    Formulario para que la Directiva cree un nuevo anuncio.
-    """
     if request.method == 'POST':
         form = AnuncioForm(request.POST)
         if form.is_valid():
@@ -33,8 +29,20 @@ def crear_anuncio(request):
             anuncio.autor = request.user 
             anuncio.save()
             
-            # (Aquí va la lógica de notificación push para la app)
-            
+            # --- LÓGICA DE NOTIFICACIÓN PUSH ---
+            try:
+                message = messaging.Message(
+                    notification=messaging.Notification(
+                        title=f"Nuevo Anuncio: {anuncio.titulo}",
+                        body=f"{anuncio.contenido[:50]}..."
+                    ),
+                    topic="anuncios_generales" # Coincide con lo que pusimos en Android
+                )
+                messaging.send(message)
+            except Exception as e:
+                print(f"Error enviando notificación: {e}")
+            # -----------------------------------
+
             messages.success(request, 'Anuncio enviado exitosamente.')
             return redirect('anuncios:lista_anuncios')
     else:

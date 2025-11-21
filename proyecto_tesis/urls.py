@@ -18,7 +18,7 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings 
 from django.conf.urls.static import static 
-
+from anuncios.api import lista_anuncios_api
 urlpatterns = [
     path('admin/', admin.site.urls),
     path("", include("core.urls")),  
@@ -30,6 +30,7 @@ urlpatterns = [
     path("votaciones/", include("votaciones.urls")),
     path('foro/', include('foro.urls', namespace='foro')),
     path('anuncios/', include('anuncios.urls', namespace='anuncios')),
+    path('api/anuncios/', lista_anuncios_api, name='api_lista_anuncios'),
     path('recursos/', include('recursos.urls', namespace='recursos')),
     path('analitica/', include('datamart.urls')),
 ]
