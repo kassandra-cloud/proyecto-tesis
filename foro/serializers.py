@@ -28,16 +28,25 @@ class ComentarioSerializer(serializers.ModelSerializer):
 class ComentarioCreateSerializer(serializers.Serializer):
     texto = serializers.CharField(max_length=2000, allow_blank=False, trim_whitespace=True)
     parent = serializers.IntegerField(required=False, allow_null=True)
+    total_likes = serializers.SerializerMethodField()
+    me_gusta_usuario = serializers.SerializerMethodField()
+    class Meta:
+        model = Comentario
+        fields = ("id", "autor_username", "contenido", "fecha_creacion", "parent", "total_likes", "me_gusta_usuario")
+    def get_total_likes(self, obj):
+        return obj.likes.count()
 
-
+    def get_me_gusta_usuario(self, obj):
+        request = self.context.get("request")
+        if request and request.user.is_authenticated:
+            return obj.likes.filter(pk=request.user.pk).exists()
+        return False
 class PublicacionSerializer(serializers.ModelSerializer):
-    # 💡 CORRECCIÓN 2: Usamos el ID (Int) para que coincida con el PublicacionDto
-    autor = serializers.IntegerField(source="autor.id", read_only=True) 
-    
+    autor = serializers.IntegerField(source="autor.id", read_only=True)
     fecha_creacion = serializers.DateTimeField(format="%Y-%m-%d %H:%M:%S")
-    # Usamos el ComentarioSerializer corregido (que ahora tiene 'autor_username')
     adjuntos = ArchivoAdjuntoSerializer(many=True, read_only=True)
-    comentarios = ComentarioSerializer(many=True, read_only=True)
+    
+    comentarios = serializers.SerializerMethodField()
 
     class Meta:
         model = Publicacion
@@ -49,3 +58,7 @@ class PublicacionSerializer(serializers.ModelSerializer):
             "adjuntos",
             "comentarios",
         )
+    def get_comentarios(self, obj):
+        # Filtramos solo los comentarios que NO han sido eliminados (visible=True)
+        qs = obj.comentarios.filter(visible=True).order_by('fecha_creacion')
+        return ComentarioSerializer(qs, many=True).data

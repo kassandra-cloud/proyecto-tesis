@@ -28,8 +28,8 @@ urlpatterns = [
             name="api_subir_adjunto",
         ),
     path("foro/mensaje/", views.crear_mensaje, name="api_foro_mensaje"),
-    path("api/publicaciones/<int:publicacion_id>/mensaje/",
-    enviar_mensaje,
-    name="foro_enviar_mensaje"
-)
+    path("api/publicaciones/<int:publicacion_id>/mensaje/",enviar_mensaje,name="foro_enviar_mensaje"),
+    path("api/v1/comentarios/<int:pk>/", views.api_eliminar_comentario, name="api_eliminar_comentario"),
+    path("api/v1/comentarios/<int:pk>/like/", views.api_toggle_like_comentario, name="api_toggle_like_comentario"),
+    path("comentario/<int:pk>/reaccionar/", views.reaccionar_comentario_web, name="reaccionar_comentario_web"),
 ]

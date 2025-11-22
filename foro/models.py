@@ -10,7 +10,7 @@ class Publicacion(models.Model):
     fecha_creacion = models.DateTimeField(auto_now_add=True)
 
     visible = models.BooleanField(default=True, db_index=True)
-
+    eliminado = models.BooleanField(default=False)
     def __str__(self):
         return f'Publicación de {self.autor.username}'
 
@@ -57,6 +57,6 @@ class Comentario(models.Model):
     fecha_creacion = models.DateTimeField(auto_now_add=True)
 
     visible = models.BooleanField(default=True, db_index=True)
-
+    likes = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name='comentarios_liked', blank=True)
     class Meta:
         ordering = ["fecha_creacion"]

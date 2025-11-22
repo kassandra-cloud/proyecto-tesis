@@ -438,3 +438,58 @@ def enviar_mensaje(request, publicacion_id):
     # -------------------------------
     serializer = PublicacionSerializer(pub, context={"request": request})
     return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+@api_view(["DELETE"])
+@authentication_classes([TokenAuthentication, SessionAuthentication])
+@permission_classes([IsAuthenticated])
+def api_eliminar_comentario(request, pk):
+    """
+    Permite eliminar un comentario si el usuario es el autor.
+    Realiza un 'soft delete' (visible=False) para mantener consistencia.
+    """
+    try:
+        comentario = Comentario.objects.get(pk=pk, visible=True)
+    except Comentario.DoesNotExist:
+        return Response({"error": "Comentario no encontrado"}, status=404)
+
+    # Verificar permiso: Solo el autor puede borrar
+    if comentario.autor != request.user:
+        return Response({"error": "No tienes permiso para eliminar este comentario"}, status=403)
+
+    # Soft delete (Ocultar)
+    comentario.visible = False
+    comentario.save()
+
+    return Response(status=status.HTTP_204_NO_CONTENT)
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def api_toggle_like_comentario(request, pk):
+    """Da o quita like a un comentario."""
+    comentario = get_object_or_404(Comentario, pk=pk, visible=True)
+    usuario = request.user
+
+    if usuario in comentario.likes.all():
+        comentario.likes.remove(usuario)
+        liked = False
+    else:
+        comentario.likes.add(usuario)
+        liked = True
+
+    return Response({
+        "liked": liked,
+        "total_likes": comentario.likes.count()
+    })
+
+@login_required
+def reaccionar_comentario_web(request, pk):
+    """Vista para dar/quitar like desde el sitio web (recarga la página)."""
+    comentario = get_object_or_404(Comentario, pk=pk, visible=True)
+    
+    if request.user in comentario.likes.all():
+        comentario.likes.remove(request.user)
+    else:
+        comentario.likes.add(request.user)
+        
+    # Redirige de vuelta a la publicación para ver el cambio
+    return redirect("foro:detalle_publicacion", pk=comentario.publicacion.pk)
