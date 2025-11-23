@@ -5,4 +5,5 @@ from . import views
 urlpatterns = [
     path('panel-bi/', views.panel_bi_view, name='panel_bi'),
     path('ejecutar-etl/', views.ejecutar_etl_view, name='ejecutar_etl'),
+    path('descargar-informe/', views.generar_pdf_view, name='descargar_pdf'),
 ]

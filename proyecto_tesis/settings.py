@@ -45,7 +45,7 @@ ALLOWED_HOSTS = [
     "127.0.0.1",
     "localhost",
     "10.0.2.2",
-    "192.168.0.110",   # IP de tu PC en la red (ajústala si cambia)
+    "192.168.1.131",   # IP de tu PC en la red (ajústala si cambia)
 ]
 
 # Si usas login vía sesión desde Android/web, conviene permitir CSRF
@@ -262,6 +262,28 @@ AWS_SECRET_ACCESS_KEY = os.environ.get('CELLAR_SECRET_KEY')
 AWS_STORAGE_BUCKET_NAME = os.environ.get('CELLAR_BUCKET_NAME')
 AWS_S3_REGION_NAME = 'US' 
 AWS_S3_ENDPOINT_URL = f"https://{os.environ.get('CELLAR_HOST')}"
+
+# =================================================
+# --- CONFIGURACIÓN DE CLEVER CLOUD STORAGE (CELLAR / S3) ---
+# =================================================
+
+AWS_ACCESS_KEY_ID = os.environ.get('CELLAR_KEY_ID')
+AWS_SECRET_ACCESS_KEY = os.environ.get('CELLAR_SECRET_KEY')
+AWS_STORAGE_BUCKET_NAME = os.environ.get('CELLAR_BUCKET_NAME')
+AWS_S3_REGION_NAME = "US"
+AWS_S3_ENDPOINT_URL = f"https://{os.environ.get('CELLAR_HOST')}"
+
+# Hacer públicos los adjuntos (imagenes / videos / audio)
+AWS_DEFAULT_ACL = None
+AWS_QUERYSTRING_AUTH = False  # NO firma URLs → visibles públicamente
+
+AWS_S3_OBJECT_PARAMETERS = {
+    "CacheControl": "max-age=86400",  # 1 día
+}
+
+# Backend por defecto → todos los archivos van a S3
+DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
+
 
 # Configuración de django-storages
 AWS_DEFAULT_ACL = None

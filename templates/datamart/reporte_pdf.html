@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        @page {
+            size: letter portrait;
+            margin: 2cm;
+        }
+        body {
+            font-family: Helvetica, Arial, sans-serif;
+            color: #333;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #0d6efd;
+            padding-bottom: 10px;
+        }
+        h1 { color: #0d6efd; margin: 0; font-size: 22px; }
+        h2 { color: #444; font-size: 16px; margin-top: 20px; border-bottom: 1px solid #ccc; padding-bottom: 5px; }
+        .meta { text-align: right; font-size: 10px; color: #666; margin-bottom: 20px; }
+        
+        /* Tablas */
+        table { width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 11px; }
+        th { background-color: #f0f0f0; border: 1px solid #ddd; padding: 6px; text-align: left; }
+        td { border: 1px solid #ddd; padding: 6px; }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+
+        /* KPIs */
+        .kpi-box {
+            background-color: #eef; border: 1px solid #0d6efd;
+            padding: 10px; margin-bottom: 20px; border-radius: 5px;
+        }
+        .kpi-row { margin-bottom: 5px; font-size: 12px; }
+        .kpi-val { font-weight: bold; color: #0d6efd; font-size: 14px; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>Informe de Gestión - Inteligencia de Negocios</h1>
+        <p>Junta de Vecinos "Villa Vista al Mar"</p>
+    </div>
+
+    <div class="meta">
+        Generado por: {{ usuario.get_full_name|default:usuario.username }}<br>
+        Fecha: {{ fecha_reporte|date:"d/m/Y H:i" }}
+    </div>
+
+    <div class="kpi-box">
+        <div class="kpi-row">Total Vecinos Registrados: <span class="kpi-val">{{ total_vecinos }}</span></div>
+        <div class="kpi-row">Vecinos Participantes (Votaciones): <span class="kpi-val">{{ total_participantes }}</span></div>
+        <div class="kpi-row">Tasa de Participación Global: <span class="kpi-val">{{ tasa_participacion|floatformat:1 }}%</span></div>
+    </div>
+
+    <h2>1. Distribución Demográfica (Por Sector)</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Sector / Dirección</th>
+                <th>Cantidad de Vecinos</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in data_demografia %}
+            <tr>
+                <td>{{ item.direccion_sector|default:"No especificado" }}</td>
+                <td>{{ item.total_vecinos }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="2">No hay datos disponibles.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h2>2. Ocupación de Talleres</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Nombre del Taller</th>
+                <th>Inscritos</th>
+                <th>Cupos Totales</th>
+                <th>Estado</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in data_talleres %}
+            <tr>
+                <td>{{ item.taller__nombre }}</td>
+                <td>{{ item.total_inscritos }}</td>
+                <td>{{ item.taller__cupos_totales }}</td>
+                <td>
+                    {% if item.total_inscritos >= item.taller__cupos_totales %}
+                        <span style="color: #d9534f;">LLENO</span>
+                    {% else %}
+                        <span style="color: #5cb85c;">DISPONIBLE</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="4">No hay talleres registrados.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h2>3. Transparencia: Actas Más Consultadas</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Título del Acta</th>
+                <th>Fecha Reunión</th>
+                <th>Total Consultas</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in data_actas %}
+            <tr>
+                <td>{{ item.acta__titulo }}</td>
+                <td>{{ item.acta__fecha_reunion|date:"d/m/Y" }}</td>
+                <td>{{ item.consultas }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="3">No se han registrado consultas aún.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+</body>
+</html>

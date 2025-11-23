@@ -64,7 +64,7 @@ class UsuarioCrearForm(forms.ModelForm):
 
     telefono = forms.CharField(label="Teléfono de Contacto", max_length=15, required=False,widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "+569XXXXXXXX"}))
     total_residentes = forms.IntegerField(label="Total Residentes", min_value=1, initial=1, required=True)
-    total_ninos = forms.IntegerField(label="N° de Niños (< 18)", min_value=0, initial=0, required=True)
+    total_ninos = forms.IntegerField(label="N° de Niños (< 12)", min_value=0, initial=0, required=True)
     
     class Meta:
         model  = User
@@ -201,7 +201,7 @@ class UsuarioEditarForm(forms.ModelForm):
                                 widget=forms.TextInput(attrs={'placeholder': 'Ej: Av. Principal 123, Depto 45'}))
     telefono = forms.CharField(label="Teléfono de Contacto", max_length=15, required=False,widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "+569XXXXXXXX"}))
     total_residentes = forms.IntegerField(label="Total Residentes", min_value=1, required=True)
-    total_ninos = forms.IntegerField(label="N° de Niños (< 18)", min_value=0, required=True)
+    total_ninos = forms.IntegerField(label="N° de Niños (< 12)", min_value=0, required=True)
 
     class Meta:
         model  = User

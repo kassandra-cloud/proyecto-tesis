@@ -16,59 +16,85 @@
             <div class="card shadow-sm mb-4">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center mb-2">
-                        <h5 class="card-title fw-bold mb-0">@{{ publicacion.autor.username }}</h5>
+                        <h5 class="card-title fw-bold mb-0 text-primary">@{{ publicacion.autor.username }}</h5>
                         <small class="text-muted">{{ publicacion.fecha_creacion|date:"d/m/Y H:i" }}</small>
                     </div>
-                    <p class="card-text fs-5">{{ publicacion.contenido|linebreaks }}</p>
+                    
+                    <p class="card-text fs-5 mb-4">{{ publicacion.contenido|linebreaks }}</p>
                     
                     {% if publicacion.adjuntos.all %}
-                        <hr>
-                        <div class="row">
-                            {% for adjunto in publicacion.adjuntos.all %}
-                                <div class="col-md-6 mb-2">
-                                    {% if adjunto.tipo_archivo == "imagen" %}
-                                        <img src="{{ adjunto.archivo.url }}" class="img-fluid rounded border" style="max-height: 200px;">
-                                    {% elif adjunto.tipo_archivo == "audio" %}
-                                        <audio controls class="w-100"><source src="{{ adjunto.archivo.url }}"></audio>
-                                    {% else %}
-                                        <a href="{{ adjunto.archivo.url }}" target="_blank" class="btn btn-sm btn-light border w-100 text-start">
-                                            <i class="fas fa-paperclip"></i> {{ adjunto.archivo.name }}
-                                        </a>
-                                    {% endif %}
-                                </div>
-                            {% endfor %}
+                        <div class="card border-0 bg-light p-3 rounded">
+                            <h6 class="text-muted mb-3 border-bottom pb-2">
+                                <i class="fas fa-paperclip me-2"></i>Archivos Adjuntos
+                            </h6>
+                            
+                            <div class="row g-3">
+                                {% for adjunto in publicacion.adjuntos.all %}
+                                    <div class="col-md-6">
+                                        
+                                        {% if adjunto.tipo_archivo == "imagen" %}
+                                            <div class="card h-100 shadow-sm border-0 overflow-hidden">
+                                                <a href="{{ adjunto.archivo.url }}" target="_blank">
+                                                    <img src="{{ adjunto.archivo.url }}" class="card-img-top" alt="Imagen adjunta" 
+                                                         style="height: 250px; object-fit: cover; width: 100%;">
+                                                </a>
+                                            </div>
+
+                                        {% elif adjunto.tipo_archivo == "audio" %}
+                                            <div class="card h-100 p-3 border-0 shadow-sm d-flex justify-content-center align-items-center bg-white">
+                                                <audio controls class="w-100">
+                                                    <source src="{{ adjunto.archivo.url }}" type="audio/mpeg">
+                                                    Tu navegador no soporta audio.
+                                                </audio>
+                                                <small class="text-muted mt-2">
+                                                    <i class="fas fa-microphone me-1"></i>Nota de voz
+                                                </small>
+                                            </div>
+
+                                        {% else %}
+                                            <a href="{{ adjunto.archivo.url }}" target="_blank" class="btn btn-outline-primary w-100 h-100 d-flex align-items-center justify-content-center p-4">
+                                                <div>
+                                                    <i class="fas fa-file-download fa-2x mb-2"></i><br>
+                                                    {{ adjunto.archivo.name|truncatechars:20 }}
+                                                </div>
+                                            </a>
+                                        {% endif %}
+
+                                    </div>
+                                {% endfor %}
+                            </div>
                         </div>
                     {% endif %}
-                </div>
+                    </div>
             </div>
 
-            <h5 class="mb-3 border-bottom pb-2">Comentarios ({{ comentarios.count }})</h5>
+            <h5 class="mb-3 border-bottom pb-2 text-secondary">
+                <i class="far fa-comments me-2"></i>Comentarios ({{ comentarios.count }})
+            </h5>
 
-            <div class="mb-5">
-                {% for comentario in comentarios %}
-                    <div class="card mb-2 shadow-sm border-0 
-                                {% if comentario.parent %} ms-5 border-start border-3 border-primary {% endif %}" 
-                         style="background-color: {% if comentario.parent %}#f0f4f8{% else %}#f8f9fa{% endif %};">
-                         
+            <div class="mb-5 pb-5"> {% for comentario in comentarios %}
+                    <div class="card mb-3 shadow-sm border-0 
+                                {% if comentario.parent %} ms-5 border-start border-4 border-info {% endif %}" 
+                         style="background-color: {% if comentario.parent %}#f8faff{% else %}#fff{% endif %};">
+                        
                         <div class="card-body p-3">
                             
                             {% if comentario.parent %}
-                                <div class="mb-1">
-                                    <small class="text-primary fw-bold" style="font-size: 0.8rem;">
+                                <div class="mb-2">
+                                    <small class="text-info fw-bold bg-light px-2 py-1 rounded">
                                         <i class="fas fa-share fa-flip-vertical me-1"></i>En respuesta a @{{ comentario.parent.autor.username }}
                                     </small>
                                 </div>
                             {% endif %}
 
-                            <div class="d-flex justify-content-between align-items-start">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
                                 <div>
-                                    <strong class="text-primary">@{{ comentario.autor.username }}</strong>
-                                    <small class="text-muted ms-2">{{ comentario.fecha_creacion|date:"d/m/Y H:i" }}</small>
+                                    <strong class="text-dark">@{{ comentario.autor.username }}</strong>
+                                    <small class="text-muted ms-2" style="font-size: 0.8rem;">{{ comentario.fecha_creacion|date:"d/m/Y H:i" }}</small>
                                 </div>
                                 
-                                <div class="d-flex align-items-center">
-                                    
-                                    <button class="btn btn-link text-decoration-none p-0 me-3 text-secondary" 
+                                <div class="d-flex align-items-center gap-2">
+                                    <button class="btn btn-sm btn-link text-secondary p-0" 
                                             onclick="responderComentario('{{ comentario.id }}', '{{ comentario.autor.username }}')"
                                             title="Responder">
                                         <i class="fas fa-reply"></i>
@@ -76,46 +102,63 @@
 
                                     <form action="{% url 'foro:reaccionar_comentario_web' comentario.id %}" method="POST" class="d-inline">
                                         {% csrf_token %}
-                                        <button type="submit" class="btn btn-link text-decoration-none p-0 me-3" style="color: #1976D2;">
-                                            {% if user in comentario.likes.all %} <i class="fas fa-thumbs-up"></i> {% else %} <i class="far fa-thumbs-up"></i> {% endif %}
-                                            <span class="ms-1 fw-bold text-secondary" style="font-size: 0.9em;">{{ comentario.likes.count }}</span>
+                                        <button type="submit" class="btn btn-sm btn-link text-decoration-none p-0" style="color: #1976D2;">
+                                            {% if user in comentario.likes.all %} 
+                                                <i class="fas fa-thumbs-up"></i> 
+                                            {% else %} 
+                                                <i class="far fa-thumbs-up"></i> 
+                                            {% endif %}
+                                            <span class="ms-1 fw-bold text-secondary">{{ comentario.likes.count }}</span>
                                         </button>
                                     </form>
 
                                     {% user_can 'foro' 'moderar' as puede_moderar %}
                                     {% if user == comentario.autor or puede_moderar %}
-                                        <form action="{% url 'foro:eliminar_comentario_web' comentario.id %}" method="POST" class="d-inline" onsubmit="return confirm('¿Estás seguro?');">
+                                        <form action="{% url 'foro:eliminar_comentario_web' comentario.id %}" method="POST" class="d-inline" onsubmit="return confirm('¿Estás seguro de eliminar este comentario?');">
                                             {% csrf_token %}
-                                            <button type="submit" class="btn btn-link text-danger p-0"><i class="fas fa-trash-alt"></i></button>
+                                            <button type="submit" class="btn btn-sm btn-link text-danger p-0" title="Eliminar">
+                                                <i class="fas fa-trash-alt"></i>
+                                            </button>
                                         </form>
                                     {% endif %}
                                 </div>
                             </div>
                             
-                            <p class="mb-0 mt-2 text-dark">{{ comentario.contenido|linebreaksbr }}</p>
+                            <p class="mb-0 text-secondary" style="font-size: 0.95rem;">{{ comentario.contenido|linebreaksbr }}</p>
                         </div>
                     </div>
                 {% empty %}
-                    <div class="alert alert-light text-center text-muted border py-3">No hay comentarios aún.</div>
+                    <div class="alert alert-light text-center text-muted border border-dashed py-4">
+                        <i class="far fa-comment-dots fa-2x mb-2"></i><br>
+                        No hay comentarios aún. ¡Sé el primero en opinar!
+                    </div>
                 {% endfor %}
             </div>
 
-            <div class="card shadow-sm border-primary fixed-bottom mx-auto mb-3" style="max-width: 800px; left: 0; right: 0;">
-                <div class="card-body bg-white p-2">
-                    
-                    <div id="respuesta-aviso" class="alert alert-info py-1 px-2 mb-2 d-none d-flex justify-content-between align-items-center">
-                        <small>Respondiendo a <strong id="respuesta-usuario">...</strong></small>
-                        <button type="button" class="btn-close btn-sm" onclick="cancelarRespuesta()"></button>
-                    </div>
+            <div class="fixed-bottom bg-white border-top shadow-lg py-3">
+                <div class="container">
+                    <div class="row justify-content-center">
+                        <div class="col-lg-8">
+                            
+                            <div id="respuesta-aviso" class="alert alert-info py-2 px-3 mb-2 d-none d-flex justify-content-between align-items-center shadow-sm">
+                                <small><i class="fas fa-reply me-2"></i>Respondiendo a <strong id="respuesta-usuario">...</strong></small>
+                                <button type="button" class="btn-close btn-sm" onclick="cancelarRespuesta()"></button>
+                            </div>
 
-                    <form method="POST" class="d-flex gap-2">
-                        {% csrf_token %}
-                        <input type="hidden" name="parent" id="parent_id_input">
-                        
-                        <textarea name="contenido" id="contenido_input" class="form-control" rows="1" placeholder="Escribe un comentario..." required style="resize: none;"></textarea>
-                        
-                        <button type="submit" class="btn btn-primary"><i class="fas fa-paper-plane"></i></button>
-                    </form>
+                            <form method="POST" class="d-flex gap-2 align-items-center">
+                                {% csrf_token %}
+                                <input type="hidden" name="parent" id="parent_id_input">
+                                
+                                <div class="flex-grow-1">
+                                    <textarea name="contenido" id="contenido_input" class="form-control rounded-pill px-3" rows="1" placeholder="Escribe un comentario..." required style="resize: none; min-height: 45px; padding-top: 10px;"></textarea>
+                                </div>
+                                
+                                <button type="submit" class="btn btn-primary rounded-circle d-flex align-items-center justify-content-center shadow-sm" style="width: 45px; height: 45px;">
+                                    <i class="fas fa-paper-plane"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
                 </div>
             </div>
             <div style="height: 100px;"></div>
@@ -128,9 +171,16 @@
     function responderComentario(id, usuario) {
         document.getElementById('parent_id_input').value = id;
         document.getElementById('respuesta-usuario').innerText = '@' + usuario;
-        document.getElementById('respuesta-aviso').classList.remove('d-none');
-        document.getElementById('contenido_input').placeholder = "Escribe tu respuesta...";
-        document.getElementById('contenido_input').focus();
+        
+        const aviso = document.getElementById('respuesta-aviso');
+        aviso.classList.remove('d-none');
+        
+        const input = document.getElementById('contenido_input');
+        input.placeholder = "Escribe tu respuesta a @" + usuario + "...";
+        input.focus();
+        
+        // Scroll suave hacia abajo para ver lo que escribes
+        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
     }
 
     function cancelarRespuesta() {
