@@ -22,6 +22,7 @@ from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from core.templatetags.can import can
 from itertools import chain
 from operator import attrgetter
+from core.authz import can, role_required
 # ------------------------------------------------------------------------------
 #                                   WEB
 # ------------------------------------------------------------------------------
