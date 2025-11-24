@@ -1,192 +1,173 @@
 {% extends 'base.html' %}
 {% load static %}
-{% load can %}
+{# {% load can %} #}
 
 {% block content %}
-<div class="container mt-4">
-    <div class="row justify-content-center">
-        <div class="col-lg-8">
-            
-            <div class="mb-3">
-                <a href="{% url 'foro:lista_publicaciones' %}" class="btn btn-outline-secondary btn-sm">
-                    <i class="fas fa-arrow-left"></i> Volver al Foro
-                </a>
-            </div>
+<div class="container mt-4 mb-5">
 
-            <div class="card shadow-sm mb-4">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <h5 class="card-title fw-bold mb-0 text-primary">@{{ publicacion.autor.username }}</h5>
-                        <small class="text-muted">{{ publicacion.fecha_creacion|date:"d/m/Y H:i" }}</small>
-                    </div>
-                    
-                    <p class="card-text fs-5 mb-4">{{ publicacion.contenido|linebreaks }}</p>
-                    
-                    {% if publicacion.adjuntos.all %}
-                        <div class="card border-0 bg-light p-3 rounded">
-                            <h6 class="text-muted mb-3 border-bottom pb-2">
-                                <i class="fas fa-paperclip me-2"></i>Archivos Adjuntos
-                            </h6>
-                            
-                            <div class="row g-3">
-                                {% for adjunto in publicacion.adjuntos.all %}
-                                    <div class="col-md-6">
-                                        
-                                        {% if adjunto.tipo_archivo == "imagen" %}
-                                            <div class="card h-100 shadow-sm border-0 overflow-hidden">
-                                                <a href="{{ adjunto.archivo.url }}" target="_blank">
-                                                    <img src="{{ adjunto.archivo.url }}" class="card-img-top" alt="Imagen adjunta" 
-                                                         style="height: 250px; object-fit: cover; width: 100%;">
-                                                </a>
-                                            </div>
-
-                                        {% elif adjunto.tipo_archivo == "audio" %}
-                                            <div class="card h-100 p-3 border-0 shadow-sm d-flex justify-content-center align-items-center bg-white">
-                                                <audio controls class="w-100">
-                                                    <source src="{{ adjunto.archivo.url }}" type="audio/mpeg">
-                                                    Tu navegador no soporta audio.
-                                                </audio>
-                                                <small class="text-muted mt-2">
-                                                    <i class="fas fa-microphone me-1"></i>Nota de voz
-                                                </small>
-                                            </div>
-
-                                        {% else %}
-                                            <a href="{{ adjunto.archivo.url }}" target="_blank" class="btn btn-outline-primary w-100 h-100 d-flex align-items-center justify-content-center p-4">
-                                                <div>
-                                                    <i class="fas fa-file-download fa-2x mb-2"></i><br>
-                                                    {{ adjunto.archivo.name|truncatechars:20 }}
-                                                </div>
-                                            </a>
-                                        {% endif %}
-
-                                    </div>
-                                {% endfor %}
-                            </div>
-                        </div>
-                    {% endif %}
-                    </div>
-            </div>
-
-            <h5 class="mb-3 border-bottom pb-2 text-secondary">
-                <i class="far fa-comments me-2"></i>Comentarios ({{ comentarios.count }})
-            </h5>
-
-            <div class="mb-5 pb-5"> {% for comentario in comentarios %}
-                    <div class="card mb-3 shadow-sm border-0 
-                                {% if comentario.parent %} ms-5 border-start border-4 border-info {% endif %}" 
-                         style="background-color: {% if comentario.parent %}#f8faff{% else %}#fff{% endif %};">
-                        
-                        <div class="card-body p-3">
-                            
-                            {% if comentario.parent %}
-                                <div class="mb-2">
-                                    <small class="text-info fw-bold bg-light px-2 py-1 rounded">
-                                        <i class="fas fa-share fa-flip-vertical me-1"></i>En respuesta a @{{ comentario.parent.autor.username }}
-                                    </small>
-                                </div>
-                            {% endif %}
-
-                            <div class="d-flex justify-content-between align-items-start mb-2">
-                                <div>
-                                    <strong class="text-dark">@{{ comentario.autor.username }}</strong>
-                                    <small class="text-muted ms-2" style="font-size: 0.8rem;">{{ comentario.fecha_creacion|date:"d/m/Y H:i" }}</small>
-                                </div>
-                                
-                                <div class="d-flex align-items-center gap-2">
-                                    <button class="btn btn-sm btn-link text-secondary p-0" 
-                                            onclick="responderComentario('{{ comentario.id }}', '{{ comentario.autor.username }}')"
-                                            title="Responder">
-                                        <i class="fas fa-reply"></i>
-                                    </button>
-
-                                    <form action="{% url 'foro:reaccionar_comentario_web' comentario.id %}" method="POST" class="d-inline">
-                                        {% csrf_token %}
-                                        <button type="submit" class="btn btn-sm btn-link text-decoration-none p-0" style="color: #1976D2;">
-                                            {% if user in comentario.likes.all %} 
-                                                <i class="fas fa-thumbs-up"></i> 
-                                            {% else %} 
-                                                <i class="far fa-thumbs-up"></i> 
-                                            {% endif %}
-                                            <span class="ms-1 fw-bold text-secondary">{{ comentario.likes.count }}</span>
-                                        </button>
-                                    </form>
-
-                                    {% user_can 'foro' 'moderar' as puede_moderar %}
-                                    {% if user == comentario.autor or puede_moderar %}
-                                        <form action="{% url 'foro:eliminar_comentario_web' comentario.id %}" method="POST" class="d-inline" onsubmit="return confirm('¿Estás seguro de eliminar este comentario?');">
-                                            {% csrf_token %}
-                                            <button type="submit" class="btn btn-sm btn-link text-danger p-0" title="Eliminar">
-                                                <i class="fas fa-trash-alt"></i>
-                                            </button>
-                                        </form>
-                                    {% endif %}
-                                </div>
-                            </div>
-                            
-                            <p class="mb-0 text-secondary" style="font-size: 0.95rem;">{{ comentario.contenido|linebreaksbr }}</p>
-                        </div>
-                    </div>
-                {% empty %}
-                    <div class="alert alert-light text-center text-muted border border-dashed py-4">
-                        <i class="far fa-comment-dots fa-2x mb-2"></i><br>
-                        No hay comentarios aún. ¡Sé el primero en opinar!
-                    </div>
-                {% endfor %}
-            </div>
-
-            <div class="fixed-bottom bg-white border-top shadow-lg py-3">
-                <div class="container">
-                    <div class="row justify-content-center">
-                        <div class="col-lg-8">
-                            
-                            <div id="respuesta-aviso" class="alert alert-info py-2 px-3 mb-2 d-none d-flex justify-content-between align-items-center shadow-sm">
-                                <small><i class="fas fa-reply me-2"></i>Respondiendo a <strong id="respuesta-usuario">...</strong></small>
-                                <button type="button" class="btn-close btn-sm" onclick="cancelarRespuesta()"></button>
-                            </div>
-
-                            <form method="POST" class="d-flex gap-2 align-items-center">
-                                {% csrf_token %}
-                                <input type="hidden" name="parent" id="parent_id_input">
-                                
-                                <div class="flex-grow-1">
-                                    <textarea name="contenido" id="contenido_input" class="form-control rounded-pill px-3" rows="1" placeholder="Escribe un comentario..." required style="resize: none; min-height: 45px; padding-top: 10px;"></textarea>
-                                </div>
-                                
-                                <button type="submit" class="btn btn-primary rounded-circle d-flex align-items-center justify-content-center shadow-sm" style="width: 45px; height: 45px;">
-                                    <i class="fas fa-paper-plane"></i>
-                                </button>
-                            </form>
-                        </div>
-                    </div>
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
+            <div class="d-flex align-items-center">
+                <div class="rounded-circle bg-primary text-white d-flex justify-content-center align-items-center fw-bold me-3" style="width: 48px; height: 48px; font-size: 1.2rem;">
+                    {{ publicacion.autor.username|make_list|first|upper }}
+                </div>
+                <div>
+                    <h4 class="mb-0 text-dark">{{ publicacion.autor.username }}</h4>
+                    <small class="text-muted">{{ publicacion.fecha_creacion|date:"d M Y, H:i" }}</small>
                 </div>
             </div>
-            <div style="height: 100px;"></div>
+            
+            {% if user == publicacion.autor %}
+            <div class="dropdown">
+                <button class="btn btn-light btn-sm" type="button" data-bs-toggle="dropdown">
+                    <i class="fas fa-ellipsis-v"></i>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li><a class="dropdown-item text-danger" href="#">Eliminar</a></li>
+                </ul>
+            </div>
+            {% endif %}
+        </div>
 
+        <div class="card-body">
+            <p class="card-text fs-5 mb-4" style="white-space: pre-wrap;">{{ publicacion.contenido }}</p>
+
+            {% if publicacion.adjuntos.all %}
+                <div class="row g-3">
+                {% for adjunto in publicacion.adjuntos.all %}
+                    {% if not adjunto.es_mensaje %}
+                        <div class="col-md-4 col-sm-6">
+                            {% if adjunto.tipo_archivo == 'imagen' %}
+                                <a href="{{ adjunto.archivo.url }}" target="_blank">
+                                    <img src="{{ adjunto.archivo.url }}" class="img-fluid rounded shadow-sm border" alt="Adjunto" style="height: 200px; width: 100%; object-fit: cover;">
+                                </a>
+                            {% else %}
+                                <a href="{{ adjunto.archivo.url }}" class="btn btn-outline-secondary w-100 py-3">
+                                    <i class="fas fa-file-alt fa-2x mb-2"></i><br>
+                                    {{ adjunto.archivo.name|truncatechars:20 }}
+                                </a>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                {% endfor %}
+                </div>
+            {% endif %}
+        </div>
+        
+        <div class="card-footer bg-light text-muted">
+            <small><i class="far fa-comment-alt"></i> {{ conversacion|length }} Interacciones</small>
         </div>
     </div>
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="text-muted">Comentarios y Actividad</h5>
+    </div>
+
+    <div class="conversation-stream mb-5">
+        {% for item in conversacion %}
+            <div class="d-flex mb-4 animate__animated animate__fadeIn">
+                
+                <div class="flex-shrink-0">
+                    <div class="rounded-circle text-white d-flex justify-content-center align-items-center fw-bold shadow-sm" 
+                         style="width: 40px; height: 40px; background-color: #6c757d;">
+                        {{ item.autor.username|make_list|first|upper }}
+                    </div>
+                </div>
+
+                <div class="flex-grow-1 ms-3">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="fw-bold text-dark">{{ item.autor.username }}</span>
+                        <small class="text-muted" style="font-size: 0.85rem;">{{ item.fecha_creacion|timesince }} atrás</small>
+                    </div>
+
+                    {# TIPO A: Es un Archivo (Foto/Audio) #}
+                    {% if item.archivo %}
+                        <div class="d-inline-block p-2 rounded border bg-white shadow-sm" style="max-width: 80%; min-width: 200px;">
+                            
+                            {% if item.tipo_archivo == 'imagen' %}
+                                <a href="{{ item.archivo.url }}" target="_blank">
+                                    <img src="{{ item.archivo.url }}" 
+                                         class="img-fluid rounded" 
+                                         style="max-height: 300px; width: 100%; object-fit: cover;" 
+                                         alt="Imagen chat">
+                                </a>
+                            {% elif item.tipo_archivo == 'audio' %}
+                                <div class="d-flex align-items-center p-2 bg-light rounded border">
+                                    <i class="fas fa-microphone text-danger me-2"></i>
+                                    <audio controls class="w-100" style="height: 30px;">
+                                        <source src="{{ item.archivo.url }}" type="audio/mpeg">
+                                    </audio>
+                                </div>
+                            {% else %}
+                                <a href="{{ item.archivo.url }}" class="text-decoration-none text-dark p-2 d-block bg-light rounded border">
+                                    <i class="fas fa-paperclip"></i> Ver archivo
+                                </a>
+                            {% endif %}
+
+                            {% if item.descripcion %}
+                                <div class="mt-2 pt-2 border-top text-dark" style="white-space: pre-wrap;">{{ item.descripcion }}</div>
+                            {% endif %}
+                        </div>
+
+                    {# TIPO B: Es un Comentario de Texto #}
+                    {% else %}
+                        <div class="bg-light p-3 rounded text-dark border position-relative" 
+                             style="display: inline-block; max-width: 90%; border-radius: 0px 15px 15px 15px !important;">
+                            {{ item.contenido|linebreaksbr }}
+                        </div>
+                    {% endif %}
+                    
+                </div>
+            </div>
+        {% empty %}
+            <div class="text-center py-5 text-muted">
+                <p>No hay comentarios aún.</p>
+            </div>
+        {% endfor %}
+    </div>
+
+    <div class="card shadow-sm border-0 sticky-bottom">
+        <div class="card-body bg-light border-top">
+            <form method="post" action="" enctype="multipart/form-data">
+                {% csrf_token %}
+                
+                {% if form.non_field_errors %}
+                    <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+                {% endif %}
+
+                <div class="row">
+                    <div class="col-md-10 col-sm-9">
+                        <div class="mb-2">
+                            {{ form.contenido }}
+                            {% if form.contenido.errors %}
+                                <div class="text-danger small">{{ form.contenido.errors }}</div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="collapse" id="collapseAdjunto">
+                            <div class="card card-body p-2 bg-white mb-2">
+                                <label class="small text-muted mb-1"><i class="fas fa-camera"></i> Adjuntar imagen o archivo:</label>
+                                {{ form.archivo }} 
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-2 col-sm-3 d-flex flex-column gap-2">
+                        <button type="submit" class="btn btn-primary w-100 h-100">
+                            <i class="fas fa-paper-plane"></i> Enviar
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="mt-1">
+                    <button class="btn btn-sm btn-link text-decoration-none ps-0" type="button" data-bs-toggle="collapse" data-bs-target="#collapseAdjunto">
+                        <i class="fas fa-paperclip"></i> Adjuntar foto
+                    </button>
+                </div>
+
+            </form>
+        </div>
+    </div>
+
 </div>
-
-<script>
-    function responderComentario(id, usuario) {
-        document.getElementById('parent_id_input').value = id;
-        document.getElementById('respuesta-usuario').innerText = '@' + usuario;
-        
-        const aviso = document.getElementById('respuesta-aviso');
-        aviso.classList.remove('d-none');
-        
-        const input = document.getElementById('contenido_input');
-        input.placeholder = "Escribe tu respuesta a @" + usuario + "...";
-        input.focus();
-        
-        // Scroll suave hacia abajo para ver lo que escribes
-        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-    }
-
-    function cancelarRespuesta() {
-        document.getElementById('parent_id_input').value = '';
-        document.getElementById('respuesta-aviso').classList.add('d-none');
-        document.getElementById('contenido_input').placeholder = "Escribe un comentario...";
-    }
-</script>
 {% endblock %}

@@ -19,7 +19,9 @@ from rest_framework.response import Response
 from rest_framework import status
 from .serializers import PublicacionSerializer, ArchivoAdjuntoSerializer, ComentarioSerializer
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
-
+from core.templatetags.can import can
+from itertools import chain
+from operator import attrgetter
 # ------------------------------------------------------------------------------
 #                                   WEB
 # ------------------------------------------------------------------------------
@@ -90,51 +92,77 @@ def crear_mensaje(request):
         )
 
     return Response({"mensaje": "ok"})
-
 @login_required
 def detalle_publicacion(request, pk):
     es_moderador = can(request.user, "foro", "moderar")
     
-    # Obtenemos la publicación
+    # 1. Obtenemos la publicación con sus relaciones optimizadas
     try:
+        qs = Publicacion.objects.select_related("autor").prefetch_related("adjuntos")
         if es_moderador:
-            publicacion = get_object_or_404(Publicacion.objects.select_related("autor").prefetch_related("adjuntos"), pk=pk)
+            publicacion = get_object_or_404(qs, pk=pk)
         else:
-            publicacion = get_object_or_404(Publicacion.objects.select_related("autor").prefetch_related("adjuntos"), pk=pk, visible=True)
+            publicacion = get_object_or_404(qs, pk=pk, visible=True)
     except Http404:
         messages.error(request, "Esa publicación no existe o no tienes permiso para verla.")
         return redirect("foro:lista_publicaciones")
 
-    # Lógica para ENVIAR un comentario (POST)
+    # 2. Lógica para ENVIAR un comentario o archivo (POST desde la Web)
     if request.method == "POST":
-        form = ComentarioCreateForm(request.POST)
+        # 🔹 IMPORTANTE: Pasar request.FILES para recibir la foto
+        form = ComentarioCreateForm(request.POST, request.FILES)
+        
         if form.is_valid():
-            form.save(publicacion=publicacion, autor=request.user)
-            messages.success(request, "Comentario publicado.")
+            contenido = form.cleaned_data.get('contenido')
+            archivo = form.cleaned_data.get('archivo')
+
+            if archivo:
+                # CASO A: Subieron un archivo (Foto/Audio)
+                # Guardamos como ArchivoAdjunto tipo "mensaje"
+                # El texto opcional se guarda en 'descripcion'
+                ArchivoAdjunto.objects.create(
+                    publicacion=publicacion,
+                    autor=request.user,
+                    archivo=archivo,
+                    es_mensaje=True,       # Esto hace que salga en el chat
+                    descripcion=contenido  # Unimos el texto a la foto
+                )
+                messages.success(request, "Archivo publicado.")
+            
+            elif contenido:
+                # CASO B: Es solo texto
+                # Usamos el método save del form que crea un Comentario normal
+                form.save(publicacion=publicacion, autor=request.user)
+                messages.success(request, "Comentario publicado.")
+
             return redirect("foro:detalle_publicacion", pk=publicacion.pk)
         else:
             messages.error(request, "No se pudo publicar el comentario.")
     else:
         form = ComentarioCreateForm()
 
-    # Obtenemos los comentarios
-    if es_moderador:
-        comentarios_qs = publicacion.comentarios.all()
-    else:
-        comentarios_qs = publicacion.comentarios.filter(
-            Q(visible=True) | Q(autor=request.user)
-        )
-        
-    comentarios = comentarios_qs.select_related("autor").order_by("fecha_creacion")
+    # ---------------------------------------------------------
+    # 3. LÓGICA DE FUSIÓN (CHAT)
+    # ---------------------------------------------------------
     
-    context = {
-        "publicacion": publicacion,
-        "comentarios": comentarios,
-        "form_comentario": form,
-    }
-    return render(request, "foro/detalle_publicacion.html", context)
+    # A. Comentarios de texto
+    comentarios = publicacion.comentarios.filter(visible=True).select_related('autor')
+    
+    # B. Archivos adjuntos del chat (App y Web)
+    adjuntos_chat = publicacion.adjuntos.filter(es_mensaje=True).select_related('autor')
 
+    # C. Fusionamos y ordenamos por fecha
+    conversacion = sorted(
+        chain(comentarios, adjuntos_chat),
+        key=attrgetter('fecha_creacion')
+    )
 
+    return render(request, 'foro/detalle_publicacion.html', {
+        'publicacion': publicacion,
+        'form': form,
+        'conversacion': conversacion, 
+        'es_moderador': es_moderador
+    })
 # --- VISTAS DE MODERACIÓN (WEB) ---
 
 @require_POST
@@ -315,11 +343,20 @@ def api_subir_adjunto(request, pk: int):
     if not archivo:
         return Response({"detail": "No se envió ningún archivo."}, status=400)
 
+    # 1. Recibir el flag 'esMensaje' (Android envía "true"/"false" como string)
+    es_mensaje_str = request.data.get('esMensaje', 'false')
+    es_mensaje = es_mensaje_str.lower() == 'true'
+
+    # 2. Recibir la descripción (caption)
+    descripcion = request.data.get('descripcion', '')
+
+    # 3. Crear el objeto incluyendo la descripción
     adj = ArchivoAdjunto(
         publicacion=publicacion,
         archivo=archivo,
         autor=request.user,
-        es_mensaje=True,
+        es_mensaje=es_mensaje,     # Usamos el valor recibido
+        descripcion=descripcion    # <--- Guardamos el texto aquí
     )
     adj.save()
 
@@ -424,3 +461,40 @@ def reaccionar_comentario_web(request, pk):
         comentario.likes.add(request.user)
         
     return redirect("foro:detalle_publicacion", pk=comentario.publicacion.pk)
+
+@api_view(["DELETE"])
+@authentication_classes([TokenAuthentication, SessionAuthentication])
+@permission_classes([IsAuthenticated])
+def api_eliminar_adjunto(request, pk):
+    try:
+        # Buscamos el adjunto por ID
+        adjunto = ArchivoAdjunto.objects.get(pk=pk)
+    except ArchivoAdjunto.DoesNotExist:
+        return Response({"error": "Adjunto no encontrado"}, status=404)
+
+    # Verificamos que quien borra sea el dueño
+    if adjunto.autor != request.user:
+        return Response({"error": "No tienes permiso para eliminar esto"}, status=403)
+
+    # Borramos el archivo y el registro
+    adjunto.delete()
+
+    return Response(status=status.HTTP_204_NO_CONTENT)
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def api_toggle_like_adjunto(request, pk):
+    adjunto = get_object_or_404(ArchivoAdjunto, pk=pk)
+    usuario = request.user
+
+    if usuario in adjunto.likes.all():
+        adjunto.likes.remove(usuario)
+        liked = False
+    else:
+        adjunto.likes.add(usuario)
+        liked = True
+
+    return Response({
+        "liked": liked,
+        "total_likes": adjunto.likes.count()
+    })

@@ -23,32 +23,57 @@ class PublicacionForm(forms.ModelForm):
         }
         labels = {"contenido": ""}
 
-
 class ComentarioCreateForm(forms.ModelForm):
-    # Campo oculto para soportar “Responder”. Guardamos el ID del comentario padre.
+    # 1. Campo oculto para respuestas (ID del comentario padre)
     parent_id = forms.IntegerField(required=False, widget=forms.HiddenInput)
+    
+    # 2. Campo para subir archivos (Opcional)
+    # Le ponemos una clase para poder estilizarlo o seleccionarlo con JS si es necesario
+    archivo = forms.FileField(
+        required=False, 
+        widget=forms.FileInput(attrs={'class': 'form-control form-control-sm mt-2'})
+    )
 
     class Meta:
         model = Comentario
-        fields = ["contenido"]  # parent se asigna en save() usando parent_id
+        fields = ["contenido"]
         widgets = {
             "contenido": forms.Textarea(attrs={
                 "rows": 2,
                 "class": "form-control",
-                "placeholder": "Escribe un comentario…",
+                "placeholder": "Escribe un comentario o adjunta una foto...",
             })
         }
         labels = {"contenido": ""}
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # 3. 🔹 Hacemos que el texto NO sea obligatorio a nivel de campo
+        # (La validación real la haremos en el método clean)
+        self.fields['contenido'].required = False
+
+    def clean(self):
+        """Validación personalizada: Exigir Texto O Archivo."""
+        cleaned_data = super().clean()
+        contenido = cleaned_data.get("contenido")
+        archivo = cleaned_data.get("archivo")
+
+        # Si ambos están vacíos, lanzamos error
+        if not contenido and not archivo:
+            raise forms.ValidationError("Debes escribir un mensaje o subir un archivo.")
+        
+        return cleaned_data
+
     def save(self, publicacion, autor, commit=True):
         """
         Crea el comentario asignando publicacion, autor y (opcional) el parent.
-        Se llama desde la vista con: form.save(publicacion, request.user)
+        NOTA: Este método SOLO se usa para comentarios de texto. 
+        Si hay archivo, la vista se encarga de crear el ArchivoAdjunto manualmente.
         """
         comentario = Comentario(
             publicacion=publicacion,
             autor=autor,
-            contenido=self.cleaned_data["contenido"],
+            contenido=self.cleaned_data.get("contenido", ""), # Usamos get por si viene vacío
         )
 
         pid = self.cleaned_data.get("parent_id")
@@ -57,7 +82,7 @@ class ComentarioCreateForm(forms.ModelForm):
             try:
                 comentario.parent = Comentario.objects.get(id=pid, publicacion=publicacion)
             except Comentario.DoesNotExist:
-                pass  # si no existe o no corresponde, lo ignoramos
+                pass
 
         if commit:
             comentario.save()

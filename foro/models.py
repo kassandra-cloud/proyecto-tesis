@@ -28,12 +28,13 @@ class ArchivoAdjunto(models.Model):
     archivo = models.FileField(upload_to='archivos/')
     fecha_creacion = models.DateTimeField(auto_now_add=True)
 
-    # 🔹 NUEVO: para saber si debe mostrarse como "mensaje" (app) o adjunto normal (web)
+    # 🔹  para saber si debe mostrarse como "mensaje" (app) o adjunto normal (web)
     es_mensaje = models.BooleanField(
         default=False,
         help_text="Si está marcado, se mostrará en la sección de comentarios."
     )
-
+    descripcion = models.TextField(null=True, blank=True)
+    likes = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name='adjuntos_liked', blank=True)
     def __str__(self):
         return self.archivo.name
 

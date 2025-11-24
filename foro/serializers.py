@@ -7,10 +7,11 @@ class ArchivoAdjuntoSerializer(serializers.ModelSerializer):
     autor = serializers.CharField(source="autor.username", read_only=True)
     url = serializers.SerializerMethodField()
     fecha_creacion = serializers.DateTimeField(format="%Y-%m-%d %H:%M:%S")
-
+    total_likes = serializers.SerializerMethodField()
+    me_gusta_usuario = serializers.SerializerMethodField()
     class Meta:
         model = ArchivoAdjunto
-        fields = ("id", "autor", "tipo_archivo", "url", "fecha_creacion", "archivo")
+        fields = ("id", "autor", "tipo_archivo", "url", "fecha_creacion", "archivo", "es_mensaje", "descripcion")
 
     def get_url(self, obj):
         request = self.context.get("request")
@@ -23,7 +24,7 @@ class ComentarioSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Comentario
-        # 💡 Aseguramos que el campo en la respuesta sea 'autor_username'
+        # Aseguramos que el campo en la respuesta sea 'autor_username'
         fields = ("id", "autor_username", "contenido", "fecha_creacion", "parent")
 class ComentarioCreateSerializer(serializers.Serializer):
     texto = serializers.CharField(max_length=2000, allow_blank=False, trim_whitespace=True)
@@ -42,7 +43,7 @@ class ComentarioCreateSerializer(serializers.Serializer):
             return obj.likes.filter(pk=request.user.pk).exists()
         return False
 class PublicacionSerializer(serializers.ModelSerializer):
-    autor = serializers.IntegerField(source="autor.id", read_only=True)
+    autor = serializers.CharField(source="autor.username", read_only=True)
     fecha_creacion = serializers.DateTimeField(format="%Y-%m-%d %H:%M:%S")
     adjuntos = ArchivoAdjuntoSerializer(many=True, read_only=True)
     

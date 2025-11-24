@@ -32,4 +32,6 @@ urlpatterns = [
     path("api/v1/comentarios/<int:pk>/", views.api_eliminar_comentario, name="api_eliminar_comentario"),
     path("api/v1/comentarios/<int:pk>/like/", views.api_toggle_like_comentario, name="api_toggle_like_comentario"),
     path("comentario/<int:pk>/reaccionar/", views.reaccionar_comentario_web, name="reaccionar_comentario_web"),
+    path('api/v1/adjuntos/<int:pk>/', views.api_eliminar_adjunto, name='api_eliminar_adjunto'),
+    path('api/v1/adjuntos/<int:pk>/like/', views.api_toggle_like_adjunto, name='api_toggle_like_adjunto'),
 ]
