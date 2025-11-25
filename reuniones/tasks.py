@@ -157,6 +157,92 @@ def enviar_notificacion_nueva_reunion(reunion_id):
     logger.info(f"Notificaciones enviadas. Éxito: {exito}, Fallos: {fallo}")
 
 
+@shared_task
+def enviar_notificacion_reunion_finalizada(reunion_id):
+    """
+    Notifica a los usuarios cuando una reunión cambia a estado REALIZADA.
+    """
+    try:
+        # Aseguramos inicialización de Firebase
+        inicializar_firebase()
+        
+        reunion = Reunion.objects.get(id=reunion_id)
+        
+        # Obtenemos los tokens de todos los usuarios que tengan uno registrado
+        tokens = list(Perfil.objects.exclude(fcm_token__isnull=True)
+                                    .exclude(fcm_token="")
+                                    .values_list("fcm_token", flat=True))
+
+        if not tokens:
+            print("No hay tokens FCM registrados para enviar notificación.")
+            return
+
+        # Creamos el mensaje Multicast
+        mensaje = messaging.MulticastMessage(
+            notification=messaging.Notification(
+                title="Reunión Finalizada",
+                body=f"La reunión '{reunion.titulo}' ha finalizado. Revisa los detalles en la app."
+            ),
+            data={
+                "tipo": "reunion_finalizada",
+                "reunion_id": str(reunion.id),
+                "click_action": "FLUTTER_NOTIFICATION_CLICK"
+            },
+            tokens=tokens
+        )
+
+        response = messaging.send_each_for_multicast(mensaje)
+        print(f"[FCM] Notificación de finalización enviada. Éxitos: {response.success_count}")
+
+    except Reunion.DoesNotExist:
+        print(f"Reunión {reunion_id} no encontrada.")
+    except Exception as e:
+        print(f"Error enviando notificación FCM: {e}")
+
+
+@shared_task  # <--- ESTA ES LA NUEVA TAREA QUE NECESITAS
+def enviar_notificacion_reunion_iniciada(reunion_id):
+    """
+    Notifica a los usuarios cuando una reunión cambia a estado EN_CURSO.
+    """
+    try:
+        # Aseguramos inicialización de Firebase
+        inicializar_firebase()
+        
+        reunion = Reunion.objects.get(id=reunion_id)
+        
+        # Obtenemos los tokens de todos los usuarios que tengan uno registrado
+        tokens = list(Perfil.objects.exclude(fcm_token__isnull=True)
+                                    .exclude(fcm_token="")
+                                    .values_list("fcm_token", flat=True))
+
+        if not tokens:
+            print("No hay tokens FCM registrados para enviar notificación.")
+            return
+
+        # Creamos el mensaje Multicast
+        mensaje = messaging.MulticastMessage(
+            notification=messaging.Notification(
+                title="¡Reunión Iniciada!",
+                body=f"La reunión '{reunion.titulo}' ha comenzado. ¡Únete ahora!"
+            ),
+            data={
+                "tipo": "reunion_iniciada",  # Clave para identificar el tipo en Android
+                "reunion_id": str(reunion.id),
+                "click_action": "FLUTTER_NOTIFICATION_CLICK"
+            },
+            tokens=tokens
+        )
+
+        response = messaging.send_each_for_multicast(mensaje)
+        print(f"[FCM] Notificación de inicio enviada. Éxitos: {response.success_count}")
+
+    except Reunion.DoesNotExist:
+        print(f"Reunión {reunion_id} no encontrada.")
+    except Exception as e:
+        print(f"Error enviando notificación FCM: {e}")
+
+
 # -----------------------------------------------------------------
 # TAREA DE PRUEBA (Suma)
 # -----------------------------------------------------------------
