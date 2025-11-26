@@ -48,9 +48,9 @@ class Perfil(models.Model):
         null=True, 
         verbose_name='Token FCM'
     )
-
+    debe_cambiar_password = models.BooleanField(default=False, verbose_name="Debe cambiar contraseña")
     # =========================================================================
-    #  NUEVOS CAMPOS MFA (Esto es lo que faltaba)
+    #  NUEVOS CAMPOS MFA 
     # =========================================================================
     mfa_code = models.CharField(max_length=6, blank=True, null=True)
     mfa_expires = models.DateTimeField(blank=True, null=True)
@@ -67,7 +67,7 @@ class Perfil(models.Model):
         return f"{self.usuario.username} - {self.get_rol_display()} - {self.rut}"
 
     # =========================================================================
-    # 🔥 MÉTODOS MFA (Esto faltaba y causaba el error)
+    # MÉTODOS MFA 
     # =========================================================================
     def generar_mfa(self):
         """Genera un código de 6 dígitos y le da 5 minutos de vida."""

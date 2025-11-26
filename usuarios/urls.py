@@ -9,6 +9,7 @@ urlpatterns = [
     path("<int:pk>/editar/", views.editar_usuario, name="editar_usuario"),
     path("<int:pk>/eliminar/", views.eliminar_usuario, name="eliminar_usuario"),
     path('api/login/', views.login_api, name='login_api'),
+    path('api/cambiar-password-inicial/', views.cambiar_password_inicial, name='cambiar_password_inicial'),
     path('api/health/', health, name='health'),   # ← nuevo
     path("api/test/", views.ping, name="api_test"),
     path('accounts/password_reset/', auth_views.PasswordResetView.as_view(), name='password_reset'),

@@ -1,29 +1,28 @@
 # usuarios/views.py
 from __future__ import annotations
 
+import json
 from django.contrib import messages
-from django.contrib.auth import get_user_model
+from django.contrib.auth import get_user_model, authenticate
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
-from django.views.decorators.http import require_http_methods
+from django.views.decorators.http import require_http_methods, require_POST
+from django.views.decorators.csrf import csrf_exempt
+from django.http import JsonResponse
+from django.utils import timezone
+
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny, IsAuthenticated  
+from rest_framework.response import Response
+from rest_framework import status
 
 from core.authz import role_required
 from .forms import UsuarioCrearForm, UsuarioEditarForm
-from django.contrib.auth import authenticate
-from rest_framework.decorators import api_view
-from rest_framework.response import Response
-from rest_framework import status
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny
-from rest_framework.response import Response
-from django.utils import timezone
-from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
+
 User = get_user_model()
-import json
-from django.views.decorators.http import require_POST
+
 # -------------------------------------------------------------------
 # Config
 # -------------------------------------------------------------------
@@ -134,7 +133,7 @@ def crear_usuario(request):
         if form.is_valid():
             user = form.save()
             messages.success(request, f"Usuario «{user.username}» creado correctamente.")
-            # ⬇️ redirección con el nombre del "antiguo"
+            #  redirección con el nombre del "antiguo"
             return redirect("lista_usuarios")
         messages.error(request, "Revisa los errores del formulario.")
     else:
@@ -155,7 +154,7 @@ def editar_usuario(request, pk: int):
         if form.is_valid():
             form.save()
             messages.success(request, "Usuario actualizado.")
-            # ⬇️ redirección con el nombre del "antiguo"
+            #  redirección con el nombre del "antiguo"
             return redirect("lista_usuarios")
         messages.error(request, "Revisa los errores del formulario.")
     else:
@@ -174,10 +173,13 @@ def eliminar_usuario(request, pk: int):
     username = user.username
     user.delete()
     messages.success(request, f"Usuario «{username}» eliminado.")
-    # ⬇️ redirección con el nombre del "antiguo" (unificamos)
     return redirect("lista_usuarios")
-@api_view(['POST'])
 
+# ===================================================================
+#  APIs
+# ===================================================================
+
+@api_view(['POST'])
 @csrf_exempt
 def login_api(request):
     if request.method != "POST":
@@ -188,36 +190,93 @@ def login_api(request):
     except Exception:
         return JsonResponse({"success": False, "message": "Invalid JSON"}, status=400)
 
-    # Tu app envía "username" y "password"
-    username = data.get("username") or data.get("nombre_usuario")
+    # 1. Recibimos el dato (Usuario O Correo)
+    login_input = data.get("username") or data.get("email")
     password = data.get("password")
 
-    if not username or not password:
+    if not login_input or not password:
         return JsonResponse({"success": False, "message": "Faltan credenciales"}, status=400)
 
-    # IMPORTANTE: aunque tu USERNAME_FIELD sea 'nombre_usuario',
-    # pásalo como 'username' a authenticate.
-    user = authenticate(request, username=username, password=password)
+    # 2. Lógica Híbrida: Detectar si es Email o Usuario
+    user = None
+    
+    # Intento A: ¿Es un correo electrónico?
+    if '@' in login_input:
+        try:
+            user_obj = User.objects.get(email=login_input)
+            # Si existe por email, usamos su username real para autenticar
+            user = authenticate(request, username=user_obj.username, password=password)
+        except User.DoesNotExist:
+            pass # No existe ese email
+        except User.MultipleObjectsReturned:
+             return JsonResponse({"success": False, "message": "Error: Correo duplicado en sistema"}, status=400)
+
+    # Intento B: Si no funcionó arriba, probamos como username directo
+    if user is None:
+        user = authenticate(request, username=login_input, password=password)
+
+    # 3. Verificaciones finales
     if user is None:
         return JsonResponse({"success": False, "message": "Credenciales inválidas"}, status=401)
+    
     if not user.is_active:
         return JsonResponse({"success": False, "message": "Usuario inactivo"}, status=403)
 
-    # Token (DRF authtoken)
+    # Generación de token
     try:
         from rest_framework.authtoken.models import Token
         token, _ = Token.objects.get_or_create(user=user)
         token_key = token.key
     except Exception:
-        # Si no usas DRF, puedes devolver None o un token propio
         token_key = None
 
+    # Verificar cambio de contraseña
+    must_change = False
+    if hasattr(user, 'perfil'):
+        must_change = user.perfil.debe_cambiar_password
+
+    #  RESPUESTA FINAL CON DATOS DEL USUARIO
     return JsonResponse({
         "success": True,
         "message": "Login exitoso",
-        "token": token_key
+        "token": token_key,
+        "must_change_password": must_change,
+        "user": {
+            "id": user.id,              
+            "username": user.username,
+            "email": user.email,
+            "first_name": user.first_name,
+            "last_name": user.last_name
+        }
     }, status=200)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def cambiar_password_inicial(request):
+    """
+    Endpoint para cambiar la contraseña obligatoria (Onboarding).
+    Espera JSON: { "new_password": "..." }
+    """
+    new_password = request.data.get("new_password")
     
+    # Validaciones básicas
+    if not new_password:
+        return Response({"error": "La contraseña es requerida"}, status=400)
+    
+    if len(new_password) < 12:
+         return Response({"error": "La contraseña debe tener al menos 12 caracteres"}, status=400)
+
+    user = request.user
+    user.set_password(new_password)
+    user.save()
+    
+    # Actualizar bandera en perfil
+    if hasattr(user, 'perfil'):
+        user.perfil.debe_cambiar_password = False
+        user.perfil.save()
+        
+    return Response({"success": True, "message": "Contraseña actualizada correctamente."})
+
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def health(request):
@@ -236,10 +295,10 @@ def deshabilitar_usuario(request, pk):
     # Reglas básicas de protección
     if usuario == request.user:
         messages.warning(request, "No puedes deshabilitar tu propia cuenta.")
-        return redirect("usuarios:lista")
+        return redirect("lista_usuarios")
     if usuario.is_superuser:
         messages.warning(request, "No puedes deshabilitar a un superusuario.")
-        return redirect("usuarios:lista")
+        return redirect("lista_usuarios")
 
     if not usuario.is_active:
         messages.info(request, "El usuario ya estaba deshabilitado.")
