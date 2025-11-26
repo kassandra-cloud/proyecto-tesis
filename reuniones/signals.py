@@ -24,20 +24,17 @@ def guardar_estado_anterior_reunion(sender, instance, **kwargs):
 
 @receiver(post_save, sender=Reunion)
 def gestionar_notificaciones_reunion(sender, instance, created, **kwargs):
-    # 1. Nueva Reunión
     if created:
-        transaction.on_commit(lambda: enviar_notificacion_nueva_reunion.delay(instance.id))
+        transaction.on_commit(lambda: enviar_notificacion_nueva_reunion.delay(instance.pk))
     else:
         prev = getattr(instance, "_estado_anterior", None)
         curr = instance.estado
 
-        # 2. Reunión Finalizada
         if prev != EstadoReunion.REALIZADA and curr == EstadoReunion.REALIZADA:
-            transaction.on_commit(lambda: enviar_notificacion_reunion_finalizada.delay(instance.id))
+            transaction.on_commit(lambda: enviar_notificacion_reunion_finalizada.delay(instance.pk))
 
-        # 3. Reunión Iniciada
         if prev != EstadoReunion.EN_CURSO and curr == EstadoReunion.EN_CURSO:
-            transaction.on_commit(lambda: enviar_notificacion_reunion_iniciada.delay(instance.id))
+            transaction.on_commit(lambda: enviar_notificacion_reunion_iniciada.delay(instance.pk))
 
 # --- ACTAS ---
 
@@ -59,4 +56,5 @@ def gestionar_notificaciones_acta(sender, instance, created, **kwargs):
 
     # Notificar solo si pasa de No Aprobada -> Aprobada
     if not was_approved and is_approved:
+        # Usamos .pk aquí, lo cual es seguro
         transaction.on_commit(lambda: enviar_notificacion_acta_aprobada.delay(instance.pk))
