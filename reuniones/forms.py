@@ -1,5 +1,6 @@
 from django import forms
-from .models import Reunion, Acta # <--- AÑADE Acta A LA IMPORTACIÓN
+from django.utils import timezone  
+from .models import Reunion, Acta
 
 class ReunionForm(forms.ModelForm):
     class Meta:
@@ -18,10 +19,24 @@ class ReunionForm(forms.ModelForm):
             'tabla': 'Tabla de Contenidos (Temas a tratar)',
         }
 
+    # --- 2. NUEVA VALIDACIÓN ---
+    def clean_fecha(self):
+        fecha = self.cleaned_data.get('fecha')
+        
+        # Si existe una fecha y es menor a "ahora mismo"
+        if fecha and fecha < timezone.now():
+            raise forms.ValidationError("La fecha de la reunión no puede ser anterior al momento actual.")
+        
+        return fecha
+    # ---------------------------
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['fecha'].input_formats = ('%Y-%m-%dT%H:%M',)
-
+        
+        # Opcional: Esto ayuda visualmente bloqueando días pasados en el calendario HTML
+        # (Aunque la validación real la hace el método clean_fecha de arriba)
+        self.fields['fecha'].widget.attrs['min'] = timezone.now().strftime('%Y-%m-%dT%H:%M')
 
 class ActaForm(forms.ModelForm):
     class Meta:

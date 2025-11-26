@@ -399,6 +399,8 @@
 <script>
     window.REUNION_CONFIG = {
         reunionId: "{{ reunion.pk }}",
+        reunionTitulo: "{{ reunion.titulo|escapejs }}",
+        reunionFecha: "{{ reunion.fecha|date:'Y-m-d' }}",
         urls: {
             guardarBorrador: "{% url 'reuniones:guardar_borrador_acta' reunion.pk %}",
             enviarCorreo: "{% url 'reuniones:enviar_acta_pdf_por_correo' reunion.pk %}",

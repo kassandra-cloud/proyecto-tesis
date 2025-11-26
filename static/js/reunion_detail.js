@@ -134,7 +134,24 @@ document.addEventListener('DOMContentLoaded', () => {
                     const audioUrl = URL.createObjectURL(audioBlob);
                     if(audioPlayer) audioPlayer.src = audioUrl;
                     
-                    const nombreArchivo = `grabacion-reunion-${config.reunionId}-${new Date().toISOString().split('T')[0]}.webm`;
+                    // --- INICIO DE LA MEJORA ---
+                    
+                    // 1. Obtenemos el título y la fecha desde la configuración
+                    let tituloSeguro = config.reunionTitulo || `reunion-${config.reunionId}`;
+                    const fechaSegura = config.reunionFecha || new Date().toISOString().split('T')[0];
+
+                    // 2. Limpiamos el título para que sea un nombre de archivo válido
+                    // Reemplazamos espacios por guiones bajos y quitamos caracteres especiales
+                    tituloSeguro = tituloSeguro
+                        .replace(/\s+/g, '_')           // Espacios a guiones bajos
+                        .replace(/[^a-zA-Z0-9_\-]/g, '') // Eliminar caracteres no alfanuméricos (opcional, por seguridad)
+                        .toLowerCase();
+
+                    // 3. Generamos el nombre final: ej. "reunion_ordinaria_2025-11-26.webm"
+                    const nombreArchivo = `${tituloSeguro}_${fechaSegura}.webm`;
+
+                    // --- FIN DE LA MEJORA ---
+
                     if(downloadAudioLink) {
                         downloadAudioLink.href = audioUrl;
                         downloadAudioLink.download = nombreArchivo;

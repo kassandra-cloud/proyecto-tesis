@@ -52,7 +52,7 @@ def _pdf_bytes_desde_xhtml(template_path: str, context: dict) -> bytes:
 
 @login_required
 @role_required("reuniones", "view")
-def reunion_list(request):  # <-- Vuelve a ser un 'def' normal
+def reunion_list(request): 
     estado_query = request.GET.get('estado', 'programada')
 
     if estado_query == 'realizada':
@@ -513,6 +513,22 @@ def subir_audio_acta(request, pk):
 
     messages.success(request, f"¡Audio subido! El procesamiento ha comenzado en segundo plano. El acta se actualizará al finalizar.")
     return redirect("reuniones:detalle_reunion", pk=pk)
+
+@login_required
+@role_required("actas", "edit") 
+def lista_grabaciones(request):
+    # Filtramos las reuniones que tienen acta Y esa acta tiene un archivo de audio
+    reuniones_con_audio = Reunion.objects.filter(
+        acta__archivo_audio__isnull=False
+    ).exclude(
+        acta__archivo_audio=''
+    ).select_related('acta').order_by('-fecha')
+
+    context = {
+        'reuniones': reuniones_con_audio,
+        'titulo': 'Repositorio de Grabaciones (Solo Directiva)'
+    }
+    return render(request, "reuniones/grabaciones_list.html", context)
 
 # =================================================
 # --- PASO 1: NUEVA VISTA DE API PARA POLLING ---

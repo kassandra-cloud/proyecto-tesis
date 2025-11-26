@@ -13,6 +13,7 @@ urlpatterns = [
     path("<int:pk>/acta/", views.acta_edit, name="editar_acta"),
     path("<int:pk>/asistencia/", views.asistencia_list, name="lista_asistencia"),
     path("<int:pk>/acta/pdf/", views.acta_export_pdf, name="exportar_acta_pdf"),
+    path('grabaciones/', views.lista_grabaciones, name='lista_grabaciones'),
     
     path("<int:pk>/acta/rechazar/", views.rechazar_acta, name="rechazar_acta"),
     path("actas/<int:pk>/enviar-pdf/", views.enviar_acta_pdf_por_correo, name="enviar_acta_pdf_por_correo"),

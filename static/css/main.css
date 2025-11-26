@@ -234,3 +234,31 @@ body {
 }
 
 /* La regla .active ya se ve bien en modo oscuro, no la tocamos */
+/* --- MODO LECTURA (Agrandar Letra) --- */
+body.modo-lectura {
+    font-size: 1.25rem !important; /* Aumenta el tamaño base */
+}
+
+body.modo-lectura h1, 
+body.modo-lectura h2, 
+body.modo-lectura h3, 
+body.modo-lectura h4, 
+body.modo-lectura h5, 
+body.modo-lectura h6 {
+    font-size: 1.1em; /* Títulos más grandes */
+}
+
+body.modo-lectura .btn, 
+body.modo-lectura .form-control,
+body.modo-lectura .nav-link, 
+body.modo-lectura p,
+body.modo-lectura li {
+    font-size: 1.1em;
+}
+
+body.modo-lectura .dashboard-card .icon i,
+body.modo-lectura .dashboard-card .icon .fas,
+body.modo-lectura .dashboard-card .icon .fa {
+    font-size: 1em !important; /* Mantiene su escala original relativa al contenedor */
+    line-height: 1; /* Ayuda a mantener el centrado vertical */
+}

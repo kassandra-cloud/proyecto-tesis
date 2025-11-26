@@ -45,15 +45,25 @@
                     </a>
                     
                     <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userMenu">
-
+    
                         <li class="px-3 py-2">
                             <div class="form-check form-switch">
                                 <input class="form-check-input" type="checkbox" id="dark-mode-toggle" style="cursor: pointer;">
-                                <label class="form-check-label" for="dark-mode-toggle" style="cursor: pointer;">
-                                    Modo Oscuro
+                                <label class="form-check-label d-flex align-items-center" for="dark-mode-toggle" style="cursor: pointer;">
+                                    <i class="fas fa-moon me-2"></i> Modo Oscuro
                                 </label>
                             </div>
                         </li>
+
+                        <li class="px-3 py-2">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="lectura-mode-toggle" style="cursor: pointer;">
+                                <label class="form-check-label d-flex align-items-center" for="lectura-mode-toggle" style="cursor: pointer;">
+                                    <i class="fas fa-text-height me-2"></i> Texto Grande
+                                </label>
+                            </div>
+                        </li>
+
                         <li><hr class="dropdown-divider"></li>
 
                         <li class="px-3 py-2">
@@ -172,6 +182,35 @@
     {% block extra_js %}{% endblock %}
 
     <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Obtenemos el nuevo checkbox por su ID
+            const checkLectura = document.getElementById('lectura-mode-toggle');
+            const body = document.body;
+
+            // 1. Verificar preferencia guardada al cargar la página
+            if (localStorage.getItem('modoLectura') === 'activo') {
+                body.classList.add('modo-lectura');
+                if(checkLectura) checkLectura.checked = true; // Marcamos el switch como encendido
+            }
+
+            // 2. Evento al cambiar el switch
+            if (checkLectura) {
+                checkLectura.addEventListener('change', () => {
+                    if (checkLectura.checked) {
+                        // Si se activa
+                        body.classList.add('modo-lectura');
+                        localStorage.setItem('modoLectura', 'activo');
+                    } else {
+                        // Si se desactiva
+                        body.classList.remove('modo-lectura');
+                        localStorage.removeItem('modoLectura');
+                    }
+                });
+            }
+        });
+    </script>
+
+    <script>
         {% if messages %}
             const Toast = Swal.mixin({
                 toast: true,
@@ -193,5 +232,6 @@
             {% endfor %}
         {% endif %}
     </script>
-    </body>
+
+</body>
 </html>
