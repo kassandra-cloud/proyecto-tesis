@@ -27,9 +27,9 @@ def home(request):
     fin_mes = hoy.replace(day=num_dias_mes, hour=23, minute=59, second=59)
     
     reuniones_pendientes_mes = Reunion.objects.filter(
-        fecha__gte=hoy,       # Desde hoy
-        fecha__lte=fin_mes,   # Hasta fin de mes
-        estado='PROGRAMADA'   # <--- EL FILTRO QUE FALTABA
+        fecha__gte=hoy,      # Desde hoy
+        fecha__lte=fin_mes,  # Hasta fin de mes
+        estado='PROGRAMADA'  # <--- EL FILTRO QUE FALTABA
     ).count()
 
     # Publicaciones 24h

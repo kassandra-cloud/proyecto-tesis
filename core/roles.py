@@ -8,7 +8,7 @@ PRESIDENTE = Perfil.Roles.PRESIDENTE
 SECRETARIA = Perfil.Roles.SECRETARIA
 TESORERO   = Perfil.Roles.TESORERO
 SUPLENTE   = Perfil.Roles.SUPLENTE
-VECINO    = Perfil.Roles.VECINO 
+VECINO     = Perfil.Roles.VECINO 
 
 # Agrupaciones
 ROL_DIRECTIVA = [PRESIDENTE, SECRETARIA, TESORERO, SUPLENTE]
@@ -75,11 +75,11 @@ ROLE_MATRIX: Dict[str, Dict[str, List[str]]] = {
         "manage_all": ROL_DIRECTIVA,
     },
     "foro": {
-        "view":    ROL_DIRECTIVA + ROL_VECINO,
-        "create":  ROL_VECINO,
-        "comment": ROL_VECINO,
-        "moderate":ROL_DIRECTIVA,
-        "delete": [PRESIDENTE], # Solo el presi borra
+        "view":     ROL_DIRECTIVA + ROL_VECINO,
+        "create":   ROL_VECINO,
+        "comment":  ROL_VECINO,
+        "moderar":  ROL_DIRECTIVA,  # <-- CORREGIDO: Antes era "moderate"
+        "delete":   [PRESIDENTE], # Solo el presi borra
     },
     "anuncios": {
         "view":   ROL_DIRECTIVA + ROL_VECINO,

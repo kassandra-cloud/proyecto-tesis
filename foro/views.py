@@ -110,6 +110,36 @@ def detalle_publicacion(request, pk):
 
     # 2. Lógica para ENVIAR un comentario o archivo (POST desde la Web)
     if request.method == "POST":
+        parent_id = request.POST.get('parent_id') # <--- NUEVA LÍNEA CLAVE
+
+        # CASO A: Es una RESPUESTA ANIDADA (viene con parent_id)
+        if parent_id:
+            contenido = request.POST.get('contenido', '').strip()
+            
+            if not contenido:
+                messages.error(request, "El contenido de la respuesta no puede estar vacío.")
+                return redirect("foro:detalle_publicacion", pk=publicacion.pk)
+
+            try:
+                # El campo parent solo puede apuntar a otro Comentario (no ArchivoAdjunto)
+                parent_comment = Comentario.objects.get(pk=parent_id, publicacion=publicacion, visible=True)
+                
+                Comentario.objects.create(
+                    publicacion=publicacion,
+                    autor=request.user,
+                    contenido=contenido,
+                    parent=parent_comment  # <--- GUARDAMOS LA REFERENCIA DEL PADRE
+                )
+                messages.success(request, "Respuesta publicada.")
+                return redirect("foro:detalle_publicacion", pk=publicacion.pk)
+
+            except Comentario.DoesNotExist:
+                messages.error(request, "Error al responder: El comentario original no es válido o ha sido eliminado.")
+                return redirect("foro:detalle_publicacion", pk=publicacion.pk)
+
+        
+        # CASO B: Es el formulario PRINCIPAL (al pie de página)
+        
         # 🔹 IMPORTANTE: Pasar request.FILES para recibir la foto
         form = ComentarioCreateForm(request.POST, request.FILES)
         
@@ -136,9 +166,15 @@ def detalle_publicacion(request, pk):
                 form.save(publicacion=publicacion, autor=request.user)
                 messages.success(request, "Comentario publicado.")
 
+            # En ambos casos (A o B) debe haber contenido o archivo
+            elif not archivo and not contenido:
+                 messages.error(request, "Debes ingresar contenido o adjuntar un archivo.")
+                 
             return redirect("foro:detalle_publicacion", pk=publicacion.pk)
         else:
             messages.error(request, "No se pudo publicar el comentario.")
+
+
     else:
         form = ComentarioCreateForm()
 
@@ -147,7 +183,8 @@ def detalle_publicacion(request, pk):
     # ---------------------------------------------------------
     
     # A. Comentarios de texto
-    comentarios = publicacion.comentarios.filter(visible=True).select_related('autor')
+    # Incluimos parent__autor para mostrar el nombre del padre en la plantilla web.
+    comentarios = publicacion.comentarios.filter(visible=True).select_related('autor', 'parent__autor')
     
     # B. Archivos adjuntos del chat (App y Web)
     adjuntos_chat = publicacion.adjuntos.filter(es_mensaje=True).select_related('autor')
@@ -255,7 +292,7 @@ def _comentario_to_dict(c: Comentario) -> dict:
         "autor_username": c.autor.username,
         "contenido": c.contenido,
         "fecha_creacion": c.fecha_creacion,
-        "parent": c.parent_id,
+        "parent": c.parent_id, # <--- CLAVE PARA ANIDACIÓN EN APP MÓVIL
     }
 
 @login_required

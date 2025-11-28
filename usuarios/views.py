@@ -263,19 +263,27 @@ def cambiar_password_inicial(request):
     if not new_password:
         return Response({"error": "La contraseña es requerida"}, status=400)
     
-    if len(new_password) < 12:
+    if len(new_password) < 14:
          return Response({"error": "La contraseña debe tener al menos 12 caracteres"}, status=400)
 
     user = request.user
     user.set_password(new_password)
     user.save()
     
+    # Lógica para obtener el nombre (esto es correcto)
+    full_name = user.get_full_name().strip()
+    display_name = full_name if full_name else user.username
+    
+    # Determinar el mensaje de éxito (esto es correcto)
+    success_message = f"¡Bienvenido(a) {display_name}, tu contraseña ha sido actualizada correctamente!"
+    
     # Actualizar bandera en perfil
     if hasattr(user, 'perfil'):
         user.perfil.debe_cambiar_password = False
         user.perfil.save()
         
-    return Response({"success": True, "message": "Contraseña actualizada correctamente."})
+    # CORRECCIÓN: Usar la variable 'success_message' en la respuesta
+    return Response({"success": True, "message": success_message})
 
 @api_view(['GET'])
 @permission_classes([AllowAny])

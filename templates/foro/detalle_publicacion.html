@@ -70,7 +70,8 @@
 
     <div class="conversation-stream mb-5">
         {% for item in conversacion %}
-            <div class="d-flex mb-4 animate__animated animate__fadeIn">
+            {# APLICAMOS INDENTACIÓN TIPO ESCALERA: si es un comentario y tiene un padre, añadimos margen y borde #}
+            <div class="d-flex mb-4 animate__animated animate__fadeIn {% if item.parent and not item.archivo %}ms-5 border-start ps-3 border-secondary{% endif %}">
                 
                 <div class="flex-shrink-0">
                     <div class="rounded-circle text-white d-flex justify-content-center align-items-center fw-bold shadow-sm" 
@@ -123,10 +124,54 @@
                     {% else %}
                         <div class="bg-light p-3 rounded text-dark border position-relative" 
                              style="display: inline-block; max-width: 90%; border-radius: 0px 15px 15px 15px !important;">
+                            
+                            {# Mostrar a quién responde (si es que tiene padre) #}
+                            {% if item.parent %}
+                                <small class="text-muted d-block mb-1">
+                                    <i class="fas fa-level-up-alt fa-rotate-90 me-1"></i> Respondiendo a **{{ item.parent.autor.username }}**
+                                </small>
+                            {% endif %}
+                            
                             {{ item.contenido|linebreaksbr }}
                         </div>
+                        
+                        {# Botón y Formulario de Respuesta para Comentarios #}
+                        <div class="d-flex justify-content-start align-items-center mt-1">
+                            <button class="btn btn-sm btn-link text-decoration-none text-muted me-3" data-reply="{{ item.pk }}">
+                                <i class="fas fa-reply me-1"></i> Responder
+                            </button>
+                            
+                            {# INICIO: Formulario de Reacción funcional #}
+                            <form method="post" action="{% url 'foro:reaccionar_comentario_web' pk=item.pk %}" style="display: inline;">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-link text-decoration-none">
+                                    {# Lógica para cambiar el ícono y color si ya reaccionó #}
+                                    {% if request.user in item.likes.all %}
+                                        <i class="fas fa-thumbs-up me-1 text-primary"></i> 
+                                    {% else %}
+                                        <i class="far fa-thumbs-up me-1 text-muted"></i>
+                                    {% endif %}
+                                    <span class="text-muted">{{ item.likes.count }}</span>
+                                </button>
+                            </form>
+                            {# FIN: Formulario de Reacción #}
+
+                            {# Agregar más acciones como editar/eliminar si corresponde #}
+                        </div>
+                        
+                        {# Formulario Oculto de Respuesta #}
+                        <div id="reply-form-{{ item.pk }}" style="display: none;" class="mt-2" data-parent-id="{{ item.pk }}">
+                            <form method="post" action="{% url 'foro:detalle_publicacion' pk=publicacion.pk %}" class="needs-validation">
+                                {% csrf_token %}
+                                <input type="hidden" name="parent_id" value="{{ item.pk }}">
+                                <div class="d-flex">
+                                    <textarea name="contenido" class="form-control form-control-sm me-2" rows="2" placeholder="Tu respuesta a {{ item.autor.username }}..." required></textarea>
+                                    <button type="submit" class="btn btn-sm btn-secondary text-nowrap">Enviar Respuesta</button>
+                                </div>
+                            </form>
+                        </div>
+                        
                     {% endif %}
-                    
                 </div>
             </div>
         {% empty %}
@@ -136,9 +181,10 @@
         {% endfor %}
     </div>
 
+    {# Formulario principal y controles de adjunto, incluyendo audio #}
     <div class="card shadow-sm border-0 sticky-bottom">
         <div class="card-body bg-light border-top">
-            <form method="post" action="" enctype="multipart/form-data">
+            <form method="post" action="{% url 'foro:detalle_publicacion' pk=publicacion.pk %}" enctype="multipart/form-data">
                 {% csrf_token %}
                 
                 {% if form.non_field_errors %}
@@ -154,12 +200,36 @@
                             {% endif %}
                         </div>
                         
+                        {# Área de Adjuntos (Archivos/Imágenes) - Contiene el input file original #}
                         <div class="collapse" id="collapseAdjunto">
                             <div class="card card-body p-2 bg-white mb-2">
                                 <label class="small text-muted mb-1"><i class="fas fa-camera"></i> Adjuntar imagen o archivo:</label>
                                 {{ form.archivo }} 
                             </div>
                         </div>
+
+                        {# ÁREA PARA GRABACIÓN DE AUDIO #}
+                        <div class="collapse" id="collapseAudio">
+                            <div class="card card-body p-2 bg-white mb-2" id="audio-recorder-ui">
+                                <div class="d-flex align-items-center">
+                                    <button type="button" id="start-record-btn" class="btn btn-sm btn-outline-danger me-2">
+                                        <i class="fas fa-microphone"></i> Iniciar Grabación
+                                    </button>
+                                    <button type="button" id="stop-record-btn" class="btn btn-sm btn-secondary" disabled>
+                                        <i class="fas fa-stop-circle"></i> Detener
+                                    </button>
+                                    <span id="recording-status" class="ms-3 text-danger fw-bold" style="display: none;">
+                                        <i class="fas fa-dot-circle fa-beat me-1"></i> Grabando...
+                                    </span>
+                                </div>
+                                <div id="audio-playback-container" class="mt-2" style="display: none;">
+                                    <label class="small text-muted">Audio listo para enviar:</label>
+                                    <audio controls class="w-100" id="recorded-audio-playback"></audio>
+                                    <small class="text-muted mt-1 d-block">El audio grabado reemplazará cualquier archivo adjunto subido manualmente.</small>
+                                </div>
+                            </div>
+                        </div>
+                        {# FIN ÁREA DE AUDIO #}
                     </div>
 
                     <div class="col-md-2 col-sm-3 d-flex flex-column gap-2">
@@ -169,9 +239,13 @@
                     </div>
                 </div>
                 
-                <div class="mt-1">
+                <div class="mt-1 d-flex gap-3">
                     <button class="btn btn-sm btn-link text-decoration-none ps-0" type="button" data-bs-toggle="collapse" data-bs-target="#collapseAdjunto">
-                        <i class="fas fa-paperclip"></i> Adjuntar foto
+                        <i class="fas fa-paperclip"></i> Adjuntar foto/archivo
+                    </button>
+                    
+                    <button class="btn btn-sm btn-link text-decoration-none ps-0" type="button" data-bs-toggle="collapse" data-bs-target="#collapseAudio">
+                        <i class="fas fa-headset text-danger"></i> Grabar mensaje de voz
                     </button>
                 </div>
 
@@ -180,4 +254,8 @@
     </div>
 
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/foro_detalle.js' %}"></script>
 {% endblock %}
