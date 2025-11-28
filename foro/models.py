@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.auth.models import User
 import os
 from django.conf import settings
+from django.contrib import admin 
 
 
 class Publicacion(models.Model):
@@ -47,9 +48,15 @@ class ArchivoAdjunto(models.Model):
             return 'audio'
         elif ext in ['.mp4', '.mov', '.avi', '.mkv', '.webm']:
             return 'video'
+        elif ext in ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx']:
+            return 'documento'
         else:
             return 'otro'
 
+    @admin.display(description="Tipo de archivo")
+    def tipo_archivo_admin(self):
+        return self.tipo_archivo
+        
 class Comentario(models.Model):
     publicacion = models.ForeignKey("Publicacion", on_delete=models.CASCADE, related_name="comentarios")
     autor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)

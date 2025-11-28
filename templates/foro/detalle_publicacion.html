@@ -41,9 +41,14 @@
                                 <a href="{{ adjunto.archivo.url }}" target="_blank">
                                     <img src="{{ adjunto.archivo.url }}" class="img-fluid rounded shadow-sm border" alt="Adjunto" style="height: 200px; width: 100%; object-fit: cover;">
                                 </a>
-                            {% else %}
-                                <a href="{{ adjunto.archivo.url }}" class="btn btn-outline-secondary w-100 py-3">
+                            {% elif adjunto.tipo_archivo == 'documento' %}
+                                <a href="{{ adjunto.archivo.url }}" class="btn btn-outline-secondary w-100 py-3" target="_blank">
                                     <i class="fas fa-file-alt fa-2x mb-2"></i><br>
+                                    {{ adjunto.archivo.name|truncatechars:20 }}
+                                </a>
+                            {% else %}
+                                <a href="{{ adjunto.archivo.url }}" class="btn btn-outline-secondary w-100 py-3" target="_blank">
+                                    <i class="fas fa-paperclip fa-2x mb-2"></i><br>
                                     {{ adjunto.archivo.name|truncatechars:20 }}
                                 </a>
                             {% endif %}
@@ -80,7 +85,7 @@
                         <small class="text-muted" style="font-size: 0.85rem;">{{ item.fecha_creacion|timesince }} atrás</small>
                     </div>
 
-                    {# TIPO A: Es un Archivo (Foto/Audio) #}
+                    {# TIPO A: Es un Archivo (Foto/Audio/Documento) #}
                     {% if item.archivo %}
                         <div class="d-inline-block p-2 rounded border bg-white shadow-sm" style="max-width: 80%; min-width: 200px;">
                             
@@ -98,6 +103,11 @@
                                         <source src="{{ item.archivo.url }}" type="audio/mpeg">
                                     </audio>
                                 </div>
+                            {% elif item.tipo_archivo == 'documento' %}
+                                <a href="{{ item.archivo.url }}" class="btn btn-outline-secondary w-100 py-3" target="_blank">
+                                    <i class="fas fa-file-alt fa-2x mb-2"></i><br>
+                                    {{ item.archivo.name|truncatechars:20 }}
+                                </a>
                             {% else %}
                                 <a href="{{ item.archivo.url }}" class="text-decoration-none text-dark p-2 d-block bg-light rounded border">
                                     <i class="fas fa-paperclip"></i> Ver archivo
