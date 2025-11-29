@@ -19,7 +19,7 @@ from django.template.loader import get_template
 from xhtml2pdf import pisa
 
 # ==============================================================================
-# 🛡️ FUNCIÓN DE SEGURIDAD MEJORADA (CON DEBUGGING)
+# FUNCIÓN DE SEGURIDAD MEJORADA (CON DEBUGGING)
 # ==============================================================================
 def es_directiva(user):
     """
@@ -40,7 +40,7 @@ def es_directiva(user):
         perfil = getattr(user, 'perfil', None)
         
         if perfil is None:
-            print(f"⚠️ DEBUG ACCESS: El usuario '{user.username}' NO tiene un perfil asociado.")
+            print(f" DEBUG ACCESS: El usuario '{user.username}' NO tiene un perfil asociado.")
             return False
             
         # Convertimos el rol a texto, quitamos espacios y pasamos a minúsculas
@@ -50,14 +50,14 @@ def es_directiva(user):
         roles_permitidos = ['presidente', 'secretaria', 'tesorero', 'suplente']
         
         if rol_actual in roles_permitidos:
-            print(f"✅ DEBUG ACCESS: Acceso CONCEDIDO a '{user.username}' (Rol: {rol_actual})")
+            print(f" DEBUG ACCESS: Acceso CONCEDIDO a '{user.username}' (Rol: {rol_actual})")
             return True
         else:
-            print(f"⛔ DEBUG ACCESS: Acceso DENEGADO a '{user.username}'. Su rol '{rol_actual}' no está en la lista permitida.")
+            print(f" DEBUG ACCESS: Acceso DENEGADO a '{user.username}'. Su rol '{rol_actual}' no está en la lista permitida.")
             return False
             
     except Exception as e:
-        print(f"❌ DEBUG ACCESS: Error verificando permisos: {e}")
+        print(f" DEBUG ACCESS: Error verificando permisos: {e}")
         return False
 
 # ==============================================================================

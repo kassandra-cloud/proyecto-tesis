@@ -36,6 +36,7 @@ def inicializar_firebase():
 
 @shared_task
 def notificar_nueva_publicacion(publicacion_id):
+    return "Notificaciones desactivadas"
     """Avisa a TODOS (Topic) que hay un nuevo tema"""
     inicializar_firebase()
     try:
@@ -60,6 +61,7 @@ def notificar_nueva_publicacion(publicacion_id):
 
 @shared_task
 def notificar_nuevo_comentario(comentario_id):
+    return "Notificaciones desactivadas"
     """Avisa solo al DUEÑO del post que alguien le comentó"""
     inicializar_firebase()
     try:

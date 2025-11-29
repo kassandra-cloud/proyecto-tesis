@@ -45,7 +45,7 @@ ALLOWED_HOSTS = [
     "127.0.0.1",
     "localhost",
     "10.0.2.2",
-    "192.168.0.105",   # IP de tu PC en la red (ajústala si cambia)
+    "192.168.1.8",   # IP de tu PC en la red (ajústala si cambia)
 ]
 
 # Si usas login vía sesión desde Android/web, conviene permitir CSRF
@@ -53,7 +53,7 @@ CSRF_TRUSTED_ORIGINS = [
     "http://127.0.0.1",
     "http://localhost",
     "http://10.0.2.2",
-    "http://192.168.0.105:8000",
+    "http://192.168.1.8:8000",
     
 ]
 
@@ -298,3 +298,8 @@ DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
 # se sirvan desde Cellar en producción (¡recomendado!):
 # if not DEBUG:
 #     STATICFILES_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+
+AUTHENTICATION_BACKENDS = [
+    'core.authentication.LoginConCorreo',  # Tu nuevo sistema
+    'django.contrib.auth.backends.ModelBackend',   # El sistema clásico (respaldo)
+]

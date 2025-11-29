@@ -73,11 +73,11 @@ def solicitar_codigo_voto(request):
             [user.email],                # Destinatario (correo del usuario registrado)
             fail_silently=False,
         )
-        print(f"✅ Correo enviado a {user.email} con el código {codigo}") 
+        print(f" Correo enviado a {user.email} con el código {codigo}") 
         return Response({"ok": True, "mensaje": f"Código enviado a {user.email}"})
         
     except Exception as e:
-        print(f"❌ Error al intentar enviar correo: {e}")
+        print(f" Error al intentar enviar correo: {e}")
         # Retorna 500 y un mensaje descriptivo para la App
         return Response({"ok": False, "mensaje": "Error en el servidor al enviar el correo. Revise la configuración SMTP."}, status=500)
 

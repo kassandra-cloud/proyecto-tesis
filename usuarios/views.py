@@ -13,6 +13,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
 from django.utils import timezone
 
+
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated  
 from rest_framework.response import Response
@@ -20,7 +21,7 @@ from rest_framework import status
 
 from core.authz import role_required
 from .forms import UsuarioCrearForm, UsuarioEditarForm
-
+from django.core.exceptions import ValidationError
 User = get_user_model()
 
 # -------------------------------------------------------------------
@@ -125,21 +126,26 @@ def lista_usuarios(request):
 @role_required("usuarios", "create")
 @require_http_methods(["GET", "POST"])
 def crear_usuario(request):
-    """
-    Crea User + Perfil en transacción (lo maneja el form).
-    """
-    if request.method == "POST":
+    if request.method == 'POST':
         form = UsuarioCrearForm(request.POST)
+        
         if form.is_valid():
-            user = form.save()
-            messages.success(request, f"Usuario «{user.username}» creado correctamente.")
-            #  redirección con el nombre del "antiguo"
-            return redirect("lista_usuarios")
-        messages.error(request, "Revisa los errores del formulario.")
+            # 2. ENVOLVER EL GUARDADO EN UN TRY-EXCEPT
+            try:
+                form.save()
+                messages.success(request, 'Usuario creado exitosamente')
+                return redirect('lista_usuarios') # O a donde redirijas
+            
+            except ValidationError as e:
+                # 3. ATRAPAMOS EL ERROR DEL SIGNAL
+                # Esto toma el error que lanzó tu signal ("El correo ya existe...")
+                # y lo pone en el campo 'email' del formulario para que se vea rojo y bonito.
+                form.add_error('email', e) 
+                
     else:
         form = UsuarioCrearForm()
 
-    return render(request, "usuarios/form.html", {"form": form})
+    return render(request, 'usuarios/form.html', {'form': form})
 
 @login_required
 @role_required("usuarios", "edit")
@@ -235,18 +241,24 @@ def login_api(request):
     if hasattr(user, 'perfil'):
         must_change = user.perfil.debe_cambiar_password
 
-    #  RESPUESTA FINAL CON DATOS DEL USUARIO
+    # Lógica para obtener el apellido paterno preferente
+    apellido_mostrar = user.last_name
+    # Verificamos si tiene perfil y si este tiene apellido paterno guardado
+    if hasattr(user, 'perfil') and user.perfil.apellido_paterno:
+        apellido_mostrar = user.perfil.apellido_paterno
+
+    # RESPUESTA FINAL CON DATOS DEL USUARIO
     return JsonResponse({
         "success": True,
         "message": "Login exitoso",
         "token": token_key,
         "must_change_password": must_change,
         "user": {
-            "id": user.id,              
+            "id": user.id,
             "username": user.username,
             "email": user.email,
             "first_name": user.first_name,
-            "last_name": user.last_name
+            "last_name": apellido_mostrar # <--- Enviamos el apellido paterno real
         }
     }, status=200)
 
