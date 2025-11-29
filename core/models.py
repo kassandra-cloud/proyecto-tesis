@@ -22,7 +22,8 @@ class Perfil(models.Model):
 
     apellido_paterno = models.CharField(max_length=100, blank=True)
     apellido_materno = models.CharField(max_length=100, blank=True)
-
+    recovery_code = models.CharField(max_length=6, blank=True, null=True)
+    recovery_code_expires = models.DateTimeField(blank=True, null=True)
     # --- CAMPOS DEMOGRÁFICOS ---
     direccion = models.CharField(
         max_length=255, 
