@@ -47,7 +47,17 @@
             </div>
         </div>
     </div>
-
+    
+    <div class="row">
+        <div class="col-xl-12">
+            <div class="card mb-4">
+                <div class="card-header"><i class="fas fa-chart-line me-1"></i>Tendencia de Consulta de Actas (Últimos Meses)</div>
+                <div class="card-body">
+                    <canvas id="graficoTendenciaActas" width="100%" height="25"></canvas> 
+                </div>
+            </div>
+        </div>
+    </div>
     <div class="row">
         <div class="col-xl-6">
             <div class="card mb-4">
@@ -75,14 +85,17 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     
-    // 1. Capturamos los datos de Django aquí (esto DEBE quedar en el HTML)
+    // 1. Capturamos los datos de Django aquí
     const dataTalleres = JSON.parse('{{ data_ocupacion_talleres|safe }}' || "[]");
     const dataActas = JSON.parse('{{ data_consulta_actas|safe }}' || "[]");
     const dataParticipacion = JSON.parse('{{ data_participacion|safe }}' || "{}");
     const dataDemografia = JSON.parse('{{ data_demografia_sector|safe }}' || "[]");
+    // 🆕 CAPTURAR EL NUEVO DATASET
+    const dataTendenciaActas = JSON.parse('{{ data_tendencia_consultas|safe }}' || "[]"); 
 
-    // 2. Llamamos a la función que está en static/js/panel_bi.js pasando los datos
-    inicializarGraficosBI(dataTalleres, dataActas, dataParticipacion, dataDemografia);
+    // 2. Llamamos a la función que está en static/js/panel_bi.js pasando todos los datos
+    // 🆕 ASEGURARSE DE PASAR EL NUEVO DATASET COMO ARGUMENTO
+    inicializarGraficosBI(dataTalleres, dataActas, dataParticipacion, dataDemografia, dataTendenciaActas);
 });
 </script>
 {% endblock %}

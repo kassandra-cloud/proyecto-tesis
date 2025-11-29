@@ -3,14 +3,16 @@ from .models import Reunion, Acta, Asistencia
 from django.utils import timezone
 from datetime import timedelta
 from rest_framework import serializers
-from .models import Reunion, Acta  # asegúrate de tener Acta importada
+from .models import Reunion, Acta
 
 
 class ReunionSerializer(serializers.ModelSerializer):
     """
     Serializer para la API de Reuniones.
     """
-    autor = serializers.IntegerField(source="creada_por.id", read_only=True)
+    # 🆕 CORRECCIÓN: Usamos SerializerMethodField para manejar creador=None
+    autor = serializers.SerializerMethodField() 
+    
     fecha_inicio = serializers.DateTimeField(source="fecha", read_only=True)
     tipo_reunion = serializers.CharField(source="tipo", read_only=True)
     asistentes_count = serializers.SerializerMethodField()
@@ -49,9 +51,16 @@ class ReunionSerializer(serializers.ModelSerializer):
             "acta_id",
         ]
 
+    # 🆕 AJUSTE CLAVE: Retorna 0 si el autor es nulo para satisfacer al cliente móvil.
+    def get_autor(self, obj):
+        """Devuelve el ID del creador o 0 si no existe."""
+        if obj.creada_por:
+            return obj.creada_por.id
+        # Si es None, retorna 0 para que el móvil reciba un Int en lugar de NULL.
+        return 0
+    
     def get_asistentes_count(self, obj):
         try:
-            # si tienes related_name="asistentes" en Asistencia
             return obj.asistentes.filter(presente=True).count()
         except Exception:
             return 0
@@ -71,10 +80,6 @@ class ReunionSerializer(serializers.ModelSerializer):
     def get_acta_id(self, obj):
         """
         Devuelve el PK del acta, o None si no existe.
-
-        IMPORTANTE:
-        - NO usamos acta.id porque tu modelo Acta no tiene campo id.
-        - En su lugar, usamos acta.pk, que siempre existe.
         """
         acta = getattr(obj, "acta", None)
         if acta is None:
@@ -85,12 +90,15 @@ class ActaSerializer(serializers.ModelSerializer):
     # Acta usa OneToOne(primary_key=True) con Reunion
     reunion = serializers.PrimaryKeyRelatedField(read_only=True)
     reunion_titulo = serializers.CharField(source="reunion.titulo", read_only=True)
-    # ELIMINAMOS EL FORMATO TAMBIÉN AQUÍ si tu Acta API usa este Serializer
     reunion_fecha = serializers.DateTimeField(source="reunion.fecha", read_only=True) 
     reunion_tipo = serializers.CharField(source="reunion.tipo", read_only=True)
     
-    # Añadimos el autor del acta como string para el DTO
-    autor_username = serializers.CharField(source="autor.username", read_only=True)
+    # 🆕 CORRECCIÓN: Fuente aprobada_por y allow_null=True para manejar nulos
+    autor_username = serializers.CharField(
+        source="aprobado_por.username", # Campo correcto en Acta es 'aprobado_por'
+        read_only=True,
+        allow_null=True # Permite que sea nulo si no ha sido aprobado
+    )
 
     class Meta:
         model = Acta
@@ -99,6 +107,7 @@ class ActaSerializer(serializers.ModelSerializer):
             "reunion_titulo", "reunion_fecha", "reunion_tipo",
             "autor_username"
         ]
+        
 class AsistenciaSerializer(serializers.ModelSerializer):
 
     nombre_usuario= serializers.CharField(source="vecino.username", read_only=True, default=None)

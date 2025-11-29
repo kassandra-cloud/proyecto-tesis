@@ -1,21 +1,67 @@
 # reuniones/api.py
-from rest_framework import viewsets, permissions, filters
+from rest_framework import viewsets, permissions, filters, status
 from rest_framework.pagination import PageNumberPagination
 from django.db.models import Q
-from .models import Reunion, Acta,Asistencia
+from .models import Reunion, Acta, Asistencia, LogConsultaActa
 from .serializers import ReunionSerializer, ActaSerializer,AsistenciaSerializer
 from django.utils import timezone
 from datetime import timedelta
 from django.db.models import Q, Count
+from django.db import transaction # <-- Necesario para asegurar la consistencia del ETL
 from .models import Reunion, EstadoReunion
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
 from rest_framework.response import Response 
+
+# 🆕 IMPORTACIONES DEL DATA MART (Necesarias para el mini-ETL síncrono)
+from datamart.models import FactConsultaActa, DimVecino, DimActa 
+
+# =========================================================================
+# 🆕 FUNCIÓN AUXILIAR: Mini-ETL SÍNCRONO para Consultas de Actas
+# =========================================================================
+# Esta lógica debe ser idéntica a la que está en procesar_etl.py para este hecho.
+def actualizar_fact_consulta_actas_sincrono():
+    """
+    Realiza una carga completa (full load) de FactConsultaActa basada en LogConsultaActa.
+    ASUME que las dimensiones DimVecino y DimActa ya han sido pobladas.
+    """
+    with transaction.atomic():
+        # 1. Eliminar datos antiguos (full load)
+        FactConsultaActa.objects.all().delete()
+        
+        # 2. Extracción y mapeo de dimensiones (Data Mart ID -> Objeto Dimensión)
+        vecino_map = {d.vecino_id_oltp: d for d in DimVecino.objects.all()}
+        acta_map = {d.acta_id_oltp: d for d in DimActa.objects.all()}
+
+        # 3. Extraer logs transaccionales
+        logs = LogConsultaActa.objects.all().select_related('acta', 'vecino')
+
+        # 4. Transformación y Carga
+        fact_consultas = []
+        for log in logs:
+            dim_vecino = vecino_map.get(log.vecino_id) 
+            dim_acta = acta_map.get(log.acta_id)
+
+            if dim_vecino and dim_acta:
+                fact_consultas.append(FactConsultaActa(
+                    vecino=dim_vecino,
+                    acta=dim_acta,
+                    fecha_consulta=log.fecha_consulta
+                ))
+                
+        FactConsultaActa.objects.bulk_create(fact_consultas)
+
+# =========================================================================
+# FIN DE FUNCIÓN AUXILIAR
+# =========================================================================
+
 class DefaultPagination(PageNumberPagination):
     page_size = 20
     page_size_query_param = "page_size"
     max_page_size = 100
+    
 class ReunionViewSet(viewsets.ReadOnlyModelViewSet):
+    # ... (código ReunionViewSet existente)
     serializer_class = ReunionSerializer
     permission_classes = [permissions.AllowAny]
     pagination_class = DefaultPagination
@@ -35,7 +81,6 @@ class ReunionViewSet(viewsets.ReadOnlyModelViewSet):
         if not estado:
             return qs
 
-        # 👇 AHORA filtramos por el campo estado, no solo por fecha
         if estado == "programada":
             return qs.filter(estado=EstadoReunion.PROGRAMADA)
         if estado == "en_curso":
@@ -43,15 +88,9 @@ class ReunionViewSet(viewsets.ReadOnlyModelViewSet):
         if estado == "realizada":
             return qs.filter(estado=EstadoReunion.REALIZADA)
         return qs
+
 class ActaViewSet(viewsets.ReadOnlyModelViewSet):
-    """
-    GET /reuniones/api/actas/           → lista (paginada)
-    GET /reuniones/api/actas/{id}/      → detalle (id = id de la Reunion)
-    Filtros:
-      ?reunion=<id>   → por reunión
-      ?search=texto   → busca en contenido o título de la reunión
-      ?ordering=-reunion__fecha
-    """
+    # ... (código ActaViewSet existente)
     serializer_class = ActaSerializer
     permission_classes = [permissions.AllowAny]
     pagination_class = DefaultPagination
@@ -68,7 +107,30 @@ class ActaViewSet(viewsets.ReadOnlyModelViewSet):
         if search:
             qs = qs.filter(Q(contenido__icontains=search) | Q(reunion__titulo__icontains=search))
         return qs
+    
+    # --- ACCIÓN PARA REGISTRAR LA CONSULTA (MODIFICADA) ---
+    @action(detail=True, methods=["post"], permission_classes=[permissions.IsAuthenticated], url_path="consultar")
+    def registrar_consulta(self, request, pk=None):
+        try:
+            acta = Acta.objects.get(pk=pk)
+        except Acta.DoesNotExist:
+            return Response({"detail": "Acta no encontrada."}, status=status.HTTP_404_NOT_FOUND)
+
+        # 1. CREAR EL REGISTRO TRANSACCIONAL (OLTP)
+        LogConsultaActa.objects.create(
+            acta=acta,
+            vecino=request.user
+        )
+
+        # 2. 🆕 EJECUTAR EL MINI-ETL SÍNCRONO PARA EL ANÁLISIS (Data Mart)
+        # Esto asegura que el dato esté disponible inmediatamente para la web.
+        actualizar_fact_consulta_actas_sincrono() 
+        
+        return Response(status=status.HTTP_204_NO_CONTENT)
+    # ---------------------------------------------
+
 class AsistenciaViewSet(viewsets.ReadOnlyModelViewSet):
+    # ... (código AsistenciaViewSet existente)
     queryset = Asistencia.objects.select_related("reunion", "vecino")
     serializer_class = AsistenciaSerializer
     permission_classes = [IsAuthenticated]
@@ -82,22 +144,14 @@ class AsistenciaViewSet(viewsets.ReadOnlyModelViewSet):
 
     @action(detail=False, methods=["get"], url_path="mis")
     def mis_asistencias(self, request):
-        """
-        Devuelve las asistencias donde el 'vecino' es el usuario logueado.
-        """
         user = request.user
-
         if not user.is_authenticated:
-            # Por seguridad: si no está logueado, devolvemos lista vacía
             qs = self.get_queryset().none()
         else:
-
             qs = self.get_queryset().filter(vecino=user)
-
         page = self.paginate_queryset(qs)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
             return self.get_paginated_response(serializer.data)
-
         serializer = self.get_serializer(qs, many=True)
         return Response(serializer.data)

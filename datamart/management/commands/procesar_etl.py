@@ -1,126 +1,231 @@
-# datamart/management/commands/procesar_etl.py
-from django.core.management.base import BaseCommand
+import time
+from datetime import date
+from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
-from django.contrib.auth.models import User
+from django.db.models import Count, Q
+from django.db import models # <-- CORRECCIÓN CRÍTICA: Se necesita para modelos.Min/Max, etc.
+from django.conf import settings
+from django.contrib.auth import get_user_model
+from django.utils import timezone
 
-# --- Modelos de Producción (OLTP) ---
-from core.models import Perfil
-from reuniones.models import Acta, LogConsultaActa
-from talleres.models import Taller, Inscripcion
-from votaciones.models import Votacion, Voto # ¡Usamos tus modelos reales!
-
-# --- Modelos de Destino (OLAP) ---
+# Modelos del Data Mart (Destino)
 from datamart.models import (
     DimVecino, DimTaller, DimActa, DimVotacion,
     FactInscripcionTaller, FactConsultaActa, FactParticipacionVotacion
 )
 
+# Modelos del Sistema Transaccional (Origen)
+from core.models import Perfil          # Para DimVecino
+from talleres.models import Taller, Inscripcion # Para DimTaller y FactInscripcionTaller
+from reuniones.models import Acta, LogConsultaActa # Para DimActa y FactConsultaActa
+from votaciones.models import Votacion, Voto # Para DimVotacion y FactParticipacionVotacion
+
+
+User = get_user_model()
+
+
 class Command(BaseCommand):
-    help = 'Procesa los datos de producción (OLTP) al Data Mart (OLAP) para BI.'
+    help = "Ejecuta el proceso ETL (Extracción, Transformación y Carga) para actualizar el Data Mart."
+
+    def get_rango_etario(self, user: User) -> str:
+        """Función simplificada para rango etario."""
+        return "No Disponible"
 
     @transaction.atomic
     def handle(self, *args, **options):
-        self.stdout.write(self.style.NOTICE("Iniciando Proceso ETL..."))
+        self.stdout.write(self.style.SUCCESS("--- INICIANDO PROCESO ETL ---"))
+        start_time = time.time()
 
-        # --- 1. LIMPIAR Data Mart ---
-        self.stdout.write("Limpiando tablas de Hechos...")
+        # 1. CARGA DE DIMENSIONES
+        self.stdout.write(self.style.HTTP_INFO("1. Cargando Dimensión Vecino..."))
+        self.procesar_dim_vecino()
+
+        self.stdout.write(self.style.HTTP_INFO("2. Cargando Dimensión Taller..."))
+        self.procesar_dim_taller()
+
+        self.stdout.write(self.style.HTTP_INFO("3. Cargando Dimensión Acta..."))
+        self.procesar_dim_acta()
+
+        self.stdout.write(self.style.HTTP_INFO("4. Cargando Dimensión Votación..."))
+        self.procesar_dim_votacion()
+        
+        # 2. CARGA DE HECHOS
+        self.stdout.write(self.style.HTTP_INFO("5. Cargando Hechos de Inscripción a Talleres..."))
+        self.procesar_inscripciones_taller()
+
+        self.stdout.write(self.style.HTTP_INFO("6. Cargando Hechos de Participación en Votaciones..."))
+        self.procesar_participacion_votacion()
+
+        self.stdout.write(self.style.HTTP_INFO("7. Cargando Hechos de Consulta de Actas..."))
+        self.procesar_consultas_actas() 
+
+        end_time = time.time()
+        duration = end_time - start_time
+        self.stdout.write(self.style.SUCCESS(f"--- PROCESO ETL FINALIZADO con éxito en {duration:.2f} segundos. ---"))
+
+    # =========================================================================
+    # DIMENSIONES
+    # =========================================================================
+
+    def procesar_dim_vecino(self):
+        """Carga datos de Perfil/User a DimVecino."""
+        DimVecino.objects.all().delete()
+        
+        perfiles = Perfil.objects.select_related('usuario').all()
+        
+        dim_vecinos = []
+        for perfil in perfiles:
+            user = perfil.usuario
+            
+            full_name = f"{user.first_name or ''} {user.last_name or ''} {perfil.apellido_paterno or ''} {perfil.apellido_materno or ''}".strip()
+            
+            sector = perfil.direccion.split(',')[0].strip() if perfil.direccion else None
+
+            dim_vecinos.append(DimVecino(
+                vecino_id_oltp=user.id,
+                nombre_completo=full_name or user.username,
+                rango_etario=self.get_rango_etario(user), 
+                direccion_sector=sector,
+                tiene_niños=(perfil.total_ninos > 0)
+            ))
+        
+        DimVecino.objects.bulk_create(dim_vecinos)
+        self.stdout.write(self.style.SUCCESS(f"DimVecino cargados: {len(dim_vecinos)}"))
+
+
+    def procesar_dim_taller(self):
+        """Carga datos de Taller a DimTaller."""
+        DimTaller.objects.all().delete()
+        
+        talleres = Taller.objects.all()
+        dim_talleres = [
+            DimTaller(
+                taller_id_oltp=t.id,
+                nombre=t.nombre,
+                cupos_totales=t.cupos_totales
+            ) for t in talleres
+        ]
+        
+        DimTaller.objects.bulk_create(dim_talleres)
+        self.stdout.write(self.style.SUCCESS(f"DimTaller cargados: {len(dim_talleres)}"))
+
+
+    def procesar_dim_acta(self):
+        """Carga datos de Acta (OLTP) a DimActa."""
+        DimActa.objects.all().delete()
+        
+        actas = Acta.objects.select_related('reunion').all()
+        dim_actas = [
+            DimActa(
+                acta_id_oltp=a.pk, 
+                titulo=a.reunion.titulo,
+                fecha_reunion=a.reunion.fecha.date() 
+            ) for a in actas
+        ]
+        
+        DimActa.objects.bulk_create(dim_actas)
+        self.stdout.write(self.style.SUCCESS(f"DimActa cargadas: {len(dim_actas)}"))
+
+    def procesar_dim_votacion(self):
+        """Carga datos de Votacion (OLTP) a DimVotacion."""
+        DimVotacion.objects.all().delete()
+        
+        votaciones = Votacion.objects.all()
+        dim_votaciones = [
+            DimVotacion(
+                votacion_id_oltp=v.id,
+                pregunta=v.pregunta,
+                fecha_inicio=v.fecha_cierre # Usando fecha_cierre como proxy para el evento
+            ) for v in votaciones
+        ]
+        
+        DimVotacion.objects.bulk_create(dim_votaciones)
+        self.stdout.write(self.style.SUCCESS(f"DimVotacion cargadas: {len(dim_votaciones)}"))
+
+    # =========================================================================
+    # HECHOS
+    # =========================================================================
+
+    def procesar_inscripciones_taller(self):
+        """Carga datos de Inscripcion a FactInscripcionTaller."""
         FactInscripcionTaller.objects.all().delete()
-        FactConsultaActa.objects.all().delete()
+        
+        inscripciones = Inscripcion.objects.select_related('vecino', 'taller').all()
+        
+        vecino_map = {d.vecino_id_oltp: d for d in DimVecino.objects.all()}
+        taller_map = {d.taller_id_oltp: d for d in DimTaller.objects.all()}
+
+        fact_inscripciones = []
+        for i in inscripciones:
+            dim_vecino = vecino_map.get(i.vecino_id)
+            dim_taller = taller_map.get(i.taller_id)
+            
+            if dim_vecino and dim_taller:
+                fact_inscripciones.append(FactInscripcionTaller(
+                    vecino=dim_vecino,
+                    taller=dim_taller,
+                    fecha_inscripcion=i.fecha_inscripcion
+                ))
+        
+        FactInscripcionTaller.objects.bulk_create(fact_inscripciones)
+        self.stdout.write(self.style.SUCCESS(f"FactInscripcionTaller cargados: {len(fact_inscripciones)}"))
+
+
+    def procesar_participacion_votacion(self):
+        """Carga datos de Voto a FactParticipacionVotacion."""
         FactParticipacionVotacion.objects.all().delete()
         
-        self.stdout.write("Limpiando tablas de Dimensiones...")
-        DimVecino.objects.all().delete()
-        DimTaller.objects.all().delete()
-        DimActa.objects.all().delete()
-        DimVotacion.objects.all().delete()
-
-        # --- 2. CARGAR Dimensiones ---
-        self.stdout.write("Cargando Dimensión 'DimVecino'...")
-        for user in User.objects.all():
-            nombre = user.get_full_name() or user.username
-            rango, sector, niños = None, None, False
-            try:
-                perfil = Perfil.objects.get(usuario=user) 
-                sector = perfil.direccion
-                niños = perfil.total_ninos > 0
-            except Perfil.DoesNotExist:
-                pass
-            DimVecino.objects.create(
-                vecino_id_oltp=user.id, nombre_completo=nombre,
-                rango_etario=rango, direccion_sector=sector, tiene_niños=niños
-            )
+        # Agrupación de votos únicos por votante y votación
+        votos_agrupados = Voto.objects.select_related('opcion__votacion').values(
+            'votante_id', 'opcion__votacion_id', 'opcion__votacion__fecha_cierre'
+        ).annotate(
+            fecha_voto_min=models.Min('id') # <--- Esto ahora funciona gracias a la importación
+        ).order_by('votante_id', 'opcion__votacion_id')
         
-        self.stdout.write("Cargando Dimensión 'DimTaller'...")
-        for taller_oltp in Taller.objects.all():
-            DimTaller.objects.create(
-                taller_id_oltp=taller_oltp.id,
-                nombre=taller_oltp.nombre,
-                cupos_totales=taller_oltp.cupos_totales
-            )
+        vecino_map = {d.vecino_id_oltp: d for d in DimVecino.objects.all()}
+        votacion_map = {d.votacion_id_oltp: d for d in DimVotacion.objects.all()}
 
-        self.stdout.write("Cargando Dimensión 'DimActa'...")
-        for acta_oltp in Acta.objects.all().select_related('reunion'):
-            DimActa.objects.create(
-                acta_id_oltp=acta_oltp.reunion.id,
-                titulo=acta_oltp.reunion.titulo,
-                fecha_reunion=acta_oltp.reunion.fecha.date()
-            )
+        fact_participaciones = []
+        for v in votos_agrupados:
+            dim_vecino = vecino_map.get(v['votante_id'])
+            dim_votacion = votacion_map.get(v['opcion__votacion_id'])
+            
+            if dim_vecino and dim_votacion:
+                fact_participaciones.append(FactParticipacionVotacion(
+                    vecino=dim_vecino,
+                    votacion=dim_votacion,
+                    fecha_voto=v['opcion__votacion__fecha_cierre'] 
+                ))
+        
+        FactParticipacionVotacion.objects.bulk_create(fact_participaciones)
+        self.stdout.write(self.style.SUCCESS(f"FactParticipacionVotacion cargados: {len(fact_participaciones)}"))
 
-        self.stdout.write("Cargando Dimensión 'DimVotacion'...")
-        if Votacion.objects:
-            for votacion_oltp in Votacion.objects.all():
-                DimVotacion.objects.create(
-                    votacion_id_oltp=votacion_oltp.id,
-                    pregunta=votacion_oltp.pregunta, 
-                    # --- CORRECCIÓN 1 ---
-                    # Usamos 'fecha_cierre' porque 'fecha_inicio' no existe
-                    fecha_inicio=votacion_oltp.fecha_cierre 
-                )
 
-        # --- 3. CARGAR Hechos ---
-        self.stdout.write("Cargando Hecho 'FactInscripcionTaller'...")
-        for inscripcion_oltp in Inscripcion.objects.all():
-            try:
-                dim_vecino = DimVecino.objects.get(vecino_id_oltp=inscripcion_oltp.vecino.id)
-                dim_taller = DimTaller.objects.get(taller_id_oltp=inscripcion_oltp.taller.id)
-                FactInscripcionTaller.objects.create(
-                    vecino=dim_vecino, taller=dim_taller,
-                    fecha_inscripcion=inscripcion_oltp.fecha_inscripcion
-                )
-            except (DimVecino.DoesNotExist, DimTaller.DoesNotExist): pass
+    def procesar_consultas_actas(self):
+        """
+        Extrae logs de consultas de actas (transaccional) y carga la FactConsultaActa.
+        """
+        FactConsultaActa.objects.all().delete()
 
-        self.stdout.write("Cargando Hecho 'FactConsultaActa'...")
-        for log_oltp in LogConsultaActa.objects.all():
-            try:
-                dim_vecino = DimVecino.objects.get(vecino_id_oltp=log_oltp.vecino.id)
-                dim_acta = DimActa.objects.get(acta_id_oltp=log_oltp.acta.reunion_id)
-                FactConsultaActa.objects.create(
-                    vecino=dim_vecino, acta=dim_acta,
-                    fecha_consulta=log_oltp.fecha_consulta
-                )
-            except (DimVecino.DoesNotExist, DimActa.DoesNotExist): pass
+        logs = LogConsultaActa.objects.all().select_related('acta', 'vecino')
 
-        self.stdout.write("Cargando Hecho 'FactParticipacionVotacion'...")
-        if Voto.objects:
-            # Usamos select_related para optimizar la consulta
-            for voto_oltp in Voto.objects.all().select_related('votante', 'opcion__votacion'):
-                try:
-                    # --- CORRECCIÓN 2 ---
-                    # Usamos 'votante' en lugar de 'vecino'
-                    dim_vecino = DimVecino.objects.get(vecino_id_oltp=voto_oltp.votante.id) 
-                    
-                    # --- CORRECCIÓN 3 ---
-                    # Accedemos a la votacion a través de la 'opcion'
-                    dim_votacion = DimVotacion.objects.get(votacion_id_oltp=voto_oltp.opcion.votacion.id)
-                    
-                    FactParticipacionVotacion.objects.create(
-                        vecino=dim_vecino, 
-                        votacion=dim_votacion,
-                        # --- CORRECCIÓN 4 ---
-                        # Usamos 'fecha_cierre' porque 'fecha_voto' no existe
-                        fecha_voto=voto_oltp.opcion.votacion.fecha_cierre
-                    )
-                except (AttributeError, DimVecino.DoesNotExist, DimVotacion.DoesNotExist):
-                    self.stdout.write(self.style.WARNING(f"Omitiendo voto para vecino/votación no encontrado."))
+        vecino_map = {d.vecino_id_oltp: d for d in DimVecino.objects.all()}
+        acta_map = {d.acta_id_oltp: d for d in DimActa.objects.all()}
 
-        self.stdout.write(self.style.SUCCESS("¡Proceso ETL completado con éxito!"))
+        fact_consultas = []
+        for log in logs:
+            dim_vecino = vecino_map.get(log.vecino_id) 
+            dim_acta = acta_map.get(log.acta_id)
+
+            if dim_vecino and dim_acta:
+                fact_consultas.append(FactConsultaActa(
+                    vecino=dim_vecino,
+                    acta=dim_acta,
+                    fecha_consulta=log.fecha_consulta
+                ))
+            else:
+                self.stderr.write(self.style.WARNING(f"Advertencia: No se encontró DimVecino o DimActa para LogConsultaActa ID {log.id}. Salto de registro."))
+
+
+        FactConsultaActa.objects.bulk_create(fact_consultas)
+        self.stdout.write(self.style.SUCCESS(f"FactConsultaActa cargados: {len(fact_consultas)}"))
