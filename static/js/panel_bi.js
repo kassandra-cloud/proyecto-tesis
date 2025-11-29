@@ -2,11 +2,6 @@
 
 /**
  * Función principal llamada desde el HTML para inicializar todos los gráficos del panel BI.
- * * @param {Array<Object>} dataTalleres - Datos de ocupación de talleres.
- * @param {Array<Object>} dataActas - Datos de consultas de actas (Top 10) - Se mantiene por si se necesita.
- * @param {Object} dataParticipacion - Datos de participación general (Gauge).
- * @param {Array<Object>} dataDemografia - Datos de distribución de vecinos por sector.
- * @param {Array<Object>} dataTendenciaActas - Datos de tendencia de consultas por mes (NUEVO).
  */
 function inicializarGraficosBI(dataTalleres, dataActas, dataParticipacion, dataDemografia, dataTendenciaActas) {
     // 1. Gráfico Gauge de Participación
@@ -24,104 +19,84 @@ function inicializarGraficosBI(dataTalleres, dataActas, dataParticipacion, dataD
         dibujarOcupacionTalleres(dataTalleres);
     }
 
-    // 4. Gráfico de Consulta de Actas (Top 10) - YA NO SE LLAMA, HA SIDO REEMPLAZADO POR LA TENDENCIA
-    // if (dataActas && dataActas.length > 0) {
-    //     dibujarConsultaActas(dataActas); 
-    // }
-
-    // 🆕 5. Gráfico de Tendencia de Consulta de Actas (Línea/Área)
+    // 4. Gráfico de Tendencia de Consulta de Actas (Línea de Tiempo) [NUEVO]
     if (dataTendenciaActas && dataTendenciaActas.length > 0) {
-        // La función dibuja en 'graficoTendenciaActas', que ahora ocupa el espacio del Top 10.
         dibujarTendenciaActas(dataTendenciaActas); 
     }
 }
 
-
 // =========================================================
-// 🆕 5. GRÁFICO DE TENDENCIA DE CONSULTA DE ACTAS (LÍNEA/ÁREA)
+// 🆕 4. GRÁFICO DE TENDENCIA DE CONSULTA DE ACTAS (LÍNEA)
 // =========================================================
 function dibujarTendenciaActas(data) {
-    // ID del canvas donde se dibujará el gráfico (el que reemplazó al Top 10)
     const ctx = document.getElementById('graficoTendenciaActas');
-    // ⚠️ CHEQUEO CRÍTICO: Si el elemento no existe, salimos sin error
     if (!ctx) return; 
     
-    // 1. Formatear los datos
+    // 1. Procesar etiquetas (Meses)
     const labels = data.map(item => {
-        const date = new Date(item.mes_consulta);
-        return new Intl.DateTimeFormat('es-ES', { month: 'short', year: 'numeric' }).format(date);
+        // Agregamos 'T00:00:00' para asegurar que JS interprete la fecha en el día correcto
+        const date = new Date(item.mes + 'T00:00:00'); 
+        return date.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
     });
     
-    const consultas = data.map(item => item.total_consultas);
+    // 2. Procesar valores
+    const valores = data.map(item => item.total);
 
-    // 2. Inicializar el gráfico de Área/Línea
+    // 3. Crear Gráfico de Línea
     new Chart(ctx, {
         type: 'line', 
         data: {
             labels: labels,
             datasets: [{
-                label: 'Total de Consultas',
-                data: consultas,
-                backgroundColor: 'rgba(40, 123, 255, 0.3)', 
-                borderColor: 'rgba(40, 123, 255, 1)',      
-                borderWidth: 2,
-                pointRadius: 5,
-                pointHoverRadius: 7,
-                tension: 0.4, 
-                fill: true,   
+                label: 'Consultas Mensuales',
+                data: valores,
+                borderColor: '#287BFF',       // Azul Institucional
+                backgroundColor: 'rgba(40, 123, 255, 0.1)', // Relleno suave
+                borderWidth: 3,
+                pointBackgroundColor: '#ffffff',
+                pointBorderColor: '#287BFF',
+                pointRadius: 6,
+                pointHoverRadius: 8,
+                fill: true,   // Rellenar área bajo la curva
+                tension: 0.4  // Curvatura suave
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-                legend: {
-                    display: false
-                },
-                title: {
-                    display: false,
+                legend: { display: false },
+                title: { 
+                    display: true,
+                    text: 'Evolución de Consultas (Últimos 6 Meses)'
                 },
                 tooltip: {
                     callbacks: {
-                        title: (context) => context[0].label,
-                        label: (context) => `Consultas: ${context.parsed.y.toLocaleString('es-ES')}`
+                        label: (context) => ` ${context.parsed.y} consultas`
                     }
                 }
             },
             scales: {
-                x: {
-                    title: {
-                        display: true,
-                        text: 'Mes de Consulta'
-                    }
-                },
                 y: {
                     beginAtZero: true,
-                    title: {
-                        display: true,
-                        text: 'Número de Consultas'
-                    },
-                    // Asegura que las etiquetas sean enteras
-                    ticks: {
-                        callback: function(value) { 
-                            if (value % 1 === 0) { 
-                                return value.toLocaleString('es-ES'); 
-                            } 
-                        }
-                    }
+                    title: { display: true, text: 'Cantidad' },
+                    ticks: { stepSize: 1 }, // Solo enteros
+                    grid: { borderDash: [2, 4] }
+                },
+                x: {
+                    grid: { display: false }
                 }
             }
         }
     });
 }
 
-
 // =========================================================
 // 1. GRÁFICO GAUGE DE PARTICIPACIÓN
 // =========================================================
 function dibujarParticipacionGauge(data) {
     const ctx = document.getElementById('graficoParticipacionGauge');
-    if (!ctx) return; // Chequeo de nulidad
+    if (!ctx) return; 
     
     const porcentaje = data.porcentaje_actual;
     const restante = 100 - porcentaje;
@@ -171,13 +146,12 @@ function dibujarParticipacionGauge(data) {
     });
 }
 
-
 // =========================================================
 // 2. GRÁFICO DE DISTRIBUCIÓN DEMOGRÁFICA
 // =========================================================
 function dibujarDemografiaSector(data) {
     const ctx = document.getElementById('graficoDemografiaSector');
-    if (!ctx) return; // Chequeo de nulidad
+    if (!ctx) return; 
     
     const labels = data.map(item => item.direccion_sector);
     const conteos = data.map(item => item.total_vecinos);
@@ -206,13 +180,12 @@ function dibujarDemografiaSector(data) {
     });
 }
 
-
 // =========================================================
 // 3. GRÁFICO DE OCUPACIÓN DE TALLERES
 // =========================================================
 function dibujarOcupacionTalleres(data) {
     const ctx = document.getElementById('graficoOcupacionTalleres');
-    if (!ctx) return; // Chequeo de nulidad
+    if (!ctx) return; 
     
     const labels = data.map(item => item.nombre);
     const inscritos = data.map(item => item.inscritos);
@@ -246,55 +219,8 @@ function dibujarOcupacionTalleres(data) {
             scales: {
                 x: {
                     beginAtZero: true,
-                    title: {
-                        display: true,
-                        text: 'Cantidad'
-                    }
+                    title: { display: true, text: 'Cantidad' }
                 }
-            }
-        }
-    });
-}
-
-
-// =========================================================
-// 4. GRÁFICO DE CONSULTA DE ACTAS TOP 10 (Función no llamada)
-// =========================================================
-function dibujarConsultaActas(data) {
-    // Función mantenida por referencia, pero no llamada por inicializarGraficosBI
-    const ctx = document.getElementById('graficoConsultaActas');
-    if (!ctx) return;
-    
-    const labels = data.map(item => item.acta__titulo);
-    const consultas = data.map(item => item.consultas);
-    
-    new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: labels,
-            datasets: [{
-                label: 'Consultas',
-                data: consultas,
-                backgroundColor: 'rgba(40, 123, 255, 0.8)',
-                borderColor: 'rgba(40, 123, 255, 1)',
-                borderWidth: 1
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    title: { display: true, text: 'Veces Consultada' },
-                    ticks: { callback: (value) => { if (value % 1 === 0) { return value; } } }
-                },
-                x: {
-                    ticks: { autoSkip: true, maxRotation: 0, minRotation: 0 }
-                }
-            },
-            plugins: {
-                legend: { display: false }
             }
         }
     });
