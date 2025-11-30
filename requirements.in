@@ -1,7 +1,7 @@
 # -------------------------------------
 # Dependencias Principales del Proyecto
 # -------------------------------------
-
+gunicorn
 # Framework principal
 Django
 djangorestframework

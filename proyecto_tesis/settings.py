@@ -140,7 +140,7 @@ DATABASES = {
         "PASSWORD": os.getenv("MYSQL_PASSWORD", ""),
         "HOST": os.getenv("MYSQL_HOST", "127.0.0.1"),
         "PORT": os.getenv("MYSQL_PORT", "3306"),
-        "CONN_MAX_AGE": 0,            # reutiliza la conexión hasta 60s
+        "CONN_MAX_AGE": 0 if DEBUG else 60,          # 60 segundos mantiene la conexión viva para reutilizarla (Mejora ISO 25010)
         "CONN_HEALTH_CHECKS": True,    # Django 5: revisa conexión antes de usarla
         "OPTIONS": {
             "connect_timeout": 10,
@@ -277,7 +277,14 @@ AWS_S3_ENDPOINT_URL = f"https://{os.environ.get('CELLAR_HOST')}"
 
 # Hacer públicos los adjuntos (imagenes / videos / audio)
 AWS_DEFAULT_ACL = None
-AWS_QUERYSTRING_AUTH = False  # NO firma URLs → visibles públicamente
+# --- SEGURIDAD ISO 27001 (Control de Acceso) ---
+if DEBUG:
+    # En desarrollo (Local): URLs públicas para que no te den problemas al probar
+    AWS_QUERYSTRING_AUTH = False
+else:
+    # En Producción (Nube): URLs firmadas que expiran.
+    # Solo el usuario con permiso puede ver la foto/audio.
+    AWS_QUERYSTRING_AUTH = True
 
 AWS_S3_OBJECT_PARAMETERS = {
     "CacheControl": "max-age=86400",  # 1 día
