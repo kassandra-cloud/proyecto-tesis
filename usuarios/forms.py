@@ -148,10 +148,10 @@ class UsuarioCrearForm(forms.ModelForm):
         user = super().save(commit=False)
         user.username   = self.cleaned_data["username"].strip()
         user.email      = (self.cleaned_data.get("email") or "").strip()
-        user.first_name = (self.cleaned_data.get("first_name") or "").strip()
+        user.first_name = (self.cleaned_data.get("first_name") or "").strip().title()
 
-        ap = (self.cleaned_data.get("apellido_paterno") or "").strip()
-        am = (self.cleaned_data.get("apellido_materno") or "").strip()
+        ap = (self.cleaned_data.get("apellido_paterno") or "").strip().title()
+        am = (self.cleaned_data.get("apellido_materno") or "").strip().title()
         user.last_name  = f"{ap} {am}".strip()
 
         # GENERACIÓN DE CONTRASEÑA
@@ -326,9 +326,9 @@ class UsuarioEditarForm(forms.ModelForm):
         user = super().save(commit=False)
         user.username   = (self.cleaned_data.get("username") or "").strip()
         user.email      = (self.cleaned_data.get("email") or "").strip()
-        user.first_name = (self.cleaned_data.get("first_name") or "").strip()
-        ap = (self.cleaned_data.get("apellido_paterno") or "").strip()
-        am = (self.cleaned_data.get("apellido_materno") or "").strip()
+        user.first_name = (self.cleaned_data.get("first_name") or "").strip().title()
+        ap = (self.cleaned_data.get("apellido_paterno") or "").strip().title()
+        am = (self.cleaned_data.get("apellido_materno") or "").strip().title()
         user.last_name  = f"{ap} {am}".strip()
 
         if commit:

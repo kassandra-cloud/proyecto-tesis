@@ -2,7 +2,7 @@
 (function () {
   function evaluate(pw) {
     return {
-      len: pw.length >= 12,
+      len: pw.length >= 14,
       lower: /[a-z]/.test(pw),
       upper: /[A-Z]/.test(pw),
       sym: /[^A-Za-z0-9]/.test(pw),

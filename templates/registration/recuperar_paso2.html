@@ -1,0 +1,115 @@
+{% extends "base_public.html" %}
+{% load static %}
+
+{% block title %}Verificar Código{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-center align-items-center p-4" style="min-height: 100vh; background-color: #f0f2f5;">
+    <div class="card shadow-lg border-0 rounded-4 overflow-hidden" style="max-width: 900px; width: 100%;">
+        <div class="row g-0">
+            <div class="col-md-5 d-none d-md-flex flex-column justify-content-center align-items-center text-white p-4" 
+                 style="background: linear-gradient(135deg, #198754 0%, #20c997 100%);">
+                <i class="fas fa-lock-open fa-4x mb-3"></i>
+                <h3 class="fw-bold">Restablecer</h3>
+                <p class="text-center opacity-75">Ingresa el código que enviamos a <strong>{{ email }}</strong>.</p>
+            </div>
+            
+            <div class="col-md-7 p-5">
+                <div class="text-center mb-4">
+                    <h2 class="h4 fw-bold">Nueva Contraseña</h2>
+                    <p class="text-muted small">Crea una contraseña segura.</p>
+                </div>
+
+                {% if messages %}
+                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                        <ul class="mb-0 ps-3">
+                            {% for message in messages %}
+                                <li>{{ message }}</li>
+                            {% endfor %}
+                        </ul>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endif %}
+
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-muted">CÓDIGO DE 6 DÍGITOS</label>
+                        <input type="text" name="codigo" class="form-control form-control-lg text-center fw-bold" 
+                               placeholder="000000" maxlength="6" pattern="\d*" required 
+                               style="letter-spacing: 5px; font-size: 1.5rem;">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-muted">NUEVA CONTRASEÑA</label>
+                        <div class="input-group">
+                            <input type="password" name="pass1" id="id_password1" class="form-control" placeholder="******" required>
+                            <button class="btn btn-outline-secondary" type="button" onclick="toggleDirect('id_password1', this)">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label fw-bold small text-muted">CONFIRMAR CONTRASEÑA</label>
+                        <div class="input-group">
+                            <input type="password" name="pass2" id="id_password2" class="form-control" placeholder="******" required>
+                            <button class="btn btn-outline-secondary" type="button" onclick="toggleDirect('id_password2', this)">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="card bg-light border-0 mb-4 small rounded-3">
+                        <div class="card-body p-3">
+                            <div id="pw-match" class="mb-2 fw-bold text-danger">
+                                ✖ Las contraseñas no coinciden.
+                            </div>
+                            <hr class="my-1">
+                            <ul class="list-unstyled mb-0 mt-2 text-muted">
+                                <li id="pm-create-len" class="text-danger mb-1">
+                                    <span class="pm-icon">✖</span> Mínimo 14 caracteres
+                                </li>
+                                <li id="pm-create-lower" class="text-danger mb-1"><span class="pm-icon">✖</span> Al menos una minúscula</li>
+                                <li id="pm-create-upper" class="text-danger mb-1"><span class="pm-icon">✖</span> Al menos una mayúscula</li>
+                                <li id="pm-create-sym" class="text-danger"><span class="pm-icon">✖</span> Un símbolo o número</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="d-grid">
+                        <button type="submit" id="btn-guardar" class="btn btn-success btn-lg" disabled>
+                            Cambiar Contraseña
+                        </button>
+                    </div>
+                </form>
+
+                <div class="text-center mt-3">
+                    <a href="{% url 'web_recuperar_paso1' %}" class="small text-decoration-none text-muted">¿No llegó? Solicitar de nuevo</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function toggleDirect(inputId, btn) {
+        const input = document.getElementById(inputId);
+        const icon = btn.querySelector('i');
+        
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.classList.remove('fa-eye');
+            icon.classList.add('fa-eye-slash');
+        } else {
+            input.type = 'password';
+            icon.classList.remove('fa-eye-slash');
+            icon.classList.add('fa-eye');
+        }
+    }
+</script>
+
+<script src="{% static 'js/password-meter.js' %}"></script>
+
+{% endblock %}

@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Código de Recuperación</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f4f6f9;">
+    
+    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+        <tr>
+            <td style="padding: 20px 0 30px 0;">
+                
+                <table align="center" border="0" cellpadding="0" cellspacing="0" width="600" style="border-collapse: separate; border-spacing: 0; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #ffffff; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.05);">
+                    
+                    <tr>
+                        <td align="center" bgcolor="#0d6efd" style="padding: 30px 0; color: #ffffff;">
+                            <h1 style="font-size: 24px; margin: 0; font-weight: bold;">Recuperación de Cuenta</h1>
+                            <p style="margin: 5px 0 0 0; opacity: 0.9; font-size: 14px;">Junta de Vecinos "Villa vista al mar"</p>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td style="padding: 40px 30px; text-align: center;">
+                            <p style="font-size: 18px; color: #333333; margin-top: 0;">Hola <strong>{{ user.username }}</strong>,</p>
+                            
+                            <p style="font-size: 15px; color: #555555; line-height: 1.5;">
+                                Hemos recibido una solicitud para restablecer tu contraseña. <br>
+                                Usa el siguiente código de seguridad en la aplicación para continuar:
+                            </p>
+                            
+                            <div style="margin: 30px 0;">
+                                <span style="
+                                    background-color: #f0f7ff; 
+                                    color: #0d6efd; 
+                                    border: 2px dashed #0d6efd; 
+                                    padding: 15px 30px; 
+                                    border-radius: 8px; 
+                                    font-size: 32px; 
+                                    font-weight: bold; 
+                                    letter-spacing: 8px; 
+                                    display: inline-block;">
+                                    {{ codigo }}
+                                </span>
+                            </div>
+
+                            <p style="font-size: 13px; color: #888888; margin-bottom: 0;">
+                                ⚠️ Este código expira en <strong>15 minutos</strong>.
+                            </p>
+                        </td>
+                    </tr>
+
+                    <tr>
+                        <td bgcolor="#f8f9fa" style="padding: 20px 30px; font-size: 12px; color: #999999; text-align: center; border-top: 1px solid #eeeeee;">
+                            <p style="margin: 0;">Si no solicitaste este cambio, por favor ignora este mensaje. Tu cuenta sigue segura.</p>
+                        </td>
+                    </tr>
+
+                </table>
+            </td>
+        </tr>
+    </table>
+
+</body>
+</html>

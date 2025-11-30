@@ -2,37 +2,45 @@
 from __future__ import annotations
 
 import json
+import random
+from datetime import timedelta
+
+from django.conf import settings
 from django.contrib import messages
-from django.contrib.auth import get_user_model, authenticate
+from django.contrib.auth import get_user_model, authenticate, login, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.forms import PasswordChangeForm
+from django.core.exceptions import ValidationError
+from django.core.mail import send_mail
 from django.core.paginator import Paginator
 from django.db.models import Q
-from django.shortcuts import get_object_or_404, redirect, render
-from django.views.decorators.http import require_http_methods, require_POST
-from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
+from django.template.loader import render_to_string
 from django.utils import timezone
-from core.models import Perfil
+from django.utils.html import strip_tags
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods, require_POST
 
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny, IsAuthenticated  
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
+from django.contrib.auth.password_validation import validate_password  # <--- AGREGAR ESTA LÍNEA
+
 
 from core.authz import role_required
+from core.models import Perfil
 from .forms import UsuarioCrearForm, UsuarioEditarForm
-from django.core.exceptions import ValidationError
+
 User = get_user_model()
 
-from django.contrib.auth import update_session_auth_hash
-from django.contrib.auth.forms import PasswordChangeForm
-
 # -------------------------------------------------------------------
-# Config
+# Configuración
 # -------------------------------------------------------------------
 OPCIONES_PER_PAGE = [10, 25, 50]
 
-# map de columnas permitidas en sort -> field de ORM
+# Mapa de columnas permitidas en sort -> field de ORM
 SORT_MAP = {
     "username": "username",
     "email": "email",
@@ -43,7 +51,7 @@ SORT_MAP = {
 }
 
 # -------------------------------------------------------------------
-# Utilidades
+# Utilidades Internas
 # -------------------------------------------------------------------
 def _paginar(request, queryset, default_per_page: int = 10):
     """
@@ -82,36 +90,30 @@ def _aplicar_orden(qs, sort_key: str | None, direction: str | None):
     return qs.order_by(sort_field)
 
 # -------------------------------------------------------------------
-# Vistas
+# Vistas de Gestión de Usuarios (Web)
 # -------------------------------------------------------------------
 @login_required
 @role_required("usuarios", "view")
 def lista_usuarios(request):
     """
     Lista Users con su Perfil (RUT/rol), con búsqueda, orden y paginación.
-    Muestra:
-      - Tabla paginada de usuarios ACTIVOS (con botón Deshabilitar).
-      - Acordeón con usuarios DESHABILITADOS (con botón Restaurar).
     """
     q = (request.GET.get("q") or "").strip()
     sort = (request.GET.get("sort") or "username").strip().lower()
     dir_ = (request.GET.get("dir") or "asc").strip().lower()
     next_dir = "desc" if dir_ == "asc" else "asc"
 
-    # Base query con perfil asociado
     base = User.objects.select_related("perfil").filter(is_superuser=False)
     base = _aplicar_busqueda(base, q)
     base = _aplicar_orden(base, sort, dir_)
 
-    # Separamos activos/inactivos
     activos_qs = base.filter(is_active=True)
     inactivos_qs = base.filter(is_active=False)
 
-    # Paginamos SOLO los activos (lo usual)
     page_obj, per_page, paginator = _paginar(request, activos_qs, default_per_page=10)
 
     ctx = {
-        "page_obj": page_obj,             # activos paginados
+        "page_obj": page_obj,
         "per_page": per_page,
         "paginator": paginator,
         "total": base.count(),
@@ -120,7 +122,7 @@ def lista_usuarios(request):
         "sort": sort,
         "dir": dir_,
         "next_dir": next_dir,
-        "usuarios_inactivos": inactivos_qs,  # lista completa para acordeón
+        "usuarios_inactivos": inactivos_qs,
         "titulo": "Usuarios",
     }
     return render(request, "usuarios/lista.html", ctx)
@@ -131,20 +133,13 @@ def lista_usuarios(request):
 def crear_usuario(request):
     if request.method == 'POST':
         form = UsuarioCrearForm(request.POST)
-        
         if form.is_valid():
-            # 2. ENVOLVER EL GUARDADO EN UN TRY-EXCEPT
             try:
                 form.save()
                 messages.success(request, 'Usuario creado exitosamente')
-                return redirect('lista_usuarios') # O a donde redirijas
-            
+                return redirect('lista_usuarios')
             except ValidationError as e:
-                # 3. ATRAPAMOS EL ERROR DEL SIGNAL
-                # Esto toma el error que lanzó tu signal ("El correo ya existe...")
-                # y lo pone en el campo 'email' del formulario para que se vea rojo y bonito.
                 form.add_error('email', e) 
-                
     else:
         form = UsuarioCrearForm()
 
@@ -153,9 +148,6 @@ def crear_usuario(request):
 @login_required
 @role_required("usuarios", "edit")
 def editar_usuario(request, pk: int):
-    """
-    Edita datos básicos del User + RUT y rol (Perfil) vía form.
-    """
     user = get_object_or_404(User.objects.select_related("perfil"), pk=pk)
 
     if request.method == "POST":
@@ -163,7 +155,6 @@ def editar_usuario(request, pk: int):
         if form.is_valid():
             form.save()
             messages.success(request, "Usuario actualizado.")
-            #  redirección con el nombre del "antiguo"
             return redirect("lista_usuarios")
         messages.error(request, "Revisa los errores del formulario.")
     else:
@@ -173,144 +164,16 @@ def editar_usuario(request, pk: int):
 
 @login_required
 @role_required("usuarios", "delete")
-@require_http_methods(["POST", "GET"])  # permite GET si usas un enlace con confirm JS
+@require_http_methods(["POST", "GET"])
 def eliminar_usuario(request, pk: int):
-    """
-    Elimina el User; si Perfil tiene on_delete=CASCADE se elimina automáticamente.
-    """
     user = get_object_or_404(User, pk=pk)
     username = user.username
     user.delete()
     messages.success(request, f"Usuario «{username}» eliminado.")
     return redirect("lista_usuarios")
 
-# ===================================================================
-#  APIs
-# ===================================================================
-
-@api_view(['POST'])
-@csrf_exempt
-def login_api(request):
-    if request.method != "POST":
-        return JsonResponse({"success": False, "message": "Method not allowed"}, status=405)
-
-    try:
-        data = json.loads(request.body or "{}")
-    except Exception:
-        return JsonResponse({"success": False, "message": "Invalid JSON"}, status=400)
-
-    # 1. Recibimos el dato (Usuario O Correo)
-    login_input = data.get("username") or data.get("email")
-    password = data.get("password")
-
-    if not login_input or not password:
-        return JsonResponse({"success": False, "message": "Faltan credenciales"}, status=400)
-
-    # 2. Lógica Híbrida: Detectar si es Email o Usuario
-    user = None
-    
-    # Intento A: ¿Es un correo electrónico?
-    if '@' in login_input:
-        try:
-            user_obj = User.objects.get(email=login_input)
-            # Si existe por email, usamos su username real para autenticar
-            user = authenticate(request, username=user_obj.username, password=password)
-        except User.DoesNotExist:
-            pass # No existe ese email
-        except User.MultipleObjectsReturned:
-             return JsonResponse({"success": False, "message": "Error: Correo duplicado en sistema"}, status=400)
-
-    # Intento B: Si no funcionó arriba, probamos como username directo
-    if user is None:
-        user = authenticate(request, username=login_input, password=password)
-
-    # 3. Verificaciones finales
-    if user is None:
-        return JsonResponse({"success": False, "message": "Credenciales inválidas"}, status=401)
-    
-    if not user.is_active:
-        return JsonResponse({"success": False, "message": "Usuario inactivo"}, status=403)
-
-    # Generación de token
-    try:
-        from rest_framework.authtoken.models import Token
-        token, _ = Token.objects.get_or_create(user=user)
-        token_key = token.key
-    except Exception:
-        token_key = None
-
-    # Verificar cambio de contraseña
-    must_change = False
-    if hasattr(user, 'perfil'):
-        must_change = user.perfil.debe_cambiar_password
-
-    # Lógica para obtener el apellido paterno preferente
-    apellido_mostrar = user.last_name
-    # Verificamos si tiene perfil y si este tiene apellido paterno guardado
-    if hasattr(user, 'perfil') and user.perfil.apellido_paterno:
-        apellido_mostrar = user.perfil.apellido_paterno
-
-    # RESPUESTA FINAL CON DATOS DEL USUARIO
-    return JsonResponse({
-        "success": True,
-        "message": "Login exitoso",
-        "token": token_key,
-        "must_change_password": must_change,
-        "user": {
-            "id": user.id,
-            "username": user.username,
-            "email": user.email,
-            "first_name": user.first_name,
-            "last_name": apellido_mostrar # <--- Enviamos el apellido paterno real
-        }
-    }, status=200)
-
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def cambiar_password_inicial(request):
-    """
-    Endpoint para cambiar la contraseña obligatoria (Onboarding).
-    Espera JSON: { "new_password": "..." }
-    """
-    new_password = request.data.get("new_password")
-    
-    # Validaciones básicas
-    if not new_password:
-        return Response({"error": "La contraseña es requerida"}, status=400)
-    
-    if len(new_password) < 14:
-         return Response({"error": "La contraseña debe tener al menos 12 caracteres"}, status=400)
-
-    user = request.user
-    user.set_password(new_password)
-    user.save()
-    
-    # Lógica para obtener el nombre (esto es correcto)
-    full_name = user.get_full_name().strip()
-    display_name = full_name if full_name else user.username
-    
-    # Determinar el mensaje de éxito (esto es correcto)
-    success_message = f"¡Bienvenido(a) {display_name}, tu contraseña ha sido actualizada correctamente!"
-    
-    # Actualizar bandera en perfil
-    if hasattr(user, 'perfil'):
-        user.perfil.debe_cambiar_password = False
-        user.perfil.save()
-        
-    # CORRECCIÓN: Usar la variable 'success_message' en la respuesta
-    return Response({"success": True, "message": success_message})
-
-@api_view(['GET'])
-@permission_classes([AllowAny])
-def health(request):
-    return Response({"status": "ok", "time": timezone.now().isoformat()})
-
-@csrf_exempt
-def ping(request):
-    return JsonResponse({"ok": True, "detail": "pong"})
-
 @login_required
-@role_required("usuarios", "edit") # Esto asegura que SOLO el PRESIDENTE entre aquí
+@role_required("usuarios", "edit")
 @require_POST
 def deshabilitar_usuario(request, pk):
     usuario_a_bloquear = get_object_or_404(User, pk=pk)
@@ -326,12 +189,11 @@ def deshabilitar_usuario(request, pk):
         return redirect("lista_usuarios")
 
     # 3. PROTECCIÓN: No bloquear a otros Presidentes
-    # Verificamos si tiene perfil y si su rol es PRESIDENTE
     if hasattr(usuario_a_bloquear, 'perfil') and usuario_a_bloquear.perfil.rol == Perfil.Roles.PRESIDENTE:
         messages.error(request, "No tienes permisos para deshabilitar a otro Presidente.")
         return redirect("lista_usuarios")
 
-    # --- LÓGICA DE DESHABILITADO ---
+    # Lógica
     if not usuario_a_bloquear.is_active:
         messages.info(request, "El usuario ya estaba deshabilitado.")
     else:
@@ -341,13 +203,11 @@ def deshabilitar_usuario(request, pk):
         
     return redirect("lista_usuarios")
 
-
 @login_required
 @role_required("usuarios", "edit")
 @require_POST
 def restaurar_usuario(request, pk):
     usuario = get_object_or_404(User, pk=pk)
-
     if usuario.is_active:
         messages.info(request, "El usuario ya estaba activo.")
     else:
@@ -356,19 +216,124 @@ def restaurar_usuario(request, pk):
         messages.success(request, f"Usuario “{usuario.username}” restaurado.")
     return redirect("lista_usuarios")
 
+# -------------------------------------------------------------------
+# APIs (Para App Móvil)
+# -------------------------------------------------------------------
+
+@api_view(['POST'])
+@csrf_exempt
+def login_api(request):
+    if request.method != "POST":
+        return JsonResponse({"success": False, "message": "Method not allowed"}, status=405)
+
+    try:
+        data = json.loads(request.body or "{}")
+    except Exception:
+        return JsonResponse({"success": False, "message": "Invalid JSON"}, status=400)
+
+    login_input = data.get("username") or data.get("email")
+    password = data.get("password")
+
+    if not login_input or not password:
+        return JsonResponse({"success": False, "message": "Faltan credenciales"}, status=400)
+
+    user = None
+    # Intento A: Email
+    if '@' in login_input:
+        try:
+            user_obj = User.objects.get(email=login_input)
+            user = authenticate(request, username=user_obj.username, password=password)
+        except User.DoesNotExist:
+            pass
+        except User.MultipleObjectsReturned:
+             return JsonResponse({"success": False, "message": "Error: Correo duplicado en sistema"}, status=400)
+
+    # Intento B: Username
+    if user is None:
+        user = authenticate(request, username=login_input, password=password)
+
+    if user is None:
+        return JsonResponse({"success": False, "message": "Credenciales inválidas"}, status=401)
+    
+    if not user.is_active:
+        return JsonResponse({"success": False, "message": "Usuario inactivo"}, status=403)
+
+    try:
+        from rest_framework.authtoken.models import Token
+        token, _ = Token.objects.get_or_create(user=user)
+        token_key = token.key
+    except Exception:
+        token_key = None
+
+    must_change = False
+    if hasattr(user, 'perfil'):
+        must_change = user.perfil.debe_cambiar_password
+
+    apellido_mostrar = user.last_name
+    if hasattr(user, 'perfil') and user.perfil.apellido_paterno:
+        apellido_mostrar = user.perfil.apellido_paterno
+
+    return JsonResponse({
+        "success": True,
+        "message": "Login exitoso",
+        "token": token_key,
+        "must_change_password": must_change,
+        "user": {
+            "id": user.id,
+            "username": user.username,
+            "email": user.email,
+            "first_name": user.first_name,
+            "last_name": apellido_mostrar
+        }
+    }, status=200)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def cambiar_password_inicial(request):
+    """
+    Endpoint para cambiar la contraseña obligatoria (Onboarding App).
+    """
+    new_password = request.data.get("new_password")
+    
+    if not new_password:
+        return Response({"error": "La contraseña es requerida"}, status=400)
+    if len(new_password) < 14:
+         return Response({"error": "La contraseña debe tener al menos 14 caracteres"}, status=400)
+
+    user = request.user
+    user.set_password(new_password)
+    user.save()
+    
+    full_name = user.get_full_name().strip()
+    display_name = full_name if full_name else user.username
+    success_message = f"¡Bienvenido(a) {display_name}, tu contraseña ha sido actualizada correctamente!"
+    
+    if hasattr(user, 'perfil'):
+        user.perfil.debe_cambiar_password = False
+        user.perfil.save()
+        
+    return Response({"success": True, "message": success_message})
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def health(request):
+    return Response({"status": "ok", "time": timezone.now().isoformat()})
+
+@csrf_exempt
+def ping(request):
+    return JsonResponse({"ok": True, "detail": "pong"})
+
 @login_required
 def api_usuarios_by_role(request):
     """
-    Devuelve JSON con usuarios activos (con email) filtrados por rol del Perfil.
-    GET /usuarios/api/usuarios/by-role/?role=vecino
-    role = "ALL" o vacío -> todos.
+    API interna para selectores dinámicos en la web.
     """
     role = (request.GET.get("role") or "").strip()
     qs = (
         User.objects.filter(is_active=True)
         .exclude(email__isnull=True)
         .exclude(email__exact="")
-        .exclude(is_superuser=True)  # mantiene tu criterio actual
+        .exclude(is_superuser=True)
         .select_related("perfil")
         .order_by("first_name", "last_name", "email")
     )
@@ -385,6 +350,9 @@ def api_usuarios_by_role(request):
     ]
     return JsonResponse({"results": data})
 
+# -------------------------------------------------------------------
+# Flujos de Seguridad Web (Passwords)
+# -------------------------------------------------------------------
 
 @login_required
 def cambiar_password_obligatorio(request):
@@ -395,19 +363,130 @@ def cambiar_password_obligatorio(request):
         form = PasswordChangeForm(request.user, request.POST)
         if form.is_valid():
             user = form.save()
-            # 1. Actualizar la sesión para que no se desloguee al cambiar clave
+            # 1. Mantener sesión activa
             update_session_auth_hash(request, user)
             
-            # 2. Apagar la bandera de cambio obligatorio
+            # 2. Apagar bandera
             if hasattr(user, 'perfil'):
                 user.perfil.debe_cambiar_password = False
                 user.perfil.save()
                 
             messages.success(request, '¡Tu contraseña ha sido actualizada exitosamente!')
-            return redirect('home') # O a donde quieras enviarlos
+            return redirect('home')
     else:
         form = PasswordChangeForm(request.user)
     
-    return render(request, 'usuarios/cambiar_password_obligatorio.html', {
-        'form': form
-    })
+    return render(request, 'usuarios/cambiar_password_obligatorio.html', {'form': form})
+
+# --- RECUPERACIÓN DE CONTRASEÑA CON CÓDIGO (WEB) ---
+
+def web_recuperar_paso1(request):
+    """Paso 1: Solicitar correo y enviar código OTP"""
+    if request.method == 'POST':
+        email = request.POST.get('email')
+        
+        user = User.objects.filter(email__iexact=email).first()
+        
+        if user:
+            # 1. Generar Código
+            codigo = str(random.randint(100000, 999999))
+            
+            # 2. Guardar en Perfil
+            if hasattr(user, 'perfil'):
+                perfil = user.perfil
+                perfil.recovery_code = codigo
+                # Expira en 15 minutos
+                perfil.recovery_code_expires = timezone.now() + timedelta(minutes=15)
+                perfil.save()
+                
+                # 3. Enviar Correo
+                html_message = render_to_string('registration/email_codigo_otp.html', {
+                    'user': user,
+                    'codigo': codigo
+                })
+                plain_message = strip_tags(html_message)
+                
+                send_mail(
+                    subject='Código de Recuperación - Junta de Vecinos',
+                    message=plain_message,
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[user.email],
+                    html_message=html_message,
+                    fail_silently=True
+                )
+                
+                # Guardamos el email en sesión
+                request.session['recuperar_email'] = user.email
+                messages.success(request, f"Código enviado a {user.email}")
+                return redirect('web_recuperar_paso2')
+            else:
+                messages.error(request, "El usuario no tiene un perfil asociado.")
+        else:
+            messages.error(request, "No encontramos una cuenta con ese correo.")
+
+    return render(request, 'registration/recuperar_paso1.html')
+
+def web_recuperar_paso2(request):
+    """Paso 2: Ingresar código OTP y nueva contraseña (CON VALIDACIONES)"""
+    email_session = request.session.get('recuperar_email')
+    
+    if not email_session:
+        messages.error(request, "Sesión expirada, inicia el proceso nuevamente.")
+        return redirect('web_recuperar_paso1')
+
+    if request.method == 'POST':
+        codigo_ingresado = request.POST.get('codigo')
+        pass1 = request.POST.get('pass1')
+        pass2 = request.POST.get('pass2')
+
+        user = User.objects.filter(email__iexact=email_session).first()
+
+        # 1. Validaciones básicas de usuario y sesión
+        if not user:
+            return redirect('web_recuperar_paso1')
+            
+        # 2. Validación de Código OTP
+        if not hasattr(user, 'perfil') or user.perfil.recovery_code != codigo_ingresado:
+            messages.error(request, "El código ingresado es incorrecto.")
+            return render(request, 'registration/recuperar_paso2.html', {'email': email_session})
+            
+        if user.perfil.recovery_code_expires and user.perfil.recovery_code_expires < timezone.now():
+            messages.error(request, "El código ha expirado. Por favor solicita uno nuevo.")
+            return render(request, 'registration/recuperar_paso2.html', {'email': email_session})
+
+        # 3. Validación de coincidencia de contraseñas
+        if pass1 != pass2:
+            messages.error(request, "Las contraseñas no coinciden.")
+            return render(request, 'registration/recuperar_paso2.html', {'email': email_session})
+
+        # 4. VALIDACIÓN DE SEGURIDAD DE DJANGO (Lo nuevo)
+        try:
+            # Esto chequea largo mínimo (14), similitud con usuario, password común, etc.
+            validate_password(pass1, user=user)
+        except ValidationError as e:
+            # Si falla, mostramos cada error que Django encontró
+            for error in e.messages:
+                messages.error(request, error)
+            return render(request, 'registration/recuperar_paso2.html', {'email': email_session})
+
+        # --- SI LLEGA AQUÍ, TODO ESTÁ CORRECTO ---
+        
+        # Guardar contraseña
+        user.set_password(pass1)
+        user.save()
+        
+        # Limpiar código usado
+        user.perfil.recovery_code = None
+        user.perfil.recovery_code_expires = None
+        
+        # Apagar cambio obligatorio (ya la cambió voluntariamente)
+        user.perfil.debe_cambiar_password = False 
+        user.perfil.save()
+        
+        # Limpiar sesión temporal
+        del request.session['recuperar_email']
+        
+        messages.success(request, "¡Contraseña restablecida exitosamente! Ya puedes iniciar sesión.")
+        return redirect('login')
+
+    return render(request, 'registration/recuperar_paso2.html', {'email': email_session})
