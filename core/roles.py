@@ -29,7 +29,7 @@ ROLE_MATRIX: Dict[str, Dict[str, List[str]]] = {
         "view":   ROL_DIRECTIVA + ROL_VECINO, # Vecinos pueden ver la lista
         "create": [PRESIDENTE, SECRETARIA, SUPLENTE],
         "edit":   [PRESIDENTE, SECRETARIA, SUPLENTE],
-        "delete": [PRESIDENTE], # Eliminar de la BD
+        "delete": [PRESIDENTE], 
         "cancel": ROL_DIRECTIVA, # Nueva acción para cancelar
         "change_estado": ROL_DIRECTIVA, # Nueva acción para Iniciar/Finalizar
         "asistencia": [PRESIDENTE, SECRETARIA, SUPLENTE],

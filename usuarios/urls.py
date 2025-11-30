@@ -12,6 +12,7 @@ urlpatterns = [
     path('api/cambiar-password-inicial/', views.cambiar_password_inicial, name='cambiar_password_inicial'),
     path('api/health/', health, name='health'),   # ← nuevo
     path("api/test/", views.ping, name="api_test"),
+    path('cambiar-password-obligatorio/', views.cambiar_password_obligatorio, name='cambiar_password_obligatorio'),
     path('accounts/password_reset/', auth_views.PasswordResetView.as_view(), name='password_reset'),
     path('accounts/password_reset/done/', auth_views.PasswordResetDoneView.as_view(), name='password_reset_done'),
     path('accounts/reset/<uidb64>/<token>/', auth_views.PasswordResetConfirmView.as_view(), name='password_reset_confirm'),

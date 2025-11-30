@@ -12,7 +12,7 @@ from django.views.decorators.http import require_http_methods, require_POST
 from django.views.decorators.csrf import csrf_exempt
 from django.http import JsonResponse
 from django.utils import timezone
-
+from core.models import Perfil
 
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated  
@@ -23,6 +23,9 @@ from core.authz import role_required
 from .forms import UsuarioCrearForm, UsuarioEditarForm
 from django.core.exceptions import ValidationError
 User = get_user_model()
+
+from django.contrib.auth import update_session_auth_hash
+from django.contrib.auth.forms import PasswordChangeForm
 
 # -------------------------------------------------------------------
 # Config
@@ -307,25 +310,35 @@ def ping(request):
     return JsonResponse({"ok": True, "detail": "pong"})
 
 @login_required
-@role_required("usuarios", "edit")
+@role_required("usuarios", "edit") # Esto asegura que SOLO el PRESIDENTE entre aquí
 @require_POST
 def deshabilitar_usuario(request, pk):
-    usuario = get_object_or_404(User, pk=pk)
+    usuario_a_bloquear = get_object_or_404(User, pk=pk)
 
-    # Reglas básicas de protección
-    if usuario == request.user:
+    # 1. PROTECCIÓN: No bloquearse a sí mismo
+    if usuario_a_bloquear == request.user:
         messages.warning(request, "No puedes deshabilitar tu propia cuenta.")
         return redirect("lista_usuarios")
-    if usuario.is_superuser:
+
+    # 2. PROTECCIÓN: No bloquear a Superusuarios
+    if usuario_a_bloquear.is_superuser:
         messages.warning(request, "No puedes deshabilitar a un superusuario.")
         return redirect("lista_usuarios")
 
-    if not usuario.is_active:
+    # 3. PROTECCIÓN: No bloquear a otros Presidentes
+    # Verificamos si tiene perfil y si su rol es PRESIDENTE
+    if hasattr(usuario_a_bloquear, 'perfil') and usuario_a_bloquear.perfil.rol == Perfil.Roles.PRESIDENTE:
+        messages.error(request, "No tienes permisos para deshabilitar a otro Presidente.")
+        return redirect("lista_usuarios")
+
+    # --- LÓGICA DE DESHABILITADO ---
+    if not usuario_a_bloquear.is_active:
         messages.info(request, "El usuario ya estaba deshabilitado.")
     else:
-        usuario.is_active = False
-        usuario.save(update_fields=["is_active"])
-        messages.success(request, f"Usuario “{usuario.username}” deshabilitado.")
+        usuario_a_bloquear.is_active = False
+        usuario_a_bloquear.save(update_fields=["is_active"])
+        messages.success(request, f"Usuario “{usuario_a_bloquear.username}” deshabilitado correctamente.")
+        
     return redirect("lista_usuarios")
 
 
@@ -371,3 +384,30 @@ def api_usuarios_by_role(request):
         for u in qs
     ]
     return JsonResponse({"results": data})
+
+
+@login_required
+def cambiar_password_obligatorio(request):
+    """
+    Vista forzada por el Middleware cuando debe_cambiar_password es True.
+    """
+    if request.method == 'POST':
+        form = PasswordChangeForm(request.user, request.POST)
+        if form.is_valid():
+            user = form.save()
+            # 1. Actualizar la sesión para que no se desloguee al cambiar clave
+            update_session_auth_hash(request, user)
+            
+            # 2. Apagar la bandera de cambio obligatorio
+            if hasattr(user, 'perfil'):
+                user.perfil.debe_cambiar_password = False
+                user.perfil.save()
+                
+            messages.success(request, '¡Tu contraseña ha sido actualizada exitosamente!')
+            return redirect('home') # O a donde quieras enviarlos
+    else:
+        form = PasswordChangeForm(request.user)
+    
+    return render(request, 'usuarios/cambiar_password_obligatorio.html', {
+        'form': form
+    })
