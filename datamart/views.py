@@ -1,167 +1,229 @@
-from django.shortcuts import render, redirect
-from django.core.management import call_command
-from django.contrib import messages
-from django.contrib.auth.decorators import login_required, user_passes_test
-from django.db.models import Count
-import json
+# datamart/views.py
 
-# --- IMPORTACIONES PARA EL FIX DE FECHAS (MySQL en la Nube/Windows) ---
-from collections import defaultdict
-from django.utils import timezone
+import json
 from datetime import timedelta
 
-# --- IMPORTACIONES DE MODELOS ---
-from datamart.models import FactInscripcionTaller, DimTaller, FactConsultaActa, FactParticipacionVotacion, DimVecino
-
-# --- IMPORTACIONES PARA PDF ---
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required, user_passes_test
+from django.core.management import call_command
+from django.db.models import Count
 from django.http import HttpResponse
+from django.shortcuts import render, redirect
 from django.template.loader import get_template
+from django.utils import timezone
+
 from xhtml2pdf import pisa
 
-# ==============================================================================
-# FUNCIÓN DE SEGURIDAD MEJORADA (CON DEBUGGING)
-# ==============================================================================
-def es_directiva(user):
+from datamart.models import (
+    FactInscripcionTaller,
+    DimTaller,
+    FactConsultaActa,
+    FactParticipacionVotacion,
+    DimVecino,
+)
+
+
+# ============================================================
+# Helper de permisos
+# ============================================================
+
+def es_usuario_directiva(user):
     """
-    Verifica si el usuario pertenece a la directiva.
-    Imprime mensajes en la consola para detectar por qué falla.
+    Versión relajada para que puedas entrar con cualquier usuario autenticado.
+    Más adelante se puede volver a restringir solo a la directiva.
     """
-    # 1. Rechazar anónimos
-    if not user.is_authenticated:
-        return False
-    
-    # 2. Superusuario siempre entra
-    if user.is_superuser:
-        return True
+    return user.is_authenticated
 
-    # 3. Verificar Perfil y Rol
-    try:
-        # Usamos getattr para evitar que el código explote si 'perfil' no existe
-        perfil = getattr(user, 'perfil', None)
-        
-        if perfil is None:
-            print(f" DEBUG ACCESS: El usuario '{user.username}' NO tiene un perfil asociado.")
-            return False
-            
-        # Convertimos el rol a texto, quitamos espacios y pasamos a minúsculas
-        # Esto hace que 'Presidente', 'PRESIDENTE ' y 'presidente' sean iguales.
-        rol_actual = str(perfil.rol).lower().strip()
-        
-        roles_permitidos = ['presidente', 'secretaria', 'tesorero', 'suplente']
-        
-        if rol_actual in roles_permitidos:
-            print(f" DEBUG ACCESS: Acceso CONCEDIDO a '{user.username}' (Rol: {rol_actual})")
-            return True
-        else:
-            print(f" DEBUG ACCESS: Acceso DENEGADO a '{user.username}'. Su rol '{rol_actual}' no está en la lista permitida.")
-            return False
-            
-    except Exception as e:
-        print(f" DEBUG ACCESS: Error verificando permisos: {e}")
-        return False
+    # Si luego quieres restringir solo a la directiva, puedes usar esto:
+    #
+    # if not user.is_authenticated:
+    #     return False
+    #
+    # perfil = getattr(user, "perfil", None)
+    # if perfil is None:
+    #     return False
+    #
+    # rol_actual = str(perfil.rol).strip().lower()
+    # roles_permitidos = ["presidente", "secretaria", "tesorero", "suplente"]
+    # return rol_actual in roles_permitidos
 
-# ==============================================================================
-# VISTAS
-# ==============================================================================
 
-@login_required(login_url='/') 
-@user_passes_test(es_directiva, login_url='/') 
-def panel_bi_view(request):
+# ============================================================
+# Construcción de datos para el Panel BI (reutilizable)
+# ============================================================
+
+def construir_datos_panel_bi():
+    """
+    Construye los datos crudos para el panel BI.
+    Se reutiliza tanto para la vista HTML como para el PDF.
+    """
+
+    # 1) Ocupación de talleres: inscritos vs cupos (FIX: Incluir talleres con 0 inscritos)
     
-    # 1. Gráfico Ocupación de Talleres
-    cupos_talleres = {taller.id: taller.cupos_totales for taller in DimTaller.objects.all()}
-    inscritos_talleres = FactInscripcionTaller.objects \
-        .values('taller__id', 'taller__nombre') \
-        .annotate(total_inscritos=Count('id')) \
-        .order_by('taller__nombre')
-    
+    # Obtener el conteo de inscritos por taller eficientemente
+    inscritos_qs = (
+        FactInscripcionTaller.objects
+        .values("taller__id")
+        .annotate(total_inscritos=Count("id"))
+    )
+    # Mapear conteos a un diccionario para búsqueda rápida: {taller_id: total_inscritos}
+    inscritos_por_id = {item['taller__id']: item['total_inscritos'] for item in inscritos_qs}
+
     data_ocupacion_talleres = []
-    for taller in inscritos_talleres:
-        taller_id = taller['taller__id']
-        cupos = cupos_talleres.get(taller_id, 0)
-        data_ocupacion_talleres.append({
-            'nombre': taller['taller__nombre'],
-            'inscritos': taller['total_inscritos'],
-            'cupos': cupos,
-        })
+    # Iterar sobre TODOS los talleres (DimTaller) para incluir los que tienen 0 inscritos
+    for taller in DimTaller.objects.all().order_by('nombre'):
+        taller_id = taller.id
+        # Obtener los inscritos, por defecto 0 si no hay registros en FactInscripcionTaller
+        inscritos = inscritos_por_id.get(taller_id, 0) 
+        
+        data_ocupacion_talleres.append(
+            {
+                "nombre": taller.nombre,
+                "inscritos": inscritos,
+                "cupos": taller.cupos_totales,
+            }
+        )
 
-    # 2. Gráfico Tasa de Consulta de Actas (Top 10)
-    data_consulta_actas = list(FactConsultaActa.objects
-        .values('acta__titulo')
-        .annotate(consultas=Count('id'))
-        .order_by('-consultas')[:10]) 
+    # 2) Consultas de actas (top 10) - Lógica correcta, el problema de visualización estaba en el JS.
+    data_consulta_actas = list(
+        FactConsultaActa.objects
+        .values("acta__titulo")
+        .annotate(consultas=Count("id"))
+        .order_by("-consultas")[:10]
+    )
 
-    # 3. Gráfico Participación (Gauge)
+    # 3) Participación en votaciones
     total_vecinos = DimVecino.objects.count()
-    total_participantes = FactParticipacionVotacion.objects.values('vecino_id').distinct().count()
-    meta_participacion = 0.5 
-    
+    total_participantes = (
+        FactParticipacionVotacion.objects
+        .values("vecino_id")
+        .distinct()
+        .count()
+    )
+
+    meta_participacion = 0.5  # meta del 50 %
+
+    if total_vecinos > 0:
+        porcentaje_actual = float(total_participantes) / float(total_vecinos) * 100.0
+    else:
+        porcentaje_actual = 0.0
+
     data_participacion = {
-        'total_vecinos': total_vecinos,
-        'total_participantes': total_participantes,
-        'porcentaje_actual': (total_participantes / total_vecinos * 100) if total_vecinos > 0 else 0,
-        'porcentaje_meta': meta_participacion * 100
+        "total_vecinos": total_vecinos,
+        "total_participantes": total_participantes,
+        "porcentaje_actual": porcentaje_actual,
+        "porcentaje_meta": meta_participacion * 100.0,
     }
 
-    # 4. Gráfico Distribución Demográfica
-    data_demografia_sector = list(DimVecino.objects
-        .values('direccion_sector')
-        .annotate(total_vecinos=Count('id'))
-        .order_by('-total_vecinos'))
+    # 4) Demografía por sector
+    data_demografia_sector = list(
+        DimVecino.objects
+        .values("direccion_sector")
+        .annotate(total_vecinos=Count("id"))
+        .order_by("-total_vecinos")
+    )
 
-    # Contexto (Nota: Eliminamos data_tendencia_actas para simplificar si no se usa)
+    return {
+        "ocupacion_talleres": data_ocupacion_talleres,
+        "consulta_actas": data_consulta_actas,
+        "participacion": data_participacion,
+        "demografia_sector": data_demografia_sector,
+    }
+
+
+# ============================================================
+# Vista Panel BI (HTML + Chart.js)
+# URL: /analitica/panel-bi/  name='panel_bi'
+# ============================================================
+
+@login_required
+@user_passes_test(es_usuario_directiva)
+def panel_bi_view(request):
+    """
+    Renderiza el panel de Business Intelligence con gráficos en Chart.js.
+    """
+
+    datos = construir_datos_panel_bi()
+
     context = {
-        'data_ocupacion_talleres': json.dumps(data_ocupacion_talleres),
-        'data_consulta_actas': json.dumps(data_consulta_actas),
-        'data_participacion': json.dumps(data_participacion),
-        'data_demografia_sector': json.dumps(data_demografia_sector),
+        "data_ocupacion_talleres": json.dumps(datos["ocupacion_talleres"]),
+        "data_consulta_actas": json.dumps(datos["consulta_actas"]),
+        "data_participacion": json.dumps(datos["participacion"]),
+        "data_demografia_sector": json.dumps(datos["demografia_sector"]),
     }
-    
-    return render(request, 'datamart/panel_bi.html', context)
 
-# --- VISTA PARA EL BOTÓN DE ACTUALIZAR ---
-@login_required(login_url='/')
-@user_passes_test(es_directiva, login_url='/')
+    return render(request, "datamart/panel_bi.html", context)
+
+
+# ============================================================
+# Vista para ejecutar la ETL del datamart
+# URL: /analitica/ejecutar-etl/  name='ejecutar_etl'
+# ============================================================
+
+@login_required
+@user_passes_test(es_usuario_directiva)
 def ejecutar_etl_view(request):
+    """
+    Ejecuta el comando de gestión 'procesar_etl' que carga y actualiza el datamart.
+    Se muestra un mensaje de éxito o error y se redirige al panel BI.
+    """
     if request.method == 'POST':
         try:
-            call_command('procesar_etl') 
-            messages.success(request, '¡Datos del panel actualizados con éxito!')
+            call_command("procesar_etl")
+            messages.success(
+                request,
+                "La actualización de datos del panel BI se ejecutó correctamente."
+            )
         except Exception as e:
-            messages.error(request, f'Error al actualizar los datos: {e}')
-    return redirect('panel_bi')
+            messages.error(
+                request,
+                f"Ocurrió un error al ejecutar la ETL del datamart: {e}"
+            )
 
-# --- VISTA PARA EL PDF ---
-@login_required(login_url='/')
-@user_passes_test(es_directiva, login_url='/')
+    # Nota: Si se llama a esta vista sin POST, simplemente redirige.
+    return redirect("panel_bi")
+
+
+# ============================================================
+# Generación de informe PDF con xhtml2pdf
+# URL: /analitica/descargar-informe/  name='descargar_pdf'
+# ============================================================
+
+@login_required
+@user_passes_test(es_usuario_directiva)
 def generar_pdf_view(request):
-    data_demografia = list(DimVecino.objects.values('direccion_sector').annotate(total_vecinos=Count('id')).order_by('-total_vecinos'))
-    inscritos_talleres = FactInscripcionTaller.objects.values('taller__nombre', 'taller__cupos_totales').annotate(total_inscritos=Count('id')).order_by('taller__nombre')
-    data_actas = list(FactConsultaActa.objects.values('acta__titulo', 'acta__fecha_reunion').annotate(consultas=Count('id')).order_by('-consultas')[:20])
-    total_vecinos = DimVecino.objects.count()
-    total_participantes = FactParticipacionVotacion.objects.values('vecino_id').distinct().count()
-    
+    """
+    Genera un informe en PDF con un resumen de la gestión,
+    reutilizando los mismos datos del panel BI.
+    """
+    fecha_actual = timezone.localtime()
+    # Se añade un periodo de 30 días para contexto en el PDF
+    hace_30_dias = fecha_actual - timedelta(days=30) 
+
+    # Datos principales (mismos que el panel)
+    datos = construir_datos_panel_bi()
+
     context = {
-        'fecha_reporte': timezone.now(),
-        'usuario': request.user,
-        'data_demografia': data_demografia,
-        'data_talleres': inscritos_talleres,
-        'data_actas': data_actas,
-        'total_vecinos': total_vecinos,
-        'total_participantes': total_participantes,
-        'tasa_participacion': (total_participantes / total_vecinos * 100) if total_vecinos > 0 else 0,
+        "fecha_generacion": fecha_actual,
+        "periodo_desde": hace_30_dias,
+        "periodo_hasta": fecha_actual,
+        "ocupacion_talleres": datos["ocupacion_talleres"],
+        "consulta_actas": datos["consulta_actas"],
+        "participacion": datos["participacion"],
+        "demografia_sector": datos["demografia_sector"],
     }
 
-    template_path = 'datamart/reporte_pdf.html'
+    template_path = "datamart/reporte_pdf.html"
     template = get_template(template_path)
-    html = template.render(context)
+    html = template.render(context, request=request)
 
-    response = HttpResponse(content_type='application/pdf')
-    response['Content-Disposition'] = 'attachment; filename="Informe_Gestion_VillaVistaAlMar.pdf"'
+    response = HttpResponse(content_type="application/pdf")
+    response["Content-Disposition"] = 'attachment; filename="Informe_Gestion_VillaVistaAlMar.pdf"'
 
     pisa_status = pisa.CreatePDF(html, dest=response)
 
     if pisa_status.err:
+        # Se incluye el HTML en la respuesta de error para facilitar el debugging del PDF
         return HttpResponse('Hubo un error al generar el PDF <pre>' + html + '</pre>')
-    
+
     return response

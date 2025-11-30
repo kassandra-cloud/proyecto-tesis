@@ -20,6 +20,7 @@ from core.authz import role_required
 from core.models import Perfil
 import json
 from .tasks import procesar_audio_vosk
+from .tasks import enviar_notificacion_acta_aprobada
 
 
 
@@ -156,7 +157,6 @@ def guardar_borrador_acta(request, pk):
         
     return redirect("reuniones:detalle_reunion", pk=pk)
 
-
 @require_POST
 @login_required
 @role_required("actas", "approve")
@@ -172,6 +172,14 @@ def aprobar_borrador_acta(request, pk):
         acta.aprobado_por = request.user
         acta.aprobado_en = timezone.now()
         acta.save()
+
+        # 🚀 AQUÍ DISPARAMOS LA NOTIFICACIÓN
+        try:
+            enviar_notificacion_acta_aprobada.delay(acta.pk)
+        except Exception as e:
+            # No queremos que por culpa de la notificación falle la aprobación
+            logger.error(f"Error al encolar notif acta aprobada: {e}")
+
         messages.success(request, "El acta ha sido aprobada oficialmente.")
     except Acta.DoesNotExist:
         messages.error(request, "No se puede aprobar un acta que no existe.")

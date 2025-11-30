@@ -108,7 +108,7 @@ class ActaViewSet(viewsets.ReadOnlyModelViewSet):
             qs = qs.filter(Q(contenido__icontains=search) | Q(reunion__titulo__icontains=search))
         return qs
     
-    # --- ACCIÓN PARA REGISTRAR LA CONSULTA (MODIFICADA) ---
+    # --- ACCIÓN PARA REGISTRAR LA CONSULTA (CORREGIDA) ---
     @action(detail=True, methods=["post"], permission_classes=[permissions.IsAuthenticated], url_path="consultar")
     def registrar_consulta(self, request, pk=None):
         try:
@@ -119,14 +119,15 @@ class ActaViewSet(viewsets.ReadOnlyModelViewSet):
         # 1. CREAR EL REGISTRO TRANSACCIONAL (OLTP)
         LogConsultaActa.objects.create(
             acta=acta,
-            vecino=request.user
+            vecino=request.user # Asumiendo que request.user es el vecino que consulta
         )
 
-        # 2. 🆕 EJECUTAR EL MINI-ETL SÍNCRONO PARA EL ANÁLISIS (Data Mart)
-        # Esto asegura que el dato esté disponible inmediatamente para la web.
+        # 2. EJECUTAR EL MINI-ETL SÍNCRONO PARA EL ANÁLISIS (Data Mart)
         actualizar_fact_consulta_actas_sincrono() 
         
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        # 3. FIX: SERIALIZAR Y DEVOLVER LOS DATOS DEL ACTA (Cambio de 204 No Content a 200 OK + Data)
+        serializer = self.get_serializer(acta)
+        return Response(serializer.data, status=status.HTTP_200_OK)
     # ---------------------------------------------
 
 class AsistenciaViewSet(viewsets.ReadOnlyModelViewSet):
