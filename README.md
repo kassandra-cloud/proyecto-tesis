@@ -46,7 +46,7 @@ pip install -r requirements.txt
 Pueden verificar el archivo "Procfile" y ahi configurar el lanzamiento, luego hacer
 
 ```bash
-honcho start 
+honcho start -f Procfile.dev 
 ```
 se lanzaran los dos en un solo cmd Y
 ¡Listo! Ya puedes acceder a la aplicación en `http://127.0.0.1:8000/`.
