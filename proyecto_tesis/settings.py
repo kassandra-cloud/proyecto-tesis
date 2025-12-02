@@ -24,14 +24,15 @@ load_dotenv(os.path.join(BASE_DIR, '.env'))
 # Seguridad / Debug
 # -------------------------------------------------------------------
 # Clave secreta (debe venir desde .env en producción)
-SECRET_KEY = os.getenv("SECRET_KEY", "DEV-ONLY-CHANGE-ME")
-
+SECRET_KEY = os.environ.get('SECRET_KEY', default='your secret key')
 # DEBUG=True/False en .env
 DEBUG = os.getenv("DEBUG", "True").lower() == "true"
 
 # Hosts permitidos (coma separada en .env)
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
-
+RENDER_EXTERNAL_HOSTNAME = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
+if RENDER_EXTERNAL_HOSTNAME:
+    ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
 # -------------------------------------------------------------------
 # Firebase (para Admin SDK, usado por inicializar_firebase())
 # -------------------------------------------------------------------
