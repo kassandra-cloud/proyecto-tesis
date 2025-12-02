@@ -1,4 +1,3 @@
-# datamart/management/commands/limpiar_datamart.py
 from django.core.management.base import BaseCommand
 from django.db import connection
 
@@ -10,10 +9,16 @@ class Command(BaseCommand):
             "ADVERTENCIA: Se borrarán todas las tablas de 'datamart' y su historial de migración."
         ))
         
+        # LISTA COMPLETA DE TABLAS A BORRAR
         tables_to_drop = [
+            'datamart_factmetricasdiarias',       # Nueva
+            'datamart_factcalidadtranscripcion',  # Nueva
+            'datamart_factmetricastecnicas',      # Nueva
+            'datamart_factasistenciareunion',     # Nueva
+            'datamart_factparticipacionvotacion',
             'datamart_factconsultaacta',
             'datamart_factinscripciontaller',
-            'datamart_factparticipacionvotacion',
+            'datamart_dimreunion',                # Nueva
             'datamart_dimacta',
             'datamart_dimtaller',
             'datamart_dimvotacion',
@@ -21,7 +26,6 @@ class Command(BaseCommand):
         ]
 
         with connection.cursor() as cursor:
-            # Desactivar chequeo de claves foráneas para permitir borrado
             cursor.execute("SET FOREIGN_KEY_CHECKS = 0;")
             
             self.stdout.write("Borrando tablas de datamart...")
@@ -30,16 +34,14 @@ class Command(BaseCommand):
                     cursor.execute(f"DROP TABLE IF EXISTS {table_name};")
                     self.stdout.write(f" - Tabla '{table_name}' borrada.")
                 except Exception as e:
-                    self.stdout.write(self.style.ERROR(f"Error borrando {table_name}: {e}"))
+                    pass # Ignoramos si no existe
             
-            self.stdout.write("Borrando historial de migración de datamart...")
+            self.stdout.write("Borrando historial de migración...")
             try:
                 cursor.execute("DELETE FROM django_migrations WHERE app = 'datamart';")
-                self.stdout.write(f" - Historial de 'datamart' borrado de django_migrations.")
             except Exception as e:
-                self.stdout.write(self.style.ERROR(f"Error borrando historial: {e}"))
+                pass
 
-            # Reactivar chequeo de claves foráneas
             cursor.execute("SET FOREIGN_KEY_CHECKS = 1;")
 
-        self.stdout.write(self.style.SUCCESS("¡Limpieza de 'datamart' completada!"))
+        self.stdout.write(self.style.SUCCESS("¡Limpieza completa! Listo para migrar de cero."))

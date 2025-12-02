@@ -4,92 +4,85 @@
 {% block content %}
 <div class="container-fluid px-4">
 
-    <div class="d-flex justify-content-between align-items-center mt-4">
+    <div class="d-flex justify-content-between align-items-center mt-4 mb-4">
         <h1 class="mb-0">Panel de Analítica (BI)</h1>
-        
         <form action="{% url 'ejecutar_etl' %}" method="POST" onsubmit="this.querySelector('button').disabled = true; this.querySelector('button').innerHTML = 'Actualizando...';">
             {% csrf_token %}
-            <button type="submit" class="btn btn-primary">
-                <i class="fas fa-sync-alt"></i> Actualizar Datos
-            </button>
-            <a href="{% url 'descargar_pdf' %}" class="btn btn-danger">
-                <i class="fas fa-file-pdf me-2"></i> Descargar Informe
-            </a>
+            <button type="submit" class="btn btn-primary"><i class="fas fa-sync-alt"></i> Actualizar Datos</button>
+            <a href="{% url 'descargar_pdf' %}" class="btn btn-danger"><i class="fas fa-file-pdf me-2"></i> Descargar Informe</a>
         </form>
     </div>
-    
-    <p class="mb-4">Cuadro de Mando Integral para la Directiva.</p>
 
     {% if messages %}
         {% for message in messages %}
-            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
-                {{ message }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show">{{ message }}</div>
         {% endfor %}
     {% endif %}
 
-    <div class="row">
-        <div class="col-xl-6">
-            <div class="card mb-4">
-                <div class="card-header"><i class="fas fa-tachometer-alt me-1"></i>Participación General vs. Meta (50%)</div>
-                <div class="card-body">
-                    <canvas id="graficoParticipacionGauge" width="100%" height="300"></canvas>
-                </div>
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-success text-white text-center p-3 shadow-sm">
+                <h2>{{ metricas.disponibilidad_sistema }}%</h2>
+                <div>Disponibilidad del Sistema</div>
             </div>
         </div>
-        <div class="col-xl-6">
-            <div class="card mb-4">
-                <div class="card-header"><i class="fas fa-map-marker-alt me-1"></i>Distribución de Vecinos por Sector</div>
-                <div class="card-body">
-                    <canvas id="graficoDemografiaSector" width="100%" height="300"></canvas>
-                </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white text-center p-3 shadow-sm">
+                <h2>{{ metricas.tiempo_respuesta_ms }} ms</h2>
+                <div>Tiempo de Respuesta</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-dark text-center p-3 shadow-sm">
+                <h2>{{ precision }}%</h2>
+                <div>Precisión Transcripción</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-danger text-white text-center p-3 shadow-sm">
+                <h2>{{ metricas.fallos_votacion }}</h2>
+                <div>Fallos en Votaciones</div>
             </div>
         </div>
     </div>
+
+    <div class="row">
+        <div class="col-xl-6"><div class="card mb-4"><div class="card-header">Participación General vs. Meta (50%)</div><div class="card-body"><canvas id="graficoParticipacionGauge" height="250"></canvas></div></div></div>
+        <div class="col-xl-6"><div class="card mb-4"><div class="card-header">Distribución Demográfica</div><div class="card-body"><canvas id="graficoDemografiaSector" height="250"></canvas></div></div></div>
+    </div>
     
     <div class="row">
-        <div class="col-xl-6">
+        <div class="col-xl-6"><div class="card mb-4"><div class="card-header">Ocupación de Talleres</div><div class="card-body"><canvas id="graficoOcupacionTalleres" height="250"></canvas></div></div></div>
+        <div class="col-xl-6"><div class="card mb-4"><div class="card-header">Consulta de Actas (Top 10)</div><div class="card-body"><canvas id="graficoConsultaActas" height="250"></canvas></div></div></div>
+    </div>
+
+    <div class="row">
+        <div class="col-xl-8">
             <div class="card mb-4">
-                <div class="card-header"><i class="fas fa-chart-area me-1"></i>Ocupación de Talleres</div>
-                <div class="card-body">
-                    <canvas id="graficoOcupacionTalleres" width="100%" height="300"></canvas>
-                </div>
+                <div class="card-header"><i class="fas fa-chart-line"></i> Tendencia de Asistencia a Reuniones</div>
+                <div class="card-body"><canvas id="graficoAsistencia" height="250"></canvas></div>
             </div>
         </div>
-        <div class="col-xl-6">
+        <div class="col-xl-4">
             <div class="card mb-4">
-                <div class="card-header"><i class="fas fa-chart-bar me-1"></i>Tasa de Consulta de Actas (Top 10)</div>
-                <div class="card-body">
-                    <canvas id="graficoConsultaActas" width="100%" height="300"></canvas>
-                </div>
+                <div class="card-header"><i class="fas fa-mobile-alt"></i> Uso de App Móvil</div>
+                <div class="card-body"><canvas id="graficoUsoApp" height="250"></canvas></div>
             </div>
         </div>
     </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
 <script src="{% static 'js/panel_bi.js' %}"></script>
-
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    
-    // 1. Capturamos los datos de Django
-    const dataTalleres = JSON.parse('{{ data_ocupacion_talleres|safe }}' || "[]");
-    const dataActas = JSON.parse('{{ data_consulta_actas|safe }}' || "[]");
-    const dataParticipacion = JSON.parse('{{ data_participacion|safe }}' || "{}");
-    const dataDemografia = JSON.parse('{{ data_demografia_sector|safe }}' || "[]");
-    
-    // (ELIMINADO: Captura de dataTendenciaActas)
-
-    // 2. Llamamos a la función inicializadora con solo 4 argumentos
-    // El 5to argumento será undefined, lo cual el JS maneja ignorándolo.
     inicializarGraficosBI(
-        dataTalleres, 
-        dataActas, 
-        dataParticipacion, 
-        dataDemografia
+        JSON.parse('{{ data_ocupacion_talleres|safe }}' || "[]"),
+        JSON.parse('{{ data_consulta_actas|safe }}' || "[]"),
+        JSON.parse('{{ data_participacion|safe }}' || "{}"),
+        JSON.parse('{{ data_demografia_sector|safe }}' || "[]"),
+        JSON.parse('{{ data_asistencia|safe }}' || "[]"),
+        JSON.parse('{{ data_uso_app|safe }}' || "{}")
     );
 });
 </script>
