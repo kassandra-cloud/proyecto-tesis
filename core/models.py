@@ -25,12 +25,22 @@ class Perfil(models.Model):
     recovery_code = models.CharField(max_length=6, blank=True, null=True)
     recovery_code_expires = models.DateTimeField(blank=True, null=True)
     # --- CAMPOS DEMOGRÁFICOS ---
+    # MODIFICADO: Ahora representa solo el nombre de la calle/pasaje
     direccion = models.CharField(
         max_length=255, 
-        verbose_name="Dirección Completa",
+        verbose_name="Nombre de la Calle/Pasaje", # <--- MODIFICADO
         blank=False,
         default=""
     )
+    
+    # NUEVO CAMPO: Número de Casa/Depto/Lote
+    numero_casa = models.CharField( # <--- NUEVO
+        max_length=20,
+        blank=True,
+        default="",
+        verbose_name="N° Casa/Depto/Lote"
+    )
+    
     telefono = models.CharField(max_length=15, blank=True, null=True, verbose_name="Teléfono")
     total_residentes = models.PositiveIntegerField(
         verbose_name="Total de Residentes",
