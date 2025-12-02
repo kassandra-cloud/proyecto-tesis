@@ -8,8 +8,12 @@
         <h1 class="mb-0">Panel de Analítica (BI)</h1>
         <form action="{% url 'ejecutar_etl' %}" method="POST" onsubmit="this.querySelector('button').disabled = true; this.querySelector('button').innerHTML = 'Actualizando...';">
             {% csrf_token %}
-            <button type="submit" class="btn btn-primary"><i class="fas fa-sync-alt"></i> Actualizar Datos</button>
-            <a href="{% url 'descargar_pdf' %}" class="btn btn-danger"><i class="fas fa-file-pdf me-2"></i> Descargar Informe</a>
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-sync-alt"></i> Actualizar Datos
+            </button>
+            <a href="{% url 'descargar_pdf' %}" class="btn btn-danger">
+                <i class="fas fa-file-pdf me-2"></i> Descargar Informe
+            </a>
         </form>
     </div>
 
@@ -18,6 +22,45 @@
             <div class="alert alert-{{ message.tags }} alert-dismissible fade show">{{ message }}</div>
         {% endfor %}
     {% endif %}
+
+    {# 🔹 FILTROS DE MES / AÑO #}
+    <div class="row mb-3">
+        <div class="col-md-8">
+            <form method="get" class="row g-2 align-items-end">
+                <div class="col-md-4">
+                    <label for="id_mes" class="form-label">Mes</label>
+                    <select name="mes" id="id_mes" class="form-select">
+                        <option value="">Todos los meses</option>
+                        {% for m in meses_opciones %}
+                            <option value="{{ m.numero }}"
+                                    {% if m.numero == mes_seleccionado %}selected{% endif %}>
+                                {{ m.nombre }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-md-4">
+                    <label for="id_anio" class="form-label">Año</label>
+                    <select name="anio" id="id_anio" class="form-select">
+                        <option value="">Todos los años</option>
+                        {% for a in anios_opciones %}
+                            <option value="{{ a }}"
+                                    {% if a == anio_seleccionado %}selected{% endif %}>
+                                {{ a }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-md-4">
+                    <button type="submit" class="btn btn-secondary w-100">
+                        <i class="fas fa-filter me-1"></i> Aplicar filtro
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
 
     <div class="row mb-4">
         <div class="col-md-3">
@@ -47,20 +90,52 @@
     </div>
 
     <div class="row">
-        <div class="col-xl-6"><div class="card mb-4"><div class="card-header">Participación General vs. Meta (50%)</div><div class="card-body"><canvas id="graficoParticipacionGauge" height="250"></canvas></div></div></div>
-        <div class="col-xl-6"><div class="card mb-4"><div class="card-header">Distribución Demográfica</div><div class="card-body"><canvas id="graficoDemografiaSector" height="250"></canvas></div></div></div>
+        <div class="col-xl-6">
+            <div class="card mb-4">
+                <div class="card-header">Participación General vs. Meta (50%)</div>
+                <div class="card-body">
+                    <canvas id="graficoParticipacionGauge" height="250"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-6">
+            <div class="card mb-4">
+                <div class="card-header">Distribución Demográfica</div>
+                <div class="card-body">
+                    <canvas id="graficoDemografiaSector" height="250"></canvas>
+                </div>
+            </div>
+        </div>
     </div>
     
     <div class="row">
-        <div class="col-xl-6"><div class="card mb-4"><div class="card-header">Ocupación de Talleres</div><div class="card-body"><canvas id="graficoOcupacionTalleres" height="250"></canvas></div></div></div>
-        <div class="col-xl-6"><div class="card mb-4"><div class="card-header">Consulta de Actas (Top 10)</div><div class="card-body"><canvas id="graficoConsultaActas" height="250"></canvas></div></div></div>
+        <div class="col-xl-6">
+            <div class="card mb-4">
+                <div class="card-header">Ocupación de Talleres</div>
+                <div class="card-body">
+                    <canvas id="graficoOcupacionTalleres" height="250"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-6">
+            <div class="card mb-4">
+                <div class="card-header">Consulta de Actas (Top 10)</div>
+                <div class="card-body">
+                    <canvas id="graficoConsultaActas" height="250"></canvas>
+                </div>
+            </div>
+        </div>
     </div>
 
     <div class="row">
         <div class="col-xl-8">
             <div class="card mb-4">
-                <div class="card-header"><i class="fas fa-chart-line"></i> Tendencia de Asistencia a Reuniones</div>
-                <div class="card-body"><canvas id="graficoAsistencia" height="250"></canvas></div>
+                <div class="card-header">
+                    <i class="fas fa-chart-line"></i> Tendencia de Asistencia a Reuniones
+                </div>
+                <div class="card-body">
+                    <canvas id="graficoAsistencia" height="250"></canvas>
+                </div>
             </div>
         </div>
     </div>

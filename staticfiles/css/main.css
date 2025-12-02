@@ -1,0 +1,264 @@
+/* Hacemos que la barra superior original (navbar) sea un poco más oscura */
+.top-navbar {
+    background-color: #007bff; /* O el color azul que tenías */
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* * Contenedor principal que se divide en 2 columnas:
+ * 1. .main-sidebar (Barra lateral)
+ * 2. .main-content (Contenido principal)
+*/
+.page-container {
+    display: flex;
+    min-height: calc(100vh - 70px); /* Alto completo menos el navbar */
+}
+
+/* --- 1. Barra Lateral (Sidebar) --- */
+.main-sidebar {
+    width: 250px; /* Ancho fijo */
+    flex-shrink: 0; /* Evita que se encoja */
+    background-color: #ffffff; /* Fondo blanco */
+    border-right: 1px solid #e9ecef; /* Borde sutil */
+    padding: 20px;
+    transition: background-color 0.2s ease, border-color 0.2s ease; /* Transición */
+}
+
+.sidebar-nav {
+    list-style: none;
+    padding-left: 0;
+    margin: 0;
+}
+
+.sidebar-nav .nav-item {
+    margin-bottom: 5px;
+}
+
+.sidebar-nav .nav-link {
+    color: #555; /* Texto de link oscuro/gris */
+    font-size: 1.0em;
+    padding: 12px 15px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    text-decoration: none;
+    transition: background-color 0.2s, color 0.2s;
+    font-weight: 500;
+}
+
+.sidebar-nav .nav-link .icon {
+    margin-right: 15px;
+    width: 25px;
+    text-align: center;
+    font-size: 1.1em;
+    transition: color 0.2s;
+}
+
+.sidebar-nav .nav-link:hover {
+    background-color: #f0f2f5; /* Un gris muy claro al pasar el mouse */
+    color: #0056b3; /* Texto más oscuro al pasar el mouse */
+}
+
+.sidebar-nav .nav-link:hover .icon {
+    color: #0056b3; /* Icono más oscuro al pasar el mouse */
+}
+
+.sidebar-nav .nav-link.active {
+    background: #2563eb; /* Color azul activo */
+    color: #ffffff;
+    box-shadow: 0 4px 10px rgba(37, 99, 235, 0.3);
+}
+
+.sidebar-nav .nav-link.active .icon {
+    color: #ffffff;
+}
+
+/* --- 4. Contenido Principal --- */
+.main-content {
+    /* background-color: #f8f9fa;  <-- ESTA LÍNEA ES EL PROBLEMA. LA BORRAMOS. */
+    flex-grow: 1; /* Ocupa el espacio restante */
+    padding: 30px;
+    min-height: calc(100vh - 70px); /* Alto completo menos el navbar */
+}
+
+/* --- 5. BODY (AÑADIDO PARA EL FONDO) --- */
+body {
+    background-color: #f8f9fa; /* Fondo gris claro (Modo Claro) */
+    color: #212529;
+    font-family: 'Inter', sans-serif;
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+/* --- 6. ESTILOS TEXTO USUARIO NAVBAR --- */
+
+.navbar-user-role {
+    font-size: 0.75em;
+    opacity: 0.8; /* Opacidad por defecto (modo claro) */
+    transition: opacity 0.2s ease;
+}
+
+/* En modo oscuro, le quitamos la transparencia */
+[data-bs-theme="dark"] .navbar-user-role {
+    opacity: 1;
+}
+/* --- 7. BOTÓN DE ACCIÓN FLOTANTE (FAB) --- */
+
+.fab {
+    position: fixed;     /* Lo hace flotar sobre todo */
+    bottom: 30px;        /* 30px desde abajo */
+    right: 30px;         /* 30px desde la derecha */
+    width: 60px;         /* Ancho */
+    height: 60px;        /* Alto */
+    border-radius: 50%;  /* Lo hace redondo */
+    background-color: #2563eb; /* Color azul (puedes usar tu --color-primario) */
+    color: white;        /* Color del ícono '+' */
+
+    /* Para centrar el ícono '+' */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    font-size: 24px;     /* Tamaño del ícono '+' */
+    text-decoration: none;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2); /* Sombra */
+    z-index: 1030;       /* Se asegura que esté por encima de otros elementos */
+    transition: transform 0.2s ease, background-color 0.2s ease;
+}
+
+.fab:hover {
+    background-color: #1d4ed8; /* Un azul más oscuro al pasar el mouse */
+    color: white;
+    transform: scale(1.05); /* Lo agranda un poco */
+}
+/* --- 8. ARREGLO TABLAS MODO OSCURO --- */
+
+[data-bs-theme="dark"] .table {
+    color: #e0e0e0; /* Color de texto claro para la tabla */
+    border-color: #444; /* Color de borde oscuro */
+}
+
+/* Arregla el encabezado (thead) que se ve blanco */
+[data-bs-theme="dark"] .table thead th {
+    background-color: #1e1e1e; /* Fondo oscuro para el encabezado */
+    color: #f8f9fa;
+    border-color: #444;
+}
+
+/* Arregla las celdas (td) que se ven blancas */
+[data-bs-theme="dark"] .table tbody td {
+    background-color: transparent; /* Quita el fondo blanco de las celdas */
+}
+
+/* Arregla las filas "rayadas" (striped) */
+[data-bs-theme="dark"] .table-striped > tbody > tr:nth-of-type(odd) > * {
+    --bs-table-accent-bg: rgba(255, 255, 255, 0.05); /* Color de la franja oscura */
+    color: #e0e0e0;
+}
+
+[data-bs-theme="dark"] .table-striped > tbody > tr:nth-of-type(even) > * {
+    background-color: transparent; /* Asegura que la fila par sea transparente */
+}
+
+/* Arregla el efecto "hover" */
+[data-bs-theme="dark"] .table-hover > tbody > tr:hover > * {
+    --bs-table-accent-bg: rgba(255, 255, 255, 0.1); /* Color de hover más notorio */
+    color: #f8f9fa;
+}
+/* --- 9. ARREGLO TEXTO OSCURO EN CARDS (MODO OSCURO) --- */
+
+[data-bs-theme="dark"] .card a.text-dark {
+    color: #e0e0e0 !important; /* Fuerza el texto a ser claro */
+}
+
+[data-bs-theme="dark"] .card a.text-dark:hover {
+    color: #ffffff !important; /* Opcional: un poco más claro al pasar el mouse */
+}
+
+/* Arregla también las "card" en general */
+[data-bs-theme="dark"] .card {
+    background-color: #1e1e1e;
+    border-color: #444;
+}
+/* --- 10. ARREGLO BARRA DE PROGRESO (MODO OSCURO) --- */
+
+[data-bs-theme="dark"] .progress {
+    background-color: #3e444a !important; /* Fondo gris oscuro FORZADO */
+}
+
+/* Arreglo para el fondo de la 'card-body' que se ve claro en votaciones */
+[data-bs-theme="dark"] .card-body {
+    background-color: #1e1e1e;
+}
+/* --- 11. COLORES BARRA DE PROGRESO (VOTACIÓN) --- */
+
+.progress-bar-apruebo {
+    background-color: #198754 !important; 
+}
+
+.progress-bar-rechazo {
+    background-color: #dc3545 !important; 
+}
+
+.progress-bar-otro {
+    background-color: #5db324 !important; 
+}
+
+
+/* =========================================
+    SOBREESCRITURAS PARA MODO OSCURO
+=========================================
+*/
+[data-bs-theme="dark"] .bg-light {
+    background-color: #2a2e33 !important; /* Un gris oscuro, no tan negro */
+    border-color: #444 !important;
+}
+[data-bs-theme="dark"] body {
+    background-color: #121212; /* Fondo principal oscuro */
+    color: #e0e0e0;      /* Texto principal claro */
+}
+
+[data-bs-theme="dark"] .main-sidebar {
+    background-color: #1e1e1e; /* Fondo de sidebar oscuro */
+    border-right-color: #333;  /* Borde oscuro */
+}
+
+[data-bs-theme="dark"] .sidebar-nav .nav-link {
+    color: #aeb9c4; /* Texto de link claro */
+}
+
+[data-bs-theme="dark"] .sidebar-nav .nav-link:hover {
+    background-color: #344059; /* Hover oscuro */
+    color: #ffffff;
+}
+
+[data-bs-theme="dark"] .sidebar-nav .nav-link:hover .icon {
+    color: #ffffff;
+}
+
+/* La regla .active ya se ve bien en modo oscuro, no la tocamos */
+/* --- MODO LECTURA (Agrandar Letra) --- */
+body.modo-lectura {
+    font-size: 1.25rem !important; /* Aumenta el tamaño base */
+}
+
+body.modo-lectura h1, 
+body.modo-lectura h2, 
+body.modo-lectura h3, 
+body.modo-lectura h4, 
+body.modo-lectura h5, 
+body.modo-lectura h6 {
+    font-size: 1.1em; /* Títulos más grandes */
+}
+
+body.modo-lectura .btn, 
+body.modo-lectura .form-control,
+body.modo-lectura .nav-link, 
+body.modo-lectura p,
+body.modo-lectura li {
+    font-size: 1.1em;
+}
+
+body.modo-lectura .dashboard-card .icon i,
+body.modo-lectura .dashboard-card .icon .fas,
+body.modo-lectura .dashboard-card .icon .fa {
+    font-size: 1em !important; /* Mantiene su escala original relativa al contenedor */
+    line-height: 1; /* Ayuda a mantener el centrado vertical */
+}

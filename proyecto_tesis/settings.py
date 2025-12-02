@@ -45,9 +45,8 @@ ALLOWED_HOSTS = [
     "127.0.0.1",
     "localhost",
     "10.0.2.2",
-    "192.168.104.132",   # IP de tu PC en la red (ajústala si cambia)
+    "192.168.104.132",
 ]
-
 # Si usas login vía sesión desde Android/web, conviene permitir CSRF
 CSRF_TRUSTED_ORIGINS = [
     "http://127.0.0.1",
@@ -102,6 +101,8 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "core.middleware.ForcePasswordChangeMiddleware",
+    'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
 ]
 
 ROOT_URLCONF = "proyecto_tesis.urls"
@@ -187,6 +188,19 @@ STATICFILES_DIRS = [BASE_DIR / "static"] if (BASE_DIR / "static").exists() else 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
+# Define el directorio donde collectstatic copiará los archivos.
+# Debe estar fuera de cualquier condicional, ya que collectstatic siempre lo requiere.
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles') # ✅ Solución: Definido aquí
+
+# --- Configuración de WhiteNoise (Producción) ---
+if not DEBUG:
+    # Este ajuste informa a Django del path URI desde el cual tus estáticos
+    # serán accesibles (ej: en onrender.com es '/static/' por defecto)
+    STATIC_URL = '/static/'
+    
+    # Habilita el backend de WhiteNoise, el cual comprime estáticos y 
+    # les asigna nombres únicos (manifest) para soporte de caché a largo plazo.
+    STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 # -----------------------------------------------------------------------------
 # Tamaños de subida
 # -----------------------------------------------------------------------------
@@ -238,7 +252,13 @@ DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER)
 # -----------------------------------------------------------------------------
 # --- Channels (capa en memoria para desarrollo) ---
 CHANNEL_LAYERS = {
-    "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}
+    "default": {
+        "BACKEND": "channels_redis.pubsub.RedisPubSubChannelLayer",
+        "CONFIG": {
+            # Usa la misma variable de entorno REDIS_URL que usa Celery
+            "hosts": [os.environ.get('REDIS_URL', 'redis://localhost:6379/1')],
+        },
+    }
 }
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 MODEL_PATH_RELATIVO= Path(r"vosk-model-small-es-0.42")

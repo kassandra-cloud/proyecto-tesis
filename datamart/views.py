@@ -1,10 +1,13 @@
 import json
-import re  # 👈 para limpiar números en las direcciones
+import re  # para limpiar números en las direcciones
+import calendar  # (ya casi no lo usamos, pero lo puedes dejar)
 from datetime import timedelta
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.core.management import call_command
 from django.db.models import Count, Avg
+from django.db.models.functions import ExtractYear
 from django.http import HttpResponse
 from django.shortcuts import render, redirect
 from django.template.loader import get_template
@@ -17,12 +20,29 @@ from datamart.models import (
     DimActa, FactMetricasDiarias
 )
 
+# 🔹 Meses en español
+MESES_ES = [
+    "",  # índice 0 vacío
+    "Enero",
+    "Febrero",
+    "Marzo",
+    "Abril",
+    "Mayo",
+    "Junio",
+    "Julio",
+    "Agosto",
+    "Septiembre",
+    "Octubre",
+    "Noviembre",
+    "Diciembre",
+]
+
 
 def es_usuario_directiva(user):
     return user.is_authenticated
 
 
-def construir_datos_panel_bi():
+def construir_datos_panel_bi(mes=None, anio=None):
     # 1. Ocupación Talleres
     inscritos_qs = (
         FactInscripcionTaller.objects
@@ -67,8 +87,7 @@ def construir_datos_panel_bi():
         "porcentaje_meta": 50.0,
     }
 
-    # 4. Demografía: agrupamos por direccion_sector y luego
-    # limpiamos cualquier número para que el gráfico NO muestre números.
+    # 4. Demografía por sector
     data_demografia_sector = list(
         DimVecino.objects
         .values("direccion_sector")
@@ -78,18 +97,25 @@ def construir_datos_panel_bi():
 
     for row in data_demografia_sector:
         original = row["direccion_sector"] or ""
-        # Quitamos todos los dígitos
         solo_texto = re.sub(r"\d+", "", original).strip()
-        # Si queda vacío, usamos un texto genérico
         row["direccion_sector"] = solo_texto or "Sin Dirección"
 
-    # 5. Asistencia Reuniones
+    # 5. Asistencia Reuniones (filtro mes/año opcional)
+    asistencia_qs = FactAsistenciaReunion.objects.all()
+
+    if mes and anio:
+        asistencia_qs = asistencia_qs.filter(
+            reunion__fecha__year=anio,
+            reunion__fecha__month=mes,
+        )
+
     asistencia_qs = (
-        FactAsistenciaReunion.objects
+        asistencia_qs
         .values("reunion__fecha")
         .annotate(total=Count("id"))
         .order_by("reunion__fecha")
     )
+
     data_asistencia = [
         {
             "fecha": item["reunion__fecha"].strftime("%Y-%m-%d"),
@@ -128,7 +154,36 @@ def construir_datos_panel_bi():
 @login_required
 @user_passes_test(es_usuario_directiva)
 def panel_bi_view(request):
-    datos = construir_datos_panel_bi()
+    # Filtros
+    mes_str = (request.GET.get("mes") or "").strip()
+    anio_str = (request.GET.get("anio") or "").strip()
+
+    mes = int(mes_str) if mes_str.isdigit() else None
+    anio = int(anio_str) if anio_str.isdigit() else None
+
+    # Años disponibles desde la BD
+    anios_opciones = list(
+        FactAsistenciaReunion.objects
+        .annotate(anio=ExtractYear("reunion__fecha"))
+        .values_list("anio", flat=True)
+        .distinct()
+        .order_by("anio")
+    )
+
+    # Si no hay años, rango por defecto
+    now = timezone.now()
+    if not anios_opciones:
+        anio_actual = now.year
+        anios_opciones = list(range(anio_actual - 2, anio_actual + 1))
+
+    # Datos del panel
+    datos = construir_datos_panel_bi(mes=mes, anio=anio)
+
+    # Meses en español
+    meses_opciones = [
+        {"numero": i, "nombre": MESES_ES[i]}
+        for i in range(1, 13)
+    ]
 
     context = {
         "data_ocupacion_talleres": json.dumps(datos["ocupacion_talleres"]),
@@ -137,9 +192,12 @@ def panel_bi_view(request):
         "data_demografia_sector": json.dumps(datos["demografia_sector"]),
         "data_asistencia": json.dumps(datos["data_asistencia"]),
         "data_uso_app": json.dumps(datos["data_uso_app"]),
-        # Datos simples para tarjetas
         "metricas": datos["metricas"],
         "precision": datos["precision"],
+        "meses_opciones": meses_opciones,
+        "anios_opciones": anios_opciones,
+        "mes_seleccionado": mes,
+        "anio_seleccionado": anio,
     }
     return render(request, "datamart/panel_bi.html", context)
 
