@@ -1,13 +1,12 @@
 /**
  * Inicializa TODOS los gráficos del panel.
  */
-function inicializarGraficosBI(dataTalleres, dataActas, dataParticipacion, dataDemografia, dataAsistencia, dataUsoApp) {
+function inicializarGraficosBI(dataTalleres, dataActas, dataParticipacion, dataDemografia, dataAsistencia,) {
     if(dataParticipacion) dibujarParticipacionGauge(dataParticipacion);
     if(dataDemografia) dibujarDemografiaSector(dataDemografia);
     if(dataTalleres) dibujarOcupacionTalleres(dataTalleres);
     if(dataActas) dibujarConsultaActas(dataActas);
     if(dataAsistencia) dibujarAsistenciaReuniones(dataAsistencia);
-    if(dataUsoApp) dibujarUsoApp(dataUsoApp);
 }
 
 // Paleta de colores
@@ -101,19 +100,3 @@ function dibujarAsistenciaReuniones(data) {
     });
 }
 
-// 6. Uso App (Dona) - Rojo y Gris
-function dibujarUsoApp(data) {
-    const ctx = document.getElementById('graficoUsoApp');
-    if (!ctx) return;
-    new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-            labels: ['App Móvil', 'Solo Web'],
-            datasets: [{
-                data: [data.app, data.web],
-                backgroundColor: ['#e74a3b', '#858796']
-            }]
-        },
-        options: { responsive: true }
-    });
-}

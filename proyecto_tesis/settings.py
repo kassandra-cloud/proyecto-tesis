@@ -104,6 +104,7 @@ MIDDLEWARE = [
     "core.middleware.ForcePasswordChangeMiddleware",
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
+    'proyecto_tesis.middleware.MonitorRendimientoMiddleware',
 ]
 
 ROOT_URLCONF = "proyecto_tesis.urls"

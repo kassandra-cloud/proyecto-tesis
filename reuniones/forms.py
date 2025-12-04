@@ -48,3 +48,19 @@ class ActaForm(forms.ModelForm):
         labels = {
             'contenido': 'Contenido del Acta'
         }
+
+class CalificacionActaForm(forms.ModelForm):
+    class Meta:
+        model = Acta
+        fields = ['calificacion_precision']
+        widgets = {
+            'calificacion_precision': forms.NumberInput(attrs={
+                'class': 'form-control', 
+                'min': '0', 
+                'max': '100',
+                'placeholder': 'Ej: 95'
+            }),
+        }
+        labels = {
+            'calificacion_precision': 'Calificación de Precisión IA (0-100%)'
+        }

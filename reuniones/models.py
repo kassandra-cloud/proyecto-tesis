@@ -59,7 +59,7 @@ class Acta(models.Model):
         primary_key=True  # <-- ¡AÑADE ESTA LÍNEA!
     )
     contenido = models.TextField(blank=True, default="Borrador del acta...")
-    
+
     aprobada = models.BooleanField(default=False)
     aprobado_por = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -83,6 +83,10 @@ class Acta(models.Model):
         max_length=20,
         choices=ESTADO_TRANSCRIPCION_CHOICES, # Usamos la nueva lista
         default=ESTADO_NO_SUBIDO # Usamos el nuevo default
+    )
+    calificacion_precision = models.IntegerField(
+        default=0, 
+        help_text="Calificación manual de la precisión (0-100) asignada por la directiva."
     )
     # --- FIN DE CAMPOS NUEVOS ---
 

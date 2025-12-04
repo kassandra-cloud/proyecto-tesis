@@ -8,12 +8,8 @@
         <h1 class="mb-0">Panel de Analítica (BI)</h1>
         <form action="{% url 'ejecutar_etl' %}" method="POST" onsubmit="this.querySelector('button').disabled = true; this.querySelector('button').innerHTML = 'Actualizando...';">
             {% csrf_token %}
-            <button type="submit" class="btn btn-primary">
-                <i class="fas fa-sync-alt"></i> Actualizar Datos
-            </button>
-            <a href="{% url 'descargar_pdf' %}" class="btn btn-danger">
-                <i class="fas fa-file-pdf me-2"></i> Descargar Informe
-            </a>
+            <button type="submit" class="btn btn-primary"><i class="fas fa-sync-alt"></i> Actualizar Datos</button>
+            <a href="{% url 'descargar_pdf' %}" class="btn btn-danger"><i class="fas fa-file-pdf me-2"></i> Descargar Informe</a>
         </form>
     </div>
 
@@ -23,40 +19,42 @@
         {% endfor %}
     {% endif %}
 
-    {# 🔹 FILTROS DE MES / AÑO #}
-    <div class="row mb-3">
-        <div class="col-md-8">
-            <form method="get" class="row g-2 align-items-end">
-                <div class="col-md-4">
-                    <label for="id_mes" class="form-label">Mes</label>
-                    <select name="mes" id="id_mes" class="form-select">
-                        <option value="">Todos los meses</option>
+    <div class="card mb-4 border-0 bg-light shadow-sm">
+        <div class="card-body py-2">
+            <form method="get" class="row g-2 align-items-center">
+                <div class="col-auto fw-bold text-secondary">
+                    <i class="fas fa-filter me-1"></i> Filtrar Asistencia:
+                </div>
+                
+                <div class="col-auto">
+                    <select name="mes" class="form-select form-select-sm">
+                        <option value="">Todos los Meses</option>
                         {% for m in meses_opciones %}
-                            <option value="{{ m.numero }}"
-                                    {% if m.numero == mes_seleccionado %}selected{% endif %}>
+                            <option value="{{ m.num }}" {% if m.num == mes_seleccionado %}selected{% endif %}>
                                 {{ m.nombre }}
                             </option>
                         {% endfor %}
                     </select>
                 </div>
-
-                <div class="col-md-4">
-                    <label for="id_anio" class="form-label">Año</label>
-                    <select name="anio" id="id_anio" class="form-select">
-                        <option value="">Todos los años</option>
+                
+                <div class="col-auto">
+                    <select name="anio" class="form-select form-select-sm">
+                        <option value="">Todos los Años</option>
                         {% for a in anios_opciones %}
-                            <option value="{{ a }}"
-                                    {% if a == anio_seleccionado %}selected{% endif %}>
+                            <option value="{{ a }}" {% if a == anio_seleccionado %}selected{% endif %}>
                                 {{ a }}
                             </option>
                         {% endfor %}
                     </select>
                 </div>
-
-                <div class="col-md-4">
-                    <button type="submit" class="btn btn-secondary w-100">
-                        <i class="fas fa-filter me-1"></i> Aplicar filtro
-                    </button>
+                
+                <div class="col-auto">
+                    <button type="submit" class="btn btn-sm btn-secondary">Aplicar</button>
+                    {% if mes_seleccionado or anio_seleccionado %}
+                        <a href="{% url 'panel_bi' %}" class="btn btn-sm btn-outline-secondary ms-1">
+                            <i class="fas fa-times"></i> Limpiar
+                        </a>
+                    {% endif %}
                 </div>
             </form>
         </div>
@@ -64,25 +62,42 @@
 
     <div class="row mb-4">
         <div class="col-md-3">
-            <div class="card bg-success text-white text-center p-3 shadow-sm">
+            <div class="card bg-success text-white text-center p-3 shadow-sm h-100 position-relative">
                 <h2>{{ metricas.disponibilidad_sistema }}%</h2>
                 <div>Disponibilidad del Sistema</div>
+                <button type="button" class="btn btn-sm btn-light position-absolute top-0 end-0 m-2 text-success" 
+                        data-bs-toggle="modal" data-bs-target="#modalDisponibilidad" title="Ver registro de actividad">
+                    <i class="fas fa-eye"></i>
+                </button>
             </div>
         </div>
         <div class="col-md-3">
-            <div class="card bg-info text-white text-center p-3 shadow-sm">
-                <h2>{{ metricas.tiempo_respuesta_ms }} ms</h2>
+            <div class="card bg-info text-white text-center p-3 shadow-sm h-100 position-relative">
+                <h2>{{ tiempo_segundos}} s</h2>
                 <div>Tiempo de Respuesta</div>
+                <span style="font-size: 0.8rem;"></span>
+                
+                <button type="button" class="btn btn-sm btn-light position-absolute top-0 end-0 m-2" 
+                        data-bs-toggle="modal" data-bs-target="#modalRendimiento" title="Ver historial real">
+                    <i class="fas fa-eye text-info"></i>
+                </button>
             </div>
         </div>
+        
         <div class="col-md-3">
-            <div class="card bg-warning text-dark text-center p-3 shadow-sm">
+            <div class="card bg-warning text-dark text-center p-3 shadow-sm h-100 position-relative">
                 <h2>{{ precision }}%</h2>
                 <div>Precisión Transcripción</div>
+                
+                <button type="button" class="btn btn-sm btn-light position-absolute top-0 end-0 m-2" 
+                        data-bs-toggle="modal" data-bs-target="#modalPrecision" title="Ver detalle por reunión">
+                    <i class="fas fa-eye"></i>
+                </button>
             </div>
         </div>
+
         <div class="col-md-3">
-            <div class="card bg-danger text-white text-center p-3 shadow-sm">
+            <div class="card bg-danger text-white text-center p-3 shadow-sm h-100">
                 <h2>{{ metricas.fallos_votacion }}</h2>
                 <div>Fallos en Votaciones</div>
             </div>
@@ -90,55 +105,143 @@
     </div>
 
     <div class="row">
-        <div class="col-xl-6">
-            <div class="card mb-4">
-                <div class="card-header">Participación General vs. Meta (50%)</div>
-                <div class="card-body">
-                    <canvas id="graficoParticipacionGauge" height="250"></canvas>
-                </div>
-            </div>
-        </div>
-        <div class="col-xl-6">
-            <div class="card mb-4">
-                <div class="card-header">Distribución Demográfica</div>
-                <div class="card-body">
-                    <canvas id="graficoDemografiaSector" height="250"></canvas>
-                </div>
-            </div>
-        </div>
+        <div class="col-xl-6"><div class="card mb-4"><div class="card-header">Participación General vs. Meta (50%)</div><div class="card-body"><canvas id="graficoParticipacionGauge" height="250"></canvas></div></div></div>
+        <div class="col-xl-6"><div class="card mb-4"><div class="card-header">Distribución Demográfica</div><div class="card-body"><canvas id="graficoDemografiaSector" height="250"></canvas></div></div></div>
     </div>
     
     <div class="row">
-        <div class="col-xl-6">
-            <div class="card mb-4">
-                <div class="card-header">Ocupación de Talleres</div>
-                <div class="card-body">
-                    <canvas id="graficoOcupacionTalleres" height="250"></canvas>
-                </div>
-            </div>
-        </div>
-        <div class="col-xl-6">
-            <div class="card mb-4">
-                <div class="card-header">Consulta de Actas (Top 10)</div>
-                <div class="card-body">
-                    <canvas id="graficoConsultaActas" height="250"></canvas>
-                </div>
-            </div>
-        </div>
+        <div class="col-xl-6"><div class="card mb-4"><div class="card-header">Ocupación de Talleres</div><div class="card-body"><canvas id="graficoOcupacionTalleres" height="250"></canvas></div></div></div>
+        <div class="col-xl-6"><div class="card mb-4"><div class="card-header">Consulta de Actas (Top 10)</div><div class="card-body"><canvas id="graficoConsultaActas" height="250"></canvas></div></div></div>
     </div>
 
     <div class="row">
         <div class="col-xl-8">
             <div class="card mb-4">
-                <div class="card-header">
-                    <i class="fas fa-chart-line"></i> Tendencia de Asistencia a Reuniones
-                </div>
-                <div class="card-body">
-                    <canvas id="graficoAsistencia" height="250"></canvas>
-                </div>
+                <div class="card-header"><i class="fas fa-chart-line"></i> Tendencia de Asistencia a Reuniones</div>
+                <div class="card-body"><canvas id="graficoAsistencia" height="250"></canvas></div>
             </div>
         </div>
     </div>
+</div>
+
+<div class="modal fade" id="modalPrecision" tabindex="-1" aria-labelledby="modalPrecisionLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header bg-warning text-dark">
+        <h5 class="modal-title" id="modalPrecisionLabel"><i class="fas fa-clipboard-check me-2"></i>Detalle de Transcripciones</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="small text-muted">Calificación manual asignada por la directiva a la transcripción de cada acta.</p>
+        
+        <table class="table table-sm table-striped table-hover">
+            <thead>
+                <tr>
+                    <th>Reunión / Acta</th>
+                    <th>Fecha</th>
+                    <th class="text-center">Nota</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for acta in detalle_precision %}
+                <tr>
+                    <td>{{ acta.titulo }}</td>
+                    <td>{{ acta.fecha_reunion|date:"d/m/Y" }}</td>
+                    <td class="text-center fw-bold 
+                        {% if acta.precision_transcripcion >= 90 %}text-success
+                        {% elif acta.precision_transcripcion >= 70 %}text-warning
+                        {% else %}text-danger{% endif %}">
+                        {{ acta.precision_transcripcion|floatformat:0 }}%
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="3" class="text-center text-muted">No hay actas registradas.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="modalRendimiento" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header bg-info text-white">
+        <h5 class="modal-title"><i class="fas fa-stopwatch me-2"></i>Historial de Velocidad</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="small text-muted">Registro en tiempo real de cada página visitada.</p>
+        <table class="table table-sm table-hover" style="font-size: 0.85rem;">
+            <thead>
+                <tr>
+                    <th>Página</th>
+                    <th>Usuario</th>
+                    <th>Tiempo</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in detalle_rendimiento %}
+                <tr>
+                    <td class="text-truncate" style="max-width: 150px;">{{ log.path }}</td>
+                    <td>{{ log.usuario }}</td>
+                    <td class="fw-bold {% if log.tiempo_ms > 500 %}text-danger{% else %}text-success{% endif %}">
+                        {{ log.tiempo_s }} s  </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="3">No hay registros aún. Navega por la web.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="modalDisponibilidad" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header bg-success text-white">
+        <h5 class="modal-title"><i class="fas fa-server me-2"></i>Registro de Actividad</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="small text-muted">Monitor de códigos de estado HTTP (500 = Error de Servidor).</p>
+        <table class="table table-sm table-striped">
+            <thead>
+                <tr>
+                    <th>Hora</th>
+                    <th>Ruta</th>
+                    <th class="text-center">Estado</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in detalle_disponibilidad %}
+                <tr>
+                    <td>{{ log.fecha|date:"H:i:s" }}</td>
+                    <td class="text-truncate" style="max-width: 150px;">{{ log.path }}</td>
+                    <td class="text-center">
+                        {% if log.es_error %}
+                            <span class="badge bg-danger">{{ log.status }} ERROR</span>
+                        {% else %}
+                            <span class="badge bg-success">{{ log.status }} OK</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="3">Sin actividad reciente.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -151,7 +254,6 @@ document.addEventListener('DOMContentLoaded', function() {
         JSON.parse('{{ data_participacion|safe }}' || "{}"),
         JSON.parse('{{ data_demografia_sector|safe }}' || "[]"),
         JSON.parse('{{ data_asistencia|safe }}' || "[]"),
-        JSON.parse('{{ data_uso_app|safe }}' || "{}")
     );
 });
 </script>

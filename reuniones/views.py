@@ -15,7 +15,7 @@ from django.contrib.auth import get_user_model
 from datetime import timedelta
 # Importamos el nuevo EstadoReunion
 from .models import Reunion, Asistencia, Acta, EstadoReunion
-from .forms import ReunionForm, ActaForm
+from .forms import ReunionForm, ActaForm, CalificacionActaForm
 from core.authz import role_required
 from core.models import Perfil
 import json
@@ -555,3 +555,21 @@ def get_acta_estado(request, pk):
         'estado': acta.estado_transcripcion,
         'estado_display': acta.get_estado_transcripcion_display()
     })
+
+@require_POST
+@login_required
+@role_required("actas", "edit")
+def calificar_acta(request, pk):
+    reunion = get_object_or_404(Reunion, pk=pk)
+    try:
+        acta = reunion.acta
+        form = CalificacionActaForm(request.POST, instance=acta)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Calificación de precisión guardada correctamente.")
+        else:
+            messages.error(request, "Error al guardar la calificación. Debe ser un número entre 0 y 100.")
+    except Acta.DoesNotExist:
+        messages.error(request, "No existe acta para calificar.")
+        
+    return redirect("reuniones:detalle_reunion", pk=pk)

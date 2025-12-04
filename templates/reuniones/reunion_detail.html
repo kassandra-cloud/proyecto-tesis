@@ -233,6 +233,22 @@
             <a href="{% url 'reuniones:lista_asistencia' reunion.pk %}" class="btn btn-outline-secondary">
                 <i class="fas fa-users me-1"></i> Ver Asistencia ({{ asistentes.count }})
             </a>
+            <hr>
+            <form action="{% url 'reuniones:calificar_acta' reunion.pk %}" method="POST" class="row align-items-end g-2">
+              {% csrf_token %}
+              <div class="col-auto">
+                <label class="form-label fw-bold mb-0"><small>Calificar Precisión IA:</small></label>
+                <div class="input-group input-group-sm">
+                  <input type="number" name="calificacion_precision" class="form-control" 
+                  value="{{ acta.calificacion_precision }}" min="0" max="100" style="width: 70px;">
+                  <span class="input-group-text">%</span>
+                </div>
+              </div>
+              <div class="col-auto">
+                <button type="submit" class="btn btn-sm btn-outline-primary mb-0">Guardar Nota</button>
+              </div>
+              <small class="text-muted fst-italic">Evalúe qué tan bien transcribió la IA (100=Perfecto, 0=Malo).</small>
+            </form>
         </div>
         
         {% elif puede_ver_acta %}
