@@ -1,3 +1,4 @@
+import hashlib
 from django.db import models
 from django.conf import settings
 from django.utils import timezone
@@ -24,7 +25,7 @@ class Votacion(models.Model):
     class Meta:
         ordering = ["-fecha_cierre", "-id"]
         indexes = [
-            models.Index(fields=["activa", "fecha_cierre"]),  # ⚡ para listar abiertas rápido
+            models.Index(fields=["activa", "fecha_cierre"]),  
         ]
         verbose_name = "Votación"
         verbose_name_plural = "Votaciones"
@@ -40,6 +41,20 @@ class Opcion(models.Model):
 class Voto(models.Model):
     opcion = models.ForeignKey(Opcion, related_name='votos', on_delete=models.CASCADE)
     votante = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    
+    # 2. Agrega este campo nuevo
+    hash_voto = models.CharField(max_length=64, blank=True, editable=False) 
 
     class Meta:
         unique_together = [['opcion', 'votante']]
+
+    # 3. Agrega este método para generar el Hash automático
+    def save(self, *args, **kwargs):
+        # Si ya tiene ID (es edición) o es nuevo, calculamos el hash
+        # Usamos: ID Usuario + ID Opcion + LLAVE SECRETA DEL PROYECTO
+        data_string = f"{self.votante.id}-{self.opcion.id}-{settings.SECRET_KEY}"
+        
+        # Generamos el hash SHA-256
+        self.hash_voto = hashlib.sha256(data_string.encode()).hexdigest()
+        
+        super().save(*args, **kwargs)

@@ -19,8 +19,8 @@ if __name__ == "__main__":
         'proyecto_tesis',
         'worker',
         '--loglevel=info',
-        '-P',
-        'eventlet'
+        '-P', 'eventlet',
+        '-c', '2'
     ]
 
     # Pasa los argumentos a la función principal de Celery

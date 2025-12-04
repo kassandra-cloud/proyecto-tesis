@@ -46,14 +46,14 @@ ALLOWED_HOSTS = [
     "127.0.0.1",
     "localhost",
     "10.0.2.2",
-    "192.168.104.132",
+    "192.168.1.8",
 ]
 # Si usas login vía sesión desde Android/web, conviene permitir CSRF
 CSRF_TRUSTED_ORIGINS = [
     "http://127.0.0.1",
     "http://localhost",
     "http://10.0.2.2",
-    "http://192.168.104.132:8000",
+    "http://192.168.1.8:8000",
     
 ]
 
@@ -155,6 +155,7 @@ DATABASES = {
         }
     }
 }
+
 
 # -----------------------------------------------------------------------------
 # Password validators
