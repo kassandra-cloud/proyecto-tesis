@@ -58,23 +58,51 @@
     <p class="small">
         <strong>Generado por:</strong> {{ usuario }}<br>
         <strong>Fecha:</strong> {{ fecha_generacion|date:"d/m/Y H:i" }}<br>
+
         <strong>Total Vecinos Registrados:</strong>
         {% if participacion %}
             {{ participacion.total_vecinos }}
         {% else %}
             0
         {% endif %}<br>
+
         <strong>Vecinos Participantes (Votaciones):</strong>
         {% if participacion %}
             {{ participacion.total_participantes }}
         {% else %}
             0
         {% endif %}<br>
+
         <strong>Tasa de Participación Global:</strong>
         {% if participacion %}
             {{ participacion.porcentaje_actual|floatformat:1 }} %
         {% else %}
             0.0 %
+        {% endif %}<br>
+
+        <!-- KPIs técnicos (tarjetas del panel BI) -->
+        <strong>Disponibilidad del Sistema:</strong>
+        {% if metricas %}
+            {{ metricas.disponibilidad_sistema|floatformat:1 }} %
+        {% else %}
+            -
+        {% endif %}<br>
+
+        <strong>Fallos en Votaciones:</strong>
+        {% if metricas %}
+            {{ metricas.fallos_votacion }}
+        {% else %}
+            0
+        {% endif %}<br>
+
+        <strong>Precisión Promedio de Transcripciones:</strong>
+        {{ precision|default:"0"|floatformat:1 }} %<br>
+
+        <strong>Tiempo Promedio de Respuesta:</strong>
+        {% if tiempo_segundos %}
+            {{ tiempo_segundos|floatformat:2 }} s
+        {% else %}
+            -
         {% endif %}
     </p>
 </div>
@@ -162,7 +190,7 @@
                 {% for a in consulta_actas %}
                     <tr>
                         <td>{{ a.acta__titulo }}</td>
-                        <!-- Si no tienes fecha en el queryset, mostramos "-" -->
+                        <!-- Si no tienes fecha en el queryset, se deja "-" -->
                         <td>-</td>
                         <td>{{ a.consultas }}</td>
                     </tr>
@@ -171,6 +199,127 @@
         </table>
     {% else %}
         <p class="small">No se han registrado consultas aún.</p>
+    {% endif %}
+</div>
+
+<!-- 4. Asistencia a Reuniones (Serie de Tiempo) -->
+<div class="section">
+    <h2>4. Asistencia a Reuniones (Evolución)</h2>
+
+    {% if data_asistencia %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Fecha de la Reunión</th>
+                    <th>Nombre de la Reunión</th>
+                    <th>Total Asistentes</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for a in data_asistencia %}
+                    <tr>
+                        <td>{{ a.fecha }}</td>
+                        <td>{{ a.titulo }}</td>
+                        <td>{{ a.total }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p class="small">No hay registros de asistencia en el período analizado.</p>
+    {% endif %}
+</div>
+
+<!-- 5. Precisión de Transcripciones (Detalle) -->
+<div class="section">
+    <h2>5. Precisión de Transcripciones</h2>
+
+    {% if detalle_precision %}
+        <p class="small">
+            La siguiente tabla resume la precisión evaluada para cada acta,
+            similar al detalle mostrado en el panel BI.
+        </p>
+        <table>
+            <thead>
+                <tr>
+                    <th>Reunión / Acta</th>
+                    <th>Fecha</th>
+                    <th>Precisión (%)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for acta in detalle_precision %}
+                    <tr>
+                        <td>{{ acta.titulo }}</td>
+                        <td>{{ acta.fecha_reunion|date:"d/m/Y" }}</td>
+                        <td>{{ acta.precision_transcripcion|floatformat:0 }}%</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p class="small">No hay actas con calificación de precisión registrada.</p>
+    {% endif %}
+</div>
+
+<!-- 6. Rendimiento y Disponibilidad del Sistema -->
+<div class="section">
+    <h2>6. Rendimiento y Disponibilidad del Sistema</h2>
+
+    <!-- 6.1 Historial de velocidad de respuesta -->
+    <h3>6.1 Historial de Velocidad (Últimas 50 peticiones)</h3>
+    {% if detalle_rendimiento %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Página</th>
+                    <th>Usuario</th>
+                    <th>Tiempo (s)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in detalle_rendimiento %}
+                    <tr>
+                        <td>{{ log.path }}</td>
+                        <td>{{ log.usuario }}</td>
+                        <td>{{ log.tiempo_s }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p class="small">No hay registros de rendimiento disponibles.</p>
+    {% endif %}
+
+    <!-- 6.2 Disponibilidad por ruta -->
+    <h3>6.2 Disponibilidad por Ruta (Últimas 50 peticiones)</h3>
+    {% if detalle_disponibilidad %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Fecha / Hora</th>
+                    <th>Ruta</th>
+                    <th>Estado</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in detalle_disponibilidad %}
+                    <tr>
+                        <td>{{ log.fecha|date:"d/m/Y H:i:s" }}</td>
+                        <td>{{ log.path }}</td>
+                        <td>
+                            {% if log.es_error %}
+                                ERROR {{ log.status }}
+                            {% else %}
+                                OK {{ log.status }}
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p class="small">No hay historial de disponibilidad registrado.</p>
     {% endif %}
 </div>
 

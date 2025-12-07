@@ -1,6 +1,7 @@
 import json
 import re
 from datetime import timedelta
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.core.management import call_command
@@ -11,104 +12,227 @@ from django.shortcuts import render, redirect
 from django.template.loader import get_template
 from django.utils import timezone
 from xhtml2pdf import pisa
-from datamart.models import LogRendimiento
 
 from datamart.models import (
-    FactInscripcionTaller, DimTaller, FactConsultaActa,
-    FactParticipacionVotacion, DimVecino, FactAsistenciaReunion,
-    DimActa, FactMetricasDiarias, LogRendimiento, 
+    FactInscripcionTaller,
+    DimTaller,
+    FactConsultaActa,
+    FactParticipacionVotacion,
+    DimVecino,
+    FactAsistenciaReunion,
+    DimActa,
+    FactMetricasDiarias,
+    LogRendimiento,
 )
 
-MESES_ES = ["", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
+MESES_ES = [
+    "",
+    "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+    "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+]
+
 
 def es_usuario_directiva(user):
+    # Por ahora: cualquier usuario autenticado puede ver el BI.
+    # Si quieres restringir a grupo "Directiva", puedes usar:
+    # return user.is_authenticated and (user.is_staff or user.groups.filter(name="Directiva").exists())
     return user.is_authenticated
 
 def construir_datos_panel_bi(mes=None, anio=None):
-    # 1. Ocupación Talleres
-    inscritos_qs = FactInscripcionTaller.objects.values("taller__id").annotate(total_inscritos=Count("id"))
-    inscritos_por_id = {item['taller__id']: item['total_inscritos'] for item in inscritos_qs}
+    """
+    Construye los datasets para el panel BI.
+    Si se indican mes y/o año, se filtra TODA la información temporal
+    (inscripciones, consultas de actas, votaciones, asistencia, logs y actas).
+    """
+
+    # Helper para reutilizar filtro de fecha en distintos modelos/campos
+    def filtrar_por_fecha(qs, campo_fecha: str):
+        if anio:
+            qs = qs.filter(**{f"{campo_fecha}__year": anio})
+        if mes:
+            qs = qs.filter(**{f"{campo_fecha}__month": mes})
+        return qs
+
+    # 1) OCUPACIÓN DE TALLERES (filtrado por fecha_inscripcion)
+    inscritos_qs = FactInscripcionTaller.objects.all()
+    inscritos_qs = filtrar_por_fecha(inscritos_qs, "fecha_inscripcion")
+
+    inscritos_qs = (
+        inscritos_qs
+        .values("taller__id")
+        .annotate(total_inscritos=Count("id"))
+    )
+    inscritos_por_id = {
+        item["taller__id"]: item["total_inscritos"]
+        for item in inscritos_qs
+    }
+
     data_ocupacion_talleres = []
-    for taller in DimTaller.objects.all().order_by('nombre'):
+    for taller in DimTaller.objects.all().order_by("nombre"):
         data_ocupacion_talleres.append({
             "nombre": taller.nombre,
             "inscritos": inscritos_por_id.get(taller.id, 0),
             "cupos": taller.cupos_totales,
         })
 
-    # 2. Consulta Actas
-    data_consulta_actas = list(FactConsultaActa.objects.values("acta__titulo").annotate(consultas=Count("id")).order_by("-consultas")[:10])
+    # 2) CONSULTA DE ACTAS (Top 10) filtrado por fecha_consulta
+    consulta_qs = FactConsultaActa.objects.all()
+    consulta_qs = filtrar_por_fecha(consulta_qs, "fecha_consulta")
 
-    # 3. Participación
-    total_vecinos = DimVecino.objects.count() or 1
-    total_part = FactParticipacionVotacion.objects.values("vecino_id").distinct().count()
-    porcentaje_actual = (float(total_part) / float(total_vecinos) * 100.0) if total_vecinos > 0 else 0.0
-    
+    data_consulta_actas = list(
+        consulta_qs
+        .values("acta__titulo")
+        .annotate(consultas=Count("id"))
+        .order_by("-consultas")[:10]
+    )
+
+    # 3) PARTICIPACIÓN EN VOTACIONES (porcentaje en el período)
+    voto_qs = FactParticipacionVotacion.objects.all()
+    voto_qs = filtrar_por_fecha(voto_qs, "fecha_voto")
+
+    total_vecinos = DimVecino.objects.count() or 1  # universo total
+    total_part = (
+        voto_qs
+        .values("vecino_id")
+        .distinct()
+        .count()
+    )
+    porcentaje_actual = (
+        float(total_part) / float(total_vecinos) * 100.0
+        if total_vecinos > 0 else 0.0
+    )
+
     data_participacion = {
         "total_vecinos": total_vecinos,
         "total_participantes": total_part,
-        "porcentaje_actual": porcentaje_actual,
+        "porcentaje_actual": round(porcentaje_actual, 1),
         "porcentaje_meta": 50.0,
     }
 
-    # 4. Demografía
-    data_demografia_sector = list(DimVecino.objects.values("direccion_sector").annotate(total_vecinos=Count("id")).order_by("-total_vecinos"))
+    # 4) DEMOGRAFÍA POR SECTOR filtrada POR ACTIVIDAD en el período
+    #
+    # En vez de tomar a TODOS los vecinos,
+    # tomamos solo los que tuvieron alguna actividad en:
+    # - Inscripción a talleres
+    # - Asistencia a reuniones
+    # - Participación en votaciones
+    # - Consulta de actas
+    vecinos_ids_actividad = set()
+
+    # Inscripciones
+    ins_qs = FactInscripcionTaller.objects.all()
+    ins_qs = filtrar_por_fecha(ins_qs, "fecha_inscripcion")
+    vecinos_ids_actividad.update(
+        ins_qs.values_list("vecino_id", flat=True)
+    )
+
+    # Asistencia
+    asis_qs = FactAsistenciaReunion.objects.all()
+    asis_qs = filtrar_por_fecha(asis_qs, "reunion__fecha")
+    vecinos_ids_actividad.update(
+        asis_qs.values_list("vecino_id", flat=True)
+    )
+
+    # Votaciones
+    voto_qs_ids = FactParticipacionVotacion.objects.all()
+    voto_qs_ids = filtrar_por_fecha(voto_qs_ids, "fecha_voto")
+    vecinos_ids_actividad.update(
+        voto_qs_ids.values_list("vecino_id", flat=True)
+    )
+
+    # Consultas de actas
+    cons_qs_ids = FactConsultaActa.objects.all()
+    cons_qs_ids = filtrar_por_fecha(cons_qs_ids, "fecha_consulta")
+    vecinos_ids_actividad.update(
+        cons_qs_ids.values_list("vecino_id", flat=True)
+    )
+
+    if vecinos_ids_actividad:
+        vecinos_demografia = DimVecino.objects.filter(
+            id__in=vecinos_ids_actividad
+        )
+    else:
+        # Si no hubo actividad en el periodo, dejamos 0 para todos
+        vecinos_demografia = DimVecino.objects.none()
+
+    data_demografia_sector = list(
+        vecinos_demografia
+        .values("direccion_sector")
+        .annotate(total_vecinos=Count("id"))
+        .order_by("-total_vecinos")
+    )
+
+    # Limpiar números de las direcciones para agrupar mejor
     for row in data_demografia_sector:
-        original = row['direccion_sector'] or ""
-        solo_texto = re.sub(r'\d+', '', original).strip()
-        row['direccion_sector'] = solo_texto or "Sin Dirección"
+        original = row["direccion_sector"] or ""
+        solo_texto = re.sub(r"\d+", "", original).strip()
+        row["direccion_sector"] = solo_texto or "Sin Dirección"
 
-    # 5. Asistencia (CON FILTRO)
+    # 5) ASISTENCIA A REUNIONES (ya la tenías filtrada, la dejamos igual pero con helper)
     asistencia_qs = FactAsistenciaReunion.objects.all()
-    if anio: asistencia_qs = asistencia_qs.filter(reunion__fecha__year=anio)
-    if mes: asistencia_qs = asistencia_qs.filter(reunion__fecha__month=mes)
-    
-    asist_agrupada = asistencia_qs.values('reunion__fecha').annotate(total=Count('id')).order_by('reunion__fecha')
-    data_asistencia = [{'fecha': item['reunion__fecha'].strftime("%Y-%m-%d"), 'total': item['total']} for item in asist_agrupada]
+    asistencia_qs = filtrar_por_fecha(asistencia_qs, "reunion__fecha")
 
-    # 6. Métricas Técnicas
+    asist_agrupada = (
+        asistencia_qs
+        .values("reunion__fecha", "reunion__titulo")
+        .annotate(total=Count("id"))
+        .order_by("reunion__fecha")
+    )
+    data_asistencia = [
+        {
+            "fecha": item["reunion__fecha"].strftime("%Y-%m-%d"),
+            "titulo": item["reunion__titulo"],
+            "total": item["total"],
+        }
+        for item in asist_agrupada
+    ]
+
+    # 6) MÉTRICAS TÉCNICAS (último registro)
     metricas = FactMetricasDiarias.objects.last()
-    
-    # 7. Precisión
-    calidad = DimActa.objects.aggregate(promedio=Avg('precision_transcripcion'))
-    precision_avg = calidad['promedio'] or 0
-    
-    # Detalle (Modal)
-    qs_detalle = DimActa.objects.all()
-    if anio: qs_detalle = qs_detalle.filter(fecha_reunion__year=anio)
-    if mes: qs_detalle = qs_detalle.filter(fecha_reunion__month=mes)
-    detalle_precision = list(qs_detalle.values('titulo', 'fecha_reunion', 'precision_transcripcion').order_by('-fecha_reunion'))
 
-    # --- CÁLCULO DE TIEMPO GLOBAL (Tarjeta Azul) ---
+    # 7) PRECISIÓN PROMEDIO (solo actas del periodo)
+    calidad_qs = DimActa.objects.all()
+    calidad_qs = filtrar_por_fecha(calidad_qs, "fecha_reunion")
+
+    precision_avg_dict = calidad_qs.aggregate(promedio=Avg("precision_transcripcion"))
+    precision_avg = precision_avg_dict["promedio"] or 0
+
+    detalle_precision_qs = DimActa.objects.all()
+    detalle_precision_qs = filtrar_por_fecha(detalle_precision_qs, "fecha_reunion")
+
+    detalle_precision = list(
+        detalle_precision_qs
+        .values("titulo", "fecha_reunion", "precision_transcripcion")
+        .order_by("-fecha_reunion")
+    )
+
+    # 8) TIEMPO DE RESPUESTA GLOBAL
     tiempo_segundos = 0.0
     if metricas and metricas.tiempo_respuesta_ms:
-        # Dividimos por 1000 para pasar de ms a segundos
         tiempo_segundos = round(metricas.tiempo_respuesta_ms / 1000.0, 2)
 
-    # --- DETALLE DE RENDIMIENTO (Tabla del Modal) ---
-    # 1. Traemos los últimos 50 logs de la base de datos
-    logs_db = LogRendimiento.objects.all().order_by('-fecha')[:50]
-    
-    # 2. Creamos la lista final convirtiendo ms a s fila por fila
+    # 9) LOGS DE RENDIMIENTO (solo sitio web, filtrados por fecha)
+    logs_db = LogRendimiento.objects.exclude(path__startswith="/api/")
+    logs_db = filtrar_por_fecha(logs_db, "fecha")
+    logs_db = logs_db.order_by("-fecha")[:50]
+
     detalle_rendimiento = []
     for log in logs_db:
         detalle_rendimiento.append({
-            'path': log.path,
-            'usuario': log.usuario,
-            'tiempo_ms': log.tiempo_ms,
-            'tiempo_s': round(log.tiempo_ms / 1000.0, 2) # <--- Tu cálculo correcto
+            "path": log.path,
+            "usuario": log.usuario,
+            "tiempo_ms": log.tiempo_ms,
+            "tiempo_s": round(log.tiempo_ms / 1000.0, 2),
         })
 
-    # --- DETALLE PARA EL MODAL (Últimos 50 registros) ---
-    detalle_disponibilidad = [] # Lista nueva para el modal
+    detalle_disponibilidad = []
     for log in logs_db:
-        # Determinamos si fue éxito o error para mostrarlo bonito
         es_error = log.status_code >= 500
         detalle_disponibilidad.append({
-            'path': log.path,
-            'fecha': log.fecha,
-            'status': log.status_code,
-            'es_error': es_error
+            "path": log.path,
+            "fecha": log.fecha,
+            "status": log.status_code,
+            "es_error": es_error,
         })
 
     return {
@@ -128,15 +252,27 @@ def construir_datos_panel_bi(mes=None, anio=None):
 @login_required
 @user_passes_test(es_usuario_directiva)
 def panel_bi_view(request):
-    mes = request.GET.get('mes'); anio = request.GET.get('anio')
-    try: mes = int(mes) if mes else None; anio = int(anio) if anio else None
-    except: mes = None; anio = None
+    mes = request.GET.get("mes")
+    anio = request.GET.get("anio")
+    try:
+        mes = int(mes) if mes else None
+        anio = int(anio) if anio else None
+    except Exception:
+        mes = None
+        anio = None
 
-    anios_opciones = list(FactAsistenciaReunion.objects.annotate(anio=ExtractYear('reunion__fecha')).values_list('anio', flat=True).distinct().order_by('anio'))
-    if not anios_opciones: anios_opciones = [timezone.now().year]
+    anios_opciones = list(
+        FactAsistenciaReunion.objects
+        .annotate(anio=ExtractYear("reunion__fecha"))
+        .values_list("anio", flat=True)
+        .distinct()
+        .order_by("anio")
+    )
+    if not anios_opciones:
+        anios_opciones = [timezone.now().year]
 
     datos = construir_datos_panel_bi(mes, anio)
-    meses_opciones = [{'num': i, 'nombre': MESES_ES[i]} for i in range(1, 13)]
+    meses_opciones = [{"num": i, "nombre": MESES_ES[i]} for i in range(1, 13)]
 
     context = {
         "data_ocupacion_talleres": json.dumps(datos["ocupacion_talleres"]),
@@ -151,7 +287,7 @@ def panel_bi_view(request):
         "precision": datos["precision"],
         "detalle_precision": datos["detalle_precision"],
         "detalle_disponibilidad": datos["detalle_disponibilidad"],
-        
+
         "anios_opciones": anios_opciones,
         "meses_opciones": meses_opciones,
         "mes_seleccionado": mes,
@@ -159,37 +295,58 @@ def panel_bi_view(request):
     }
     return render(request, "datamart/panel_bi.html", context)
 
+
 @login_required
 @user_passes_test(es_usuario_directiva)
 def ejecutar_etl_view(request):
-    if request.method == 'POST':
+    if request.method == "POST":
         try:
+            # Usas tu management command existente
             call_command("procesar_etl")
             messages.success(request, "Datos actualizados.")
         except Exception as e:
             messages.error(request, f"Error: {e}")
     return redirect("panel_bi")
 
+
 @login_required
 def generar_pdf_view(request):
+    """
+    Genera un PDF con la MISMA información que alimenta los gráficos del panel BI:
+    - Demografía
+    - Ocupación de talleres
+    - Actas consultadas
+    - Asistencia (con nombre de la reunión)
+    - Precisión de transcripciones
+    - Rendimiento y disponibilidad SOLO del sitio web
+    """
     datos = construir_datos_panel_bi()
+
     context = {
         "fecha_generacion": timezone.localtime(),
-        "usuario_generador": request.user,
+        "usuario": request.user.get_full_name() or request.user.username,
+
         "ocupacion_talleres": datos["ocupacion_talleres"],
         "consulta_actas": datos["consulta_actas"],
         "participacion": datos["participacion"],
         "demografia_sector": datos["demografia_sector"],
         "data_asistencia": datos["data_asistencia"],
-        # ⚠️ ELIMINADO: data_uso_app
+
         "metricas": datos["metricas"],
         "precision": datos["precision"],
         "detalle_precision": datos["detalle_precision"],
+
+        "detalle_rendimiento": datos["detalle_rendimiento"],
+        "detalle_disponibilidad": datos["detalle_disponibilidad"],
+        "tiempo_segundos": datos["tiempo_segundos"],
     }
+
     template = get_template("datamart/reporte_pdf.html")
     html = template.render(context, request=request)
+
     response = HttpResponse(content_type="application/pdf")
     response["Content-Disposition"] = 'attachment; filename="Informe.pdf"'
     pisa_status = pisa.CreatePDF(html, dest=response)
-    if pisa_status.err: return HttpResponse('Error PDF')
+    if pisa_status.err:
+        return HttpResponse("Error PDF")
     return response

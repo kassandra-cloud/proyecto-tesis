@@ -98,3 +98,35 @@ class Perfil(models.Model):
 
     class Meta:
         constraints = [models.CheckConstraint(name="rut_not_empty", check=~Q(rut=""))]
+
+class DispositivoFCM(models.Model):
+    """
+    Representa un dispositivo físico (teléfono, emulador, tablet) asociado a un usuario,
+    con su token FCM independiente.
+    """
+    usuario = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="dispositivos_fcm"
+    )
+    token = models.CharField(max_length=255, unique=True)
+    nombre_dispositivo = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        help_text="Nombre amigable (por ejemplo: 'Xiaomi de María', 'Emulador Android Studio')",
+    )
+    plataforma = models.CharField(
+        max_length=20,
+        blank=True,
+        null=True,
+        help_text="android, web, ios, etc."
+    )
+    creado = models.DateTimeField(auto_now_add=True)
+    actualizado = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        base = f"{self.usuario.username} - {self.token[:10]}..."
+        if self.nombre_dispositivo:
+            return f"{base} ({self.nombre_dispositivo})"
+        return base

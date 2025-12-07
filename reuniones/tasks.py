@@ -12,7 +12,7 @@ from django.conf import settings
 from django.utils import timezone
 
 from .models import Acta, Reunion
-from core.models import Perfil
+from core.models import Perfil, DispositivoFCM
 
 # VOSK
 from vosk import Model, KaldiRecognizer
@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 VOSK_MODEL_PATH = os.path.join(settings.BASE_DIR, "vosk-model-small-es-0.42")
 vosk_model = None
 firebase_app = None
+
 
 def inicializar_firebase():
     global firebase_app
@@ -64,42 +65,65 @@ def inicializar_firebase():
     firebase_app = firebase_admin.initialize_app(cred)
     return firebase_app
 
+
 # --- TAREAS DE NOTIFICACIÓN ---
+
+
+def _obtener_tokens_dispositivos():
+    """
+    Obtiene TODOS los tokens registrados en DispositivoFCM (multi-dispositivo).
+    """
+    return list(
+        DispositivoFCM.objects
+        .values_list("token", flat=True)
+        .distinct()
+    )
+
 
 @shared_task
 def enviar_notificacion_nueva_reunion(reunion_id):
     try:
         inicializar_firebase()
         reunion = Reunion.objects.get(pk=reunion_id)
-        tokens = list(Perfil.objects.exclude(fcm_token__isnull=True).exclude(fcm_token="").values_list("fcm_token", flat=True))
 
-        if not tokens: return
+        tokens = _obtener_tokens_dispositivos()
+        if not tokens:
+            return
 
         fecha_local = timezone.localtime(reunion.fecha)
         body = f"{reunion.titulo} el {fecha_local.strftime('%d/%m/%Y %H:%M')}"
-        
-        # Enviar uno a uno (Legacy) o Multicast si prefieres unificar
+
+        # Envío uno a uno (puedes cambiar a Multicast si quieres)
         for token in tokens:
             try:
                 msg = messaging.Message(
-                    notification=messaging.Notification(title="Nueva reunión agendada", body=body),
+                    notification=messaging.Notification(
+                        title="Nueva reunión agendada",
+                        body=body
+                    ),
                     token=token,
-                    data={"tipo": "nueva_reunion", "reunion_id": str(reunion.id)}
+                    data={
+                        "tipo": "nueva_reunion",
+                        "reunion_id": str(reunion.id)
+                    }
                 )
                 messaging.send(msg)
             except Exception:
+                # No reventamos toda la tarea por un token malo
                 pass
     except Exception as e:
         logger.error(f"Error notif nueva reunion: {e}")
+
 
 @shared_task
 def enviar_notificacion_reunion_iniciada(reunion_id):
     try:
         inicializar_firebase()
         reunion = Reunion.objects.get(id=reunion_id)
-        tokens = list(Perfil.objects.exclude(fcm_token__isnull=True).exclude(fcm_token="").values_list("fcm_token", flat=True))
 
-        if not tokens: return
+        tokens = _obtener_tokens_dispositivos()
+        if not tokens:
+            return
 
         mensaje = messaging.MulticastMessage(
             notification=messaging.Notification(
@@ -117,36 +141,43 @@ def enviar_notificacion_reunion_iniciada(reunion_id):
     except Exception as e:
         logger.error(f"Error notif inicio reunion: {e}")
 
+
 @shared_task
 def enviar_notificacion_reunion_finalizada(reunion_id):
     try:
         inicializar_firebase()
         reunion = Reunion.objects.get(id=reunion_id)
-        tokens = list(Perfil.objects.exclude(fcm_token__isnull=True).exclude(fcm_token="").values_list("fcm_token", flat=True))
 
-        if not tokens: return
+        tokens = _obtener_tokens_dispositivos()
+        if not tokens:
+            return
 
         mensaje = messaging.MulticastMessage(
             notification=messaging.Notification(
                 title="Reunión Finalizada",
                 body=f"La reunión '{reunion.titulo}' ha finalizado."
             ),
-            data={"tipo": "reunion_finalizada", "reunion_id": str(reunion.id)},
+            data={
+                "tipo": "reunion_finalizada",
+                "reunion_id": str(reunion.id)
+            },
             tokens=tokens
         )
         messaging.send_each_for_multicast(mensaje)
     except Exception as e:
         logger.error(f"Error notif fin reunion: {e}")
 
+
 @shared_task
 def enviar_notificacion_acta_aprobada(acta_id):
     try:
         inicializar_firebase()
         acta = Acta.objects.get(pk=acta_id)
-        reunion = acta.reunion 
-        tokens = list(Perfil.objects.exclude(fcm_token__isnull=True).exclude(fcm_token="").values_list("fcm_token", flat=True))
+        reunion = acta.reunion
 
-        if not tokens: return
+        tokens = _obtener_tokens_dispositivos()
+        if not tokens:
+            return
 
         mensaje = messaging.MulticastMessage(
             notification=messaging.Notification(
@@ -164,7 +195,9 @@ def enviar_notificacion_acta_aprobada(acta_id):
     except Exception as e:
         logger.error(f"Error notif acta aprobada: {e}")
 
+
 # --- TAREA DE TRANSCRIPCIÓN (VOSK) ---
+
 
 @shared_task(name="procesar_audio_vosk")
 def procesar_audio_vosk(acta_pk):
@@ -199,15 +232,16 @@ def procesar_audio_vosk(acta_pk):
         wf = wave.open(output_wav_path, "rb")
         rec = KaldiRecognizer(vosk_model, wf.getframerate())
         rec.SetWords(True)
-        
+
         full_text = ""
         while True:
             data = wf.readframes(4000)
-            if len(data) == 0: break
+            if len(data) == 0:
+                break
             if rec.AcceptWaveform(data):
                 res = json.loads(rec.Result())
                 full_text += res.get("text", "") + " "
-        
+
         final_res = json.loads(rec.FinalResult())
         full_text += final_res.get("text", "")
         wf.close()
@@ -217,8 +251,10 @@ def procesar_audio_vosk(acta_pk):
         acta.save()
 
         # Limpieza
-        if os.path.exists(input_webm_path): os.remove(input_webm_path)
-        if os.path.exists(output_wav_path): os.remove(output_wav_path)
+        if os.path.exists(input_webm_path):
+            os.remove(input_webm_path)
+        if os.path.exists(output_wav_path):
+            os.remove(output_wav_path)
 
         return f"Acta {acta_pk} procesada."
 
@@ -227,5 +263,6 @@ def procesar_audio_vosk(acta_pk):
             a = Acta.objects.get(pk=acta_pk)
             a.estado_transcripcion = Acta.ESTADO_ERROR
             a.save()
-        except: pass
+        except:
+            pass
         return f"Error procesando: {e}"
