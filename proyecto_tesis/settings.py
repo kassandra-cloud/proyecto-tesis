@@ -283,17 +283,21 @@ AWS_S3_OBJECT_PARAMETERS = {
 # Seguridad de enlaces firmados (Privacidad)
 if DEBUG:
     # En desarrollo, URLs públicas para facilitar pruebas
-    AWS_QUERYSTRING_AUTH = False
+    AWS_QUERYSTRING_AUTH = True
 else:
     # En producción, URLs firmadas que expiran (seguridad)
     AWS_QUERYSTRING_AUTH = True
 
 # --- BACKEND DE ALMACENAMIENTO ---
 # Esto le dice a Django que use S3/Cellar para FileField
-DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
-
-# (Opcional) Si en el futuro quieres estáticos en Cellar:
-# STATICFILES_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
+STORAGES = {
+    "default": {
+        "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
 
 # =================================================
 # --- AUTHENTICATION BACKENDS ---

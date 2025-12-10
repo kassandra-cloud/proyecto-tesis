@@ -7,8 +7,8 @@ attrs==25.4.0
 autobahn==25.10.2
 Automat==25.4.16
 billiard==4.2.2
-boto3==1.40.74
-botocore==1.40.74
+boto3==1.35.95
+botocore==1.35.95
 CacheControl==0.14.4
 cachetools==6.2.2
 celery==5.5.3
@@ -90,7 +90,6 @@ reportlab==4.4.4
 requests==2.32.5
 rlPyCairo==0.4.0
 rsa==4.9.1
-s3transfer==0.14.0
 selenium==4.34.0
 service-identity==24.2.0
 six==1.17.0
