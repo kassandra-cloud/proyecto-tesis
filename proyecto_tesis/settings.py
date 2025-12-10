@@ -11,9 +11,6 @@ from django.conf import settings
 # -----------------------------------------------------------------------------
 # Paths & .env
 # -----------------------------------------------------------------------------
-# -------------------------------------------------------------------
-# Paths & .env
-# -------------------------------------------------------------------
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Cargar variables desde .env en la raíz del proyecto
@@ -28,40 +25,40 @@ SECRET_KEY = os.environ.get('SECRET_KEY', default='your secret key')
 # DEBUG=True/False en .env
 DEBUG = os.getenv("DEBUG", "True").lower() == "true"
 
-# Hosts permitidos (coma separada en .env)
+# Hosts permitidos
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
 RENDER_EXTERNAL_HOSTNAME = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
 if RENDER_EXTERNAL_HOSTNAME:
     ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
+
+# Agregar IPs locales para desarrollo si es necesario
+ALLOWED_HOSTS.extend([
+    "10.0.2.2",
+    "192.168.0.103",
+])
+
+# CSRF
+CSRF_TRUSTED_ORIGINS = [
+    "http://127.0.0.1",
+    "http://localhost",
+    "http://10.0.2.2",
+    "http://192.168.0.103:8000",
+]
+
 # -------------------------------------------------------------------
-# Firebase (para Admin SDK, usado por inicializar_firebase())
+# Firebase (para Admin SDK)
 # -------------------------------------------------------------------
 FIREBASE_PROJECT_ID = os.getenv("FIREBASE_PROJECT_ID")
 FIREBASE_CLIENT_EMAIL = os.getenv("FIREBASE_CLIENT_EMAIL")
 FIREBASE_PRIVATE_KEY = os.getenv("FIREBASE_PRIVATE_KEY")
 FIREBASE_PRIVATE_KEY_ID = os.getenv("FIREBASE_PRIVATE_KEY_ID", "")
 
-ALLOWED_HOSTS = [
-    # Desarrollo local / emuladores / dispositivos en tu Wi-Fi
-    "127.0.0.1",
-    "localhost",
-    "10.0.2.2",
-    "192.168.0.103",
-]
-# Si usas login vía sesión desde Android/web, conviene permitir CSRF
-CSRF_TRUSTED_ORIGINS = [
-    "http://127.0.0.1",
-    "http://localhost",
-    "http://10.0.2.2",
-    "http://192.168.0.103:8000",
-    
-]
 
 # -----------------------------------------------------------------------------
 # Apps
 # -----------------------------------------------------------------------------
 INSTALLED_APPS = [
-    # "daphne",  #
+    # "daphne",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -86,8 +83,7 @@ INSTALLED_APPS = [
     "rest_framework.authtoken",
     "django_filters",
     "channels",
-    
-    
+    "storages",  # <--- CORRECCIÓN 1: Agregado para que funcione S3/Cellar
 ]
 
 # -----------------------------------------------------------------------------
@@ -102,7 +98,7 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "core.middleware.ForcePasswordChangeMiddleware",
-    'django.middleware.security.SecurityMiddleware',
+    # Eliminado duplicado de SecurityMiddleware
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'proyecto_tesis.middleware.MonitorRendimientoMiddleware',
 ]
@@ -143,15 +139,12 @@ DATABASES = {
         "PASSWORD": os.getenv("MYSQL_PASSWORD", ""),
         "HOST": os.getenv("MYSQL_HOST", "127.0.0.1"),
         "PORT": os.getenv("MYSQL_PORT", "3306"),
-        "CONN_MAX_AGE": 0 if DEBUG else 60,          # 60 segundos mantiene la conexión viva para reutilizarla (Mejora ISO 25010)
-        "CONN_HEALTH_CHECKS": True,    # Django 5: revisa conexión antes de usarla
+        "CONN_MAX_AGE": 0 if DEBUG else 60,
+        "CONN_HEALTH_CHECKS": True,
         "OPTIONS": {
             "connect_timeout": 10,
-        },
-        "OPTIONS": {
-            "connect_timeout": 10,  # <-- De la primera
-            "charset": "utf8mb4",   # <-- De la segunda
-            "init_command": "SET sql_mode='STRICT_TRANS_TABLES'", # <-- De la segunda
+            "charset": "utf8mb4",
+            "init_command": "SET sql_mode='STRICT_TRANS_TABLES'",
         }
     }
 }
@@ -191,19 +184,13 @@ STATICFILES_DIRS = [BASE_DIR / "static"] if (BASE_DIR / "static").exists() else 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
-# Define el directorio donde collectstatic copiará los archivos.
-# Debe estar fuera de cualquier condicional, ya que collectstatic siempre lo requiere.
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles') # ✅ Solución: Definido aquí
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 # --- Configuración de WhiteNoise (Producción) ---
 if not DEBUG:
-    # Este ajuste informa a Django del path URI desde el cual tus estáticos
-    # serán accesibles (ej: en onrender.com es '/static/' por defecto)
     STATIC_URL = '/static/'
-    
-    # Habilita el backend de WhiteNoise, el cual comprime estáticos y 
-    # les asigna nombres únicos (manifest) para soporte de caché a largo plazo.
     STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
 # -----------------------------------------------------------------------------
 # Tamaños de subida
 # -----------------------------------------------------------------------------
@@ -224,53 +211,38 @@ REST_FRAMEWORK = {
 }
 
 # -----------------------------------------------------------------------------
-# Email (SMTP) — usa variables de entorno
+# Email (SMTP)
 # -----------------------------------------------------------------------------
-# Puerto: Lo lee como cadena y lo convierte a entero (int)
 EMAIL_PORT = int(os.getenv("EMAIL_PORT", "465")) 
-
-# SSL/TLS: Lo lee como cadena y lo convierte a booleano (bool)
-# Usamos un valor por defecto (False) en caso de que la variable no exista en .env
-# La forma más segura de leer booleanos desde cadenas es:
 EMAIL_USE_SSL = os.getenv("EMAIL_USE_SSL", "False").lower() == "true"
 EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "False").lower() == "true"
-
-# Host y Credenciales (se leen como cadenas - str)
 EMAIL_HOST = os.getenv("EMAIL_HOST")
 EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER)
-# -----------------------------------------------------------------------------
-# Producción (sugerencias, descomenta cuando pases a HTTPS/CDN)
-# -----------------------------------------------------------------------------
-# SECURE_SSL_REDIRECT = True
-# SESSION_COOKIE_SECURE = True
-# CSRF_COOKIE_SECURE = True
-# SECURE_HSTS_SECONDS = 31536000
-# SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-# SECURE_HSTS_PRELOAD = True
 
 # -----------------------------------------------------------------------------
-# Clave primaria por defecto
+# Configuración adicional
 # -----------------------------------------------------------------------------
-# --- Channels (capa en memoria para desarrollo) ---
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# Channels
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.pubsub.RedisPubSubChannelLayer",
         "CONFIG": {
-            # Usa la misma variable de entorno REDIS_URL que usa Celery
             "hosts": [os.environ.get('REDIS_URL', 'redis://localhost:6379/1')],
         },
     }
 }
-DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
-MODEL_PATH_RELATIVO= Path(r"vosk-model-small-es-0.42")
+
+# Modelo Vosk
+MODEL_PATH_RELATIVO = Path(r"vosk-model-small-es-0.42")
 MODEL_PATH = os.path.join(settings.BASE_DIR, MODEL_PATH_RELATIVO)
 
 # =================================================
 # --- CONFIGURACIÓN DE CELERY (CON REDIS) ---
 # =================================================
-# Lee la variable 'REDIS_URL' que pusiste en tu .env
 CELERY_BROKER_URL = os.environ.get('REDIS_URL')
 CELERY_RESULT_BACKEND = os.environ.get('REDIS_URL')
 CELERY_ACCEPT_CONTENT = ['json']
@@ -279,58 +251,54 @@ CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
 
 # =================================================
-# --- CONFIGURACIÓN DE CLEVER CLOUD STORAGE (CELLAR) ---
-# =================================================
-# Lee las variables de Cellar que pusiste en tu .env
-AWS_ACCESS_KEY_ID = os.environ.get('CELLAR_KEY_ID')
-AWS_SECRET_ACCESS_KEY = os.environ.get('CELLAR_SECRET_KEY')
-AWS_STORAGE_BUCKET_NAME = os.environ.get('CELLAR_BUCKET_NAME')
-AWS_S3_REGION_NAME = 'US' 
-AWS_S3_ENDPOINT_URL = f"https://{os.environ.get('CELLAR_HOST')}"
-
-# =================================================
 # --- CONFIGURACIÓN DE CLEVER CLOUD STORAGE (CELLAR / S3) ---
+# CORRECCIÓN 2 y 3: Bloque unificado y corregido
 # =================================================
 
+# Credenciales desde .env
 AWS_ACCESS_KEY_ID = os.environ.get('CELLAR_KEY_ID')
 AWS_SECRET_ACCESS_KEY = os.environ.get('CELLAR_SECRET_KEY')
 AWS_STORAGE_BUCKET_NAME = os.environ.get('CELLAR_BUCKET_NAME')
-AWS_S3_REGION_NAME = "US"
+
+# Endpoint para Cellar
 AWS_S3_ENDPOINT_URL = f"https://{os.environ.get('CELLAR_HOST')}"
+AWS_S3_REGION_NAME = "us-east-1" # Cellar funciona bien con la región default de boto3
 
-# Hacer públicos los adjuntos (imagenes / videos / audio)
-AWS_DEFAULT_ACL = None
-# --- SEGURIDAD ISO 27001 (Control de Acceso) ---
-if DEBUG:
-    # En desarrollo (Local): URLs públicas para que no te den problemas al probar
-    AWS_QUERYSTRING_AUTH = False
-else:
-    # En Producción (Nube): URLs firmadas que expiran.
-    # Solo el usuario con permiso puede ver la foto/audio.
-    AWS_QUERYSTRING_AUTH = True
+# --- CRÍTICO: Configuración "Path Style" para Cellar ---
+# Esto evita que Django intente conectar a bucket.cellar.services...
+AWS_S3_ADDRESSING_STYLE = "path"
+AWS_S3_SIGNATURE_VERSION = "s3v4"
 
+# Configuraciones de Archivos
+AWS_S3_FILE_OVERWRITE = False  # No sobrescribir si el nombre ya existe
+AWS_DEFAULT_ACL = None         # Dejar privacidad al bucket
+AWS_S3_VERIFY = True           # Verificar SSL
+AWS_S3_USE_SSL = True
+
+# Cache control (Opcional, mejora rendimiento)
 AWS_S3_OBJECT_PARAMETERS = {
-    "CacheControl": "max-age=86400",  # 1 día
+    "CacheControl": "max-age=86400",
 }
 
-# Backend por defecto → todos los archivos van a S3
+# Seguridad de enlaces firmados (Privacidad)
+if DEBUG:
+    # En desarrollo, URLs públicas para facilitar pruebas
+    AWS_QUERYSTRING_AUTH = False
+else:
+    # En producción, URLs firmadas que expiran (seguridad)
+    AWS_QUERYSTRING_AUTH = True
+
+# --- BACKEND DE ALMACENAMIENTO ---
+# Esto le dice a Django que use S3/Cellar para FileField
 DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
 
+# (Opcional) Si en el futuro quieres estáticos en Cellar:
+# STATICFILES_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
 
-# Configuración de django-storages
-AWS_DEFAULT_ACL = None
-AWS_S3_USE_SSL = True
-AWS_S3_VERIFY = True
-
-# Define el backend de almacenamiento
-DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
-
-# (Opcional) Si quieres que tus archivos estáticos (CSS/JS) también
-# se sirvan desde Cellar en producción (¡recomendado!):
-# if not DEBUG:
-#     STATICFILES_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
-
+# =================================================
+# --- AUTHENTICATION BACKENDS ---
+# =================================================
 AUTHENTICATION_BACKENDS = [
-    'core.authentication.LoginConCorreo',  # Tu nuevo sistema
-    'django.contrib.auth.backends.ModelBackend',   # El sistema clásico (respaldo)
+    'core.authentication.LoginConCorreo',
+    'django.contrib.auth.backends.ModelBackend',
 ]

@@ -224,7 +224,15 @@ def procesar_audio_vosk(acta_pk):
         (
             ffmpeg
             .input(input_webm_path)
-            .output(output_wav_path, format="wav", acodec="pcm_s16le", ac=1, ar="16000")
+            .output(
+                output_wav_path, 
+                format="wav", 
+                acodec="pcm_s16le", 
+                ac=1, 
+                ar="16000",
+                # Filtro de paso alto (quita ruidos graves) y compresión dinámica
+                af="highpass=f=200, lowpass=f=3000, loudnorm" 
+            )
             .run(capture_stdout=True, capture_stderr=True, overwrite_output=True)
         )
 
