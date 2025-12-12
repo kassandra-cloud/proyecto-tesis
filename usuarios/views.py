@@ -7,11 +7,15 @@ from datetime import timedelta
 
 from django.conf import settings
 from django.contrib import messages
-from django.contrib.auth import get_user_model, authenticate, login, update_session_auth_hash
+from django.contrib.auth import (
+    get_user_model,
+    authenticate,
+    login,
+    update_session_auth_hash,
+)
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import PasswordChangeForm
 from django.core.exceptions import ValidationError
-from django.core.mail import send_mail
 from django.core.paginator import Paginator
 from django.db.models import Q
 from django.http import JsonResponse
@@ -26,12 +30,12 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
-from django.contrib.auth.password_validation import validate_password  # <--- AGREGAR ESTA LÍNEA
-
+from django.contrib.auth.password_validation import validate_password
 
 from core.authz import role_required
 from core.models import Perfil
 from .forms import UsuarioCrearForm, UsuarioEditarForm
+from .utils import enviar_correo_via_webhook  # <-- USAMOS EL WEBHOOK
 
 User = get_user_model()
 
@@ -66,6 +70,7 @@ def _paginar(request, queryset, default_per_page: int = 10):
     page_obj = paginator.get_page(page_number)
     return page_obj, per_page, paginator
 
+
 def _aplicar_busqueda(qs, q: str):
     """
     Filtro por username, email, nombre, apellido y RUT (en Perfil).
@@ -80,6 +85,7 @@ def _aplicar_busqueda(qs, q: str):
         | Q(perfil__rut__icontains=q)
     )
 
+
 def _aplicar_orden(qs, sort_key: str | None, direction: str | None):
     """
     Aplica ordenamiento seguro según SORT_MAP y dir asc/desc.
@@ -88,6 +94,7 @@ def _aplicar_orden(qs, sort_key: str | None, direction: str | None):
     if (direction or "").lower() == "desc":
         sort_field = f"-{sort_field}"
     return qs.order_by(sort_field)
+
 
 # -------------------------------------------------------------------
 # Vistas de Gestión de Usuarios (Web)
@@ -127,6 +134,7 @@ def lista_usuarios(request):
     }
     return render(request, "usuarios/lista.html", ctx)
 
+
 @login_required
 @role_required("usuarios", "create")
 @require_http_methods(["GET", "POST"])
@@ -139,11 +147,12 @@ def crear_usuario(request):
                 messages.success(request, 'Usuario creado exitosamente')
                 return redirect('lista_usuarios')
             except ValidationError as e:
-                form.add_error('email', e) 
+                form.add_error('email', e)
     else:
         form = UsuarioCrearForm()
 
     return render(request, 'usuarios/form.html', {'form': form})
+
 
 @login_required
 @role_required("usuarios", "edit")
@@ -160,7 +169,12 @@ def editar_usuario(request, pk: int):
     else:
         form = UsuarioEditarForm(instance=user)
 
-    return render(request, "usuarios/form.html", {"form": form, "user_obj": user})
+    return render(
+        request,
+        "usuarios/form.html",
+        {"form": form, "user_obj": user}
+    )
+
 
 @login_required
 @role_required("usuarios", "delete")
@@ -171,6 +185,7 @@ def eliminar_usuario(request, pk: int):
     user.delete()
     messages.success(request, f"Usuario «{username}» eliminado.")
     return redirect("lista_usuarios")
+
 
 @login_required
 @role_required("usuarios", "edit")
@@ -200,8 +215,9 @@ def deshabilitar_usuario(request, pk):
         usuario_a_bloquear.is_active = False
         usuario_a_bloquear.save(update_fields=["is_active"])
         messages.success(request, f"Usuario “{usuario_a_bloquear.username}” deshabilitado correctamente.")
-        
+
     return redirect("lista_usuarios")
+
 
 @login_required
 @role_required("usuarios", "edit")
@@ -216,10 +232,10 @@ def restaurar_usuario(request, pk):
         messages.success(request, f"Usuario “{usuario.username}” restaurado.")
     return redirect("lista_usuarios")
 
+
 # -------------------------------------------------------------------
 # APIs (Para App Móvil)
 # -------------------------------------------------------------------
-
 @api_view(['POST'])
 @csrf_exempt
 def login_api(request):
@@ -246,7 +262,10 @@ def login_api(request):
         except User.DoesNotExist:
             pass
         except User.MultipleObjectsReturned:
-             return JsonResponse({"success": False, "message": "Error: Correo duplicado en sistema"}, status=400)
+            return JsonResponse(
+                {"success": False, "message": "Error: Correo duplicado en sistema"},
+                status=400
+            )
 
     # Intento B: Username
     if user is None:
@@ -254,7 +273,7 @@ def login_api(request):
 
     if user is None:
         return JsonResponse({"success": False, "message": "Credenciales inválidas"}, status=401)
-    
+
     if not user.is_active:
         return JsonResponse({"success": False, "message": "Usuario inactivo"}, status=403)
 
@@ -273,19 +292,23 @@ def login_api(request):
     if hasattr(user, 'perfil') and user.perfil.apellido_paterno:
         apellido_mostrar = user.perfil.apellido_paterno
 
-    return JsonResponse({
-        "success": True,
-        "message": "Login exitoso",
-        "token": token_key,
-        "must_change_password": must_change,
-        "user": {
-            "id": user.id,
-            "username": user.username,
-            "email": user.email,
-            "first_name": user.first_name,
-            "last_name": apellido_mostrar
-        }
-    }, status=200)
+    return JsonResponse(
+        {
+            "success": True,
+            "message": "Login exitoso",
+            "token": token_key,
+            "must_change_password": must_change,
+            "user": {
+                "id": user.id,
+                "username": user.username,
+                "email": user.email,
+                "first_name": user.first_name,
+                "last_name": apellido_mostrar,
+            },
+        },
+        status=200,
+    )
+
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -294,34 +317,42 @@ def cambiar_password_inicial(request):
     Endpoint para cambiar la contraseña obligatoria (Onboarding App).
     """
     new_password = request.data.get("new_password")
-    
+
     if not new_password:
         return Response({"error": "La contraseña es requerida"}, status=400)
     if len(new_password) < 14:
-         return Response({"error": "La contraseña debe tener al menos 14 caracteres"}, status=400)
+        return Response(
+            {"error": "La contraseña debe tener al menos 14 caracteres"},
+            status=400
+        )
 
     user = request.user
     user.set_password(new_password)
     user.save()
-    
+
     full_name = user.get_full_name().strip()
     display_name = full_name if full_name else user.username
-    success_message = f"¡Bienvenido(a) {display_name}, tu contraseña ha sido actualizada correctamente!"
-    
+    success_message = (
+        f"¡Bienvenido(a) {display_name}, tu contraseña ha sido actualizada correctamente!"
+    )
+
     if hasattr(user, 'perfil'):
         user.perfil.debe_cambiar_password = False
         user.perfil.save()
-        
+
     return Response({"success": True, "message": success_message})
+
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def health(request):
     return Response({"status": "ok", "time": timezone.now().isoformat()})
 
+
 @csrf_exempt
 def ping(request):
     return JsonResponse({"ok": True, "detail": "pong"})
+
 
 @login_required
 def api_usuarios_by_role(request):
@@ -350,10 +381,10 @@ def api_usuarios_by_role(request):
     ]
     return JsonResponse({"results": data})
 
+
 # -------------------------------------------------------------------
 # Flujos de Seguridad Web (Passwords)
 # -------------------------------------------------------------------
-
 @login_required
 def cambiar_password_obligatorio(request):
     """
@@ -365,32 +396,36 @@ def cambiar_password_obligatorio(request):
             user = form.save()
             # 1. Mantener sesión activa
             update_session_auth_hash(request, user)
-            
+
             # 2. Apagar bandera
             if hasattr(user, 'perfil'):
                 user.perfil.debe_cambiar_password = False
                 user.perfil.save()
-                
+
             messages.success(request, '¡Tu contraseña ha sido actualizada exitosamente!')
             return redirect('home')
     else:
         form = PasswordChangeForm(request.user)
-    
-    return render(request, 'usuarios/cambiar_password_obligatorio.html', {'form': form})
+
+    return render(
+        request,
+        'usuarios/cambiar_password_obligatorio.html',
+        {'form': form}
+    )
+
 
 # --- RECUPERACIÓN DE CONTRASEÑA CON CÓDIGO (WEB) ---
-
 def web_recuperar_paso1(request):
-    """Paso 1: Solicitar correo y enviar código OTP"""
+    """Paso 1: Solicitar correo y ENVIAR CÓDIGO OTP vía WEBHOOK"""
     if request.method == 'POST':
-        email = request.POST.get('email')
-        
+        email = (request.POST.get('email') or "").strip()
+
         user = User.objects.filter(email__iexact=email).first()
-        
+
         if user:
             # 1. Generar Código
             codigo = str(random.randint(100000, 999999))
-            
+
             # 2. Guardar en Perfil
             if hasattr(user, 'perfil'):
                 perfil = user.perfil
@@ -398,27 +433,41 @@ def web_recuperar_paso1(request):
                 # Expira en 15 minutos
                 perfil.recovery_code_expires = timezone.now() + timedelta(minutes=15)
                 perfil.save()
-                
-                # 3. Enviar Correo
-                html_message = render_to_string('registration/email_codigo_otp.html', {
-                    'user': user,
-                    'codigo': codigo
-                })
-                plain_message = strip_tags(html_message)
-                
-                send_mail(
-                    subject='Código de Recuperación - Junta de Vecinos',
-                    message=plain_message,
-                    from_email=settings.DEFAULT_FROM_EMAIL,
-                    recipient_list=[user.email],
-                    html_message=html_message,
-                    fail_silently=True
+
+                # 3. Construir correo HTML/TXT
+                html_message = render_to_string(
+                    'registration/email_codigo_otp.html',
+                    {
+                        'user': user,
+                        'codigo': codigo,
+                    },
                 )
-                
-                # Guardamos el email en sesión
-                request.session['recuperar_email'] = user.email
-                messages.success(request, f"Código enviado a {user.email}")
-                return redirect('web_recuperar_paso2')
+                plain_message = strip_tags(html_message)
+
+                subject = 'Código de Recuperación - Junta de Vecinos'
+
+                # 4. Enviar correo VIA WEBHOOK
+                ok = enviar_correo_via_webhook(
+                    to_email=user.email,
+                    subject=subject,
+                    html_body=html_message,
+                    text_body=plain_message,
+                )
+
+                if ok:
+                    # Guardamos el email en sesión
+                    request.session['recuperar_email'] = user.email
+                    messages.success(
+                        request,
+                        f"Código enviado a {user.email}. Revisa tu bandeja de entrada."
+                    )
+                    return redirect('web_recuperar_paso2')
+                else:
+                    messages.error(
+                        request,
+                        "No se pudo enviar el correo de recuperación. "
+                        "Verifica la configuración del webhook."
+                    )
             else:
                 messages.error(request, "El usuario no tiene un perfil asociado.")
         else:
@@ -426,16 +475,17 @@ def web_recuperar_paso1(request):
 
     return render(request, 'registration/recuperar_paso1.html')
 
+
 def web_recuperar_paso2(request):
     """Paso 2: Ingresar código OTP y nueva contraseña (CON VALIDACIONES)"""
     email_session = request.session.get('recuperar_email')
-    
+
     if not email_session:
         messages.error(request, "Sesión expirada, inicia el proceso nuevamente.")
         return redirect('web_recuperar_paso1')
 
     if request.method == 'POST':
-        codigo_ingresado = request.POST.get('codigo')
+        codigo_ingresado = (request.POST.get('codigo') or "").strip()
         pass1 = request.POST.get('pass1')
         pass2 = request.POST.get('pass2')
 
@@ -444,49 +494,74 @@ def web_recuperar_paso2(request):
         # 1. Validaciones básicas de usuario y sesión
         if not user:
             return redirect('web_recuperar_paso1')
-            
+
         # 2. Validación de Código OTP
-        if not hasattr(user, 'perfil') or user.perfil.recovery_code != codigo_ingresado:
+        if (not hasattr(user, 'perfil')
+                or not user.perfil.recovery_code
+                or user.perfil.recovery_code != codigo_ingresado):
             messages.error(request, "El código ingresado es incorrecto.")
-            return render(request, 'registration/recuperar_paso2.html', {'email': email_session})
-            
-        if user.perfil.recovery_code_expires and user.perfil.recovery_code_expires < timezone.now():
-            messages.error(request, "El código ha expirado. Por favor solicita uno nuevo.")
-            return render(request, 'registration/recuperar_paso2.html', {'email': email_session})
+            return render(
+                request,
+                'registration/recuperar_paso2.html',
+                {'email': email_session}
+            )
+
+        if (
+            user.perfil.recovery_code_expires
+            and user.perfil.recovery_code_expires < timezone.now()
+        ):
+            messages.error(
+                request,
+                "El código ha expirado. Por favor solicita uno nuevo."
+            )
+            return render(
+                request,
+                'registration/recuperar_paso2.html',
+                {'email': email_session}
+            )
 
         # 3. Validación de coincidencia de contraseñas
         if pass1 != pass2:
             messages.error(request, "Las contraseñas no coinciden.")
-            return render(request, 'registration/recuperar_paso2.html', {'email': email_session})
+            return render(
+                request,
+                'registration/recuperar_paso2.html',
+                {'email': email_session}
+            )
 
-        # 4. VALIDACIÓN DE SEGURIDAD DE DJANGO (Lo nuevo)
+        # 4. VALIDACIÓN DE SEGURIDAD DE DJANGO
         try:
-            # Esto chequea largo mínimo (14), similitud con usuario, password común, etc.
             validate_password(pass1, user=user)
         except ValidationError as e:
-            # Si falla, mostramos cada error que Django encontró
             for error in e.messages:
                 messages.error(request, error)
-            return render(request, 'registration/recuperar_paso2.html', {'email': email_session})
+            return render(
+                request,
+                'registration/recuperar_paso2.html',
+                {'email': email_session}
+            )
 
         # --- SI LLEGA AQUÍ, TODO ESTÁ CORRECTO ---
-        
-        # Guardar contraseña
         user.set_password(pass1)
         user.save()
-        
-        # Limpiar código usado
+
         user.perfil.recovery_code = None
         user.perfil.recovery_code_expires = None
-        
-        # Apagar cambio obligatorio (ya la cambió voluntariamente)
-        user.perfil.debe_cambiar_password = False 
+        user.perfil.debe_cambiar_password = False
         user.perfil.save()
-        
+
         # Limpiar sesión temporal
-        del request.session['recuperar_email']
-        
-        messages.success(request, "¡Contraseña restablecida exitosamente! Ya puedes iniciar sesión.")
+        if 'recuperar_email' in request.session:
+            del request.session['recuperar_email']
+
+        messages.success(
+            request,
+            "¡Contraseña restablecida exitosamente! Ya puedes iniciar sesión."
+        )
         return redirect('login')
 
-    return render(request, 'registration/recuperar_paso2.html', {'email': email_session})
+    return render(
+        request,
+        'registration/recuperar_paso2.html',
+        {'email': email_session}
+    )
