@@ -285,7 +285,6 @@ def acta_export_pdf(request, pk):
     response['Content-Disposition'] = f'inline; filename="{filename}"'
     return response
 
-
 @require_POST
 @login_required
 @role_required("actas", "send")
@@ -295,71 +294,57 @@ def enviar_acta_pdf_por_correo(request, pk):
     try:
         acta = reunion.acta
     except Acta.DoesNotExist:
-        return JsonResponse({"ok": False, "message": "Esta reunión no tiene acta."}, status=400)
+        return HttpResponseBadRequest("Esta reunión no tiene acta.")
 
-    correos = request.POST.getlist("correos[]")
-    if not correos:
-        correos_str = (request.POST.get("correos") or "").strip()
-        if correos_str:
-            correos = [c.strip() for c in correos_str.split(",") if c.strip()]
+    # ✅ ENVIAR A TODOS (presentes + no presentes)
+    correos = list(
+        Perfil.objects.select_related("usuario")
+        .filter(usuario__is_active=True)
+        .exclude(usuario__email__isnull=True)
+        .exclude(usuario__email__exact="")
+        .values_list("usuario__email", flat=True)
+    )
+
+    # Quitar duplicados + orden
+    correos = sorted(set([c.strip() for c in correos if c and c.strip()]))
 
     if not correos:
-        return JsonResponse({"ok": False, "message": "Debes ingresar al menos un correo válido."}, status=400)
+        return HttpResponseBadRequest("No hay correos disponibles para enviar.")
 
     # Generar PDF
     template_path = "reuniones/acta_pdf_template.html"
     pdf_bytes = _pdf_bytes_desde_xhtml(template_path, {"reunion": reunion, "acta": acta})
     if not pdf_bytes:
-        return JsonResponse({"ok": False, "message": "Error al generar el PDF."}, status=500)
+        return HttpResponse("Error al generar el PDF", status=500)
 
-    # 2) Guardar PDF en Cellar/S3 
-    safe_title = slugify(getattr(reunion, "titulo", f"reunion-{reunion.pk}"))
-    s3_path = f"actas_pdf/Acta_{safe_title}_{reunion.pk}.pdf"
+    filename = f"Acta_{slugify(getattr(reunion, 'titulo', f'reunion-{reunion.pk}'))}.pdf"
+
+    asunto = f"Acta de Reunión: {reunion.titulo}"
+    cuerpo = (
+        f"Estimado(a) vecino(a),\n\n"
+        f"Adjuntamos el acta oficial de la reunión \"{reunion.titulo}\", "
+        f"realizada el {reunion.fecha.strftime('%d/%m/%Y')}.\n\n"
+        f"Saludos cordiales,\n"
+        f"La Directiva\n"
+    )
 
     try:
-        if default_storage.exists(s3_path):
-            default_storage.delete(s3_path)
-
-        default_storage.save(s3_path, ContentFile(pdf_bytes))
-        pdf_url = default_storage.url(s3_path)  
-    except Exception as e:
-        logger.exception(f"[ACTA PDF] Error subiendo a S3/Cellar acta={pk}: {e}")
-        return JsonResponse({"ok": False, "message": "Error subiendo el PDF al almacenamiento."}, status=500)
-
-    #  Enviar correo por WEBHOOK (sin SMTP)
-    asunto = f"Acta de Reunión: {reunion.titulo}"
-    fecha_txt = reunion.fecha.strftime("%d/%m/%Y")
-
-    html = f"""
-    <p>Estimado(a) vecino(a),</p>
-    <p>Adjuntamos el <b>enlace</b> del acta oficial de la reunión "<b>{reunion.titulo}</b>", realizada el {fecha_txt}.</p>
-    <p><a href="{pdf_url}">Descargar Acta (PDF)</a></p>
-    <p>Saludos cordiales,<br/>La Directiva</p>
-    """
-
-    enviados = 0
-    fallidos = []
-
-    for email in correos:
-        ok = enviar_correo_via_webhook(
-            to_email=email,
+        email = EmailMessage(
             subject=asunto,
-            html_body=html,
-            text_body=f"Acta: {reunion.titulo} ({fecha_txt})\nDescarga: {pdf_url}"
+            body=cuerpo,
+            to=correos,
         )
-        if ok:
-            enviados += 1
-        else:
-            fallidos.append(email)
+        email.attach(filename, pdf_bytes, "application/pdf")
+        email.send(fail_silently=False)
 
-    if enviados == 0:
-        return JsonResponse({"ok": False, "message": "No se pudo enviar a ningún destinatario (webhook)."}, status=500)
+        return JsonResponse({
+            "ok": True,
+            "message": f"Correo enviado a {len(correos)} destinatario(s)."
+        })
 
-    msg = f"Correo enviado a {enviados} destinatario(s)."
-    if fallidos:
-        msg += f" Falló para: {', '.join(fallidos)}"
-
-    return JsonResponse({"ok": True, "message": msg})
+    except Exception as e:
+        print(f"Error al enviar correo: {e}")
+        return HttpResponseBadRequest(f"Error al enviar correo: {e}")
 
 
 @require_POST
