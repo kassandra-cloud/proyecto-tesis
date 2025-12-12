@@ -13,7 +13,6 @@ from django.utils.text import slugify
 from django.core.mail import EmailMessage
 from django.contrib.auth import get_user_model
 from datetime import timedelta
-# Importamos el nuevo EstadoReunion
 from .models import Reunion, Asistencia, Acta, EstadoReunion
 from .forms import ReunionForm, ActaForm, CalificacionActaForm
 from core.authz import role_required
@@ -21,16 +20,13 @@ from core.models import Perfil
 import json
 from .tasks import procesar_audio_vosk
 from .tasks import enviar_notificacion_acta_aprobada
-
-
-
+import logging
+from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
+from usuarios.utils import enviar_correo_via_webhook
 
 User = get_user_model()
 
-
-# =========================
-# Helpers
-# =========================
 def _pdf_bytes_desde_xhtml(template_path: str, context: dict) -> bytes:
     """
     Renderiza un template HTML a PDF (bytes) usando xhtml2pdf.
@@ -46,11 +42,7 @@ def _pdf_bytes_desde_xhtml(template_path: str, context: dict) -> bytes:
         return result.getvalue()
     print(f"Error al generar PDF: {pdf.err}")
     return b""
-
-# =========================
-# Vistas de Reuniones
-# =========================
-
+#Vista de reuniones
 @login_required
 @role_required("reuniones", "view")
 def reunion_list(request): 
@@ -108,13 +100,11 @@ def reunion_detail(request, pk):
 
     asistentes = Asistencia.objects.filter(reunion=reunion, presente=True)
     
-    # --- CORRECCIÓN 1 (para el modal de email) ---
     id_asistentes_usuarios = asistentes.values_list('vecino__id', flat=True)
-    # Obtenemos TODOS los perfiles (Vecino + Directiva) para el modal
     vecinos_para_email = Perfil.objects.all().exclude(
         usuario__id__in=id_asistentes_usuarios
     ).select_related('usuario')
-    # --- FIN CORRECCIÓN 1 ---
+   
 
     context = {
         "reunion": reunion,
@@ -126,9 +116,7 @@ def reunion_detail(request, pk):
     }
     return render(request, "reuniones/reunion_detail.html", context)
 
-# =========================
 # Vistas de Acta
-# =========================
 
 @login_required
 @role_required("actas", "edit")
@@ -173,11 +161,10 @@ def aprobar_borrador_acta(request, pk):
         acta.aprobado_en = timezone.now()
         acta.save()
 
-        # 🚀 AQUÍ DISPARAMOS LA NOTIFICACIÓN
+        # Aqui se envia la notificacion 
         try:
             enviar_notificacion_acta_aprobada.delay(acta.pk)
         except Exception as e:
-            # No queremos que por culpa de la notificación falle la aprobación
             logger.error(f"Error al encolar notif acta aprobada: {e}")
 
         messages.success(request, "El acta ha sido aprobada oficialmente.")
@@ -204,36 +191,24 @@ def rechazar_acta(request, pk):
         
     return redirect("reuniones:detalle_reunion", pk=pk)
 
-# =========================
+
 # Vistas de Asistencia
-# =========================
 
 @login_required
 @role_required("reuniones", "asistencia")
 def asistencia_list(request, pk):
     reunion = get_object_or_404(Reunion, pk=pk)
-    
-    # --- CORRECCIÓN 2 (Incluir a la Directiva) ---
-    # Obtenemos TODOS los perfiles (Vecinos + Directiva)
     vecinos = Perfil.objects.all().select_related('usuario').order_by('usuario__username')
-    # --- FIN CORRECCIÓN 2 ---
-
     if request.method == "POST":
-        
         presentes_pks = request.POST.getlist('presentes') 
         presentes_pks_set = set(str(pk) for pk in presentes_pks)
-
         for perfil in vecinos:
             esta_presente = str(perfil.pk) in presentes_pks_set
-            
-            # --- CORRECCIÓN 3 (Quitar 'metodo_registro') ---
             Asistencia.objects.update_or_create(
                 reunion=reunion,
                 vecino=perfil.usuario,
-                defaults={'presente': esta_presente} # <-- CAMPO INCORRECTO ELIMINADO
-            )
-            # --- FIN CORRECCIÓN 3 ---
-            
+                defaults={'presente': esta_presente} 
+            )    
         messages.success(request, "Asistencia guardada correctamente.")
         return redirect('reuniones:detalle_reunion', pk=pk)
 
@@ -261,26 +236,18 @@ def asistencia_list(request, pk):
 @login_required
 @role_required("reuniones", "asistencia")
 def registrar_asistencia_manual(request, pk):
-    # Esta función ya no se usa con el nuevo 'asistencia_list.html',
-    # pero la arreglamos por si acaso.
     reunion = get_object_or_404(Reunion, pk=pk)
     vecino_id = request.POST.get('vecino_id') 
-    
     if not vecino_id:
         messages.error(request, "No se seleccionó ningún vecino.")
         return redirect('reuniones:lista_asistencia', pk=pk)
-    
     perfil_vecino = get_object_or_404(Perfil, id=vecino_id)
     usuario_vecino = perfil_vecino.usuario
-    
-    # --- CORRECCIÓN 4 (Quitar 'metodo_registro') ---
     asistencia, created = Asistencia.objects.get_or_create(
         reunion=reunion,
         vecino=usuario_vecino, 
-        defaults={'presente': True} # <-- CAMPO INCORRECTO ELIMINADO
+        defaults={'presente': True} 
     )
-    # --- FIN CORRECCIÓN 4 ---
-    
     if created:
         messages.success(request, f"Se registró la asistencia de {perfil_vecino.usuario.get_full_name()}.")
     else:
@@ -290,9 +257,8 @@ def registrar_asistencia_manual(request, pk):
         
     return redirect('reuniones:lista_asistencia', pk=pk)
 
-# =========================
+
 # Vistas de PDF y Correos
-# =========================
 
 @login_required
 @role_required("actas", "view")
@@ -329,7 +295,7 @@ def enviar_acta_pdf_por_correo(request, pk):
     try:
         acta = reunion.acta
     except Acta.DoesNotExist:
-        return HttpResponseBadRequest("Esta reunión no tiene acta.")
+        return JsonResponse({"ok": False, "message": "Esta reunión no tiene acta."}, status=400)
 
     correos = request.POST.getlist("correos[]")
     if not correos:
@@ -338,44 +304,63 @@ def enviar_acta_pdf_por_correo(request, pk):
             correos = [c.strip() for c in correos_str.split(",") if c.strip()]
 
     if not correos:
-        return HttpResponseBadRequest("Debes ingresar al menos un correo válido.")
+        return JsonResponse({"ok": False, "message": "Debes ingresar al menos un correo válido."}, status=400)
 
-    template_path = 'reuniones/acta_pdf_template.html'
+    # Generar PDF
+    template_path = "reuniones/acta_pdf_template.html"
     pdf_bytes = _pdf_bytes_desde_xhtml(template_path, {"reunion": reunion, "acta": acta})
     if not pdf_bytes:
-        return HttpResponse("Error al generar el PDF", status=500)
+        return JsonResponse({"ok": False, "message": "Error al generar el PDF."}, status=500)
 
-    filename = f"Acta_{slugify(getattr(reunion, 'titulo', f'reunion-{reunion.pk}'))}.pdf"
+    # 2) Guardar PDF en Cellar/S3 
+    safe_title = slugify(getattr(reunion, "titulo", f"reunion-{reunion.pk}"))
+    s3_path = f"actas_pdf/Acta_{safe_title}_{reunion.pk}.pdf"
 
-    asunto = f"Acta de Reunión: {reunion.titulo}"
-    cuerpo = f"""
-    Estimado(a) vecino(a),
-
-    Adjuntamos el acta oficial de la reunión "{reunion.titulo}", realizada el {reunion.fecha.strftime('%d/%m/%Y')}.
-
-    Saludos cordiales,
-    La Directiva
-    """
-    
     try:
-        email = EmailMessage(
-            asunto,
-            cuerpo,
-            to=correos,
-        )
-        email.attach(filename, pdf_bytes, 'application/pdf')
-        email.send()
-        
-        return JsonResponse({"ok": True, "message": f"Correo enviado a {len(correos)} destinatario(s)."})
-    
+        if default_storage.exists(s3_path):
+            default_storage.delete(s3_path)
+
+        default_storage.save(s3_path, ContentFile(pdf_bytes))
+        pdf_url = default_storage.url(s3_path)  
     except Exception as e:
-        print(f"Error al enviar correo: {e}")
-        return HttpResponseBadRequest(f"Error al enviar correo: {e}")
+        logger.exception(f"[ACTA PDF] Error subiendo a S3/Cellar acta={pk}: {e}")
+        return JsonResponse({"ok": False, "message": "Error subiendo el PDF al almacenamiento."}, status=500)
 
+    #  Enviar correo por WEBHOOK (sin SMTP)
+    asunto = f"Acta de Reunión: {reunion.titulo}"
+    fecha_txt = reunion.fecha.strftime("%d/%m/%Y")
 
-# =================================================
-# --- VISTAS DE ESTADO DE REUNIÓN ---
-# =================================================
+    html = f"""
+    <p>Estimado(a) vecino(a),</p>
+    <p>Adjuntamos el <b>enlace</b> del acta oficial de la reunión "<b>{reunion.titulo}</b>", realizada el {fecha_txt}.</p>
+    <p><a href="{pdf_url}">Descargar Acta (PDF)</a></p>
+    <p>Saludos cordiales,<br/>La Directiva</p>
+    """
+
+    enviados = 0
+    fallidos = []
+
+    for email in correos:
+        ok = enviar_correo_via_webhook(
+            to_email=email,
+            subject=asunto,
+            html_body=html,
+            text_body=f"Acta: {reunion.titulo} ({fecha_txt})\nDescarga: {pdf_url}"
+        )
+        if ok:
+            enviados += 1
+        else:
+            fallidos.append(email)
+
+    if enviados == 0:
+        return JsonResponse({"ok": False, "message": "No se pudo enviar a ningún destinatario (webhook)."}, status=500)
+
+    msg = f"Correo enviado a {enviados} destinatario(s)."
+    if fallidos:
+        msg += f" Falló para: {', '.join(fallidos)}"
+
+    return JsonResponse({"ok": True, "message": msg})
+
 
 @require_POST
 @login_required
@@ -424,10 +409,8 @@ def cancelar_reunion(request, pk):
         
     return redirect('reuniones:detalle_reunion', pk=reunion.pk)
 
-# =================================================
-# --- NUEVA VISTA DE API PARA EL CALENDARIO ---
-# =================================================
 
+# NUEVA VISTA DE API PARA EL CALENDARIO 
 @login_required
 @role_required("reuniones", "view")
 def reuniones_json_feed(request):
@@ -444,18 +427,15 @@ def reuniones_json_feed(request):
         'REALIZADA': EstadoReunion.REALIZADA,
         'CANCELADA': EstadoReunion.CANCELADA,
     }
-    
     # Si el estado no es válido, usa PROGRAMADA por defecto
     estado_filtro = estados_validos.get(estado_query, EstadoReunion.PROGRAMADA)
-    
     reuniones = Reunion.objects.filter(estado=estado_filtro)
-    
     # Mapeo de colores para el calendario
     color_map = {
-        'PROGRAMADA': '#0d6efd', # Azul (Bootstrap Primary)
-        'EN_CURSO': '#198754',   # Verde (Bootstrap Success)
-        'REALIZADA': '#6c757d',  # Gris (Bootstrap Secondary)
-        'CANCELADA': '#dc3545',  # Rojo (Bootstrap Danger)
+        'PROGRAMADA': '#0d6efd', 
+        'EN_CURSO': '#198754',   
+        'REALIZADA': '#6c757d',  
+        'CANCELADA': '#dc3545',  
     }
     
     # Formateamos los eventos para FullCalendar
@@ -470,9 +450,7 @@ def reuniones_json_feed(request):
         
     return JsonResponse(eventos, safe=False)
 
-# =================================================
-# --- PASO 3: NUEVA VISTA PARA SUBIR AUDIO ---
-# =================================================
+
 
 @require_POST  # Solo permite peticiones POST
 @login_required
@@ -500,23 +478,12 @@ def subir_audio_acta(request, pk):
     if not archivo:
         messages.error(request, "No se seleccionó ningún archivo de audio.")
         return redirect("reuniones:detalle_reunion", pk=pk)
-
-    # Validación de estado (para no procesar dos veces)
     if acta.estado_transcripcion == Acta.ESTADO_PENDIENTE or acta.estado_transcripcion == Acta.ESTADO_PROCESANDO:
         messages.warning(request, "Ya hay un audio procesándose para esta acta.")
         return redirect("reuniones:detalle_reunion", pk=pk)
-
-    # --- ¡ÉXITO! AQUÍ GUARDAMOS Y LLAMAMOS A CELERY ---
-    
-    # 1. Guardamos el archivo en el modelo (esto lo sube a Cellar/S3)
     acta.archivo_audio = archivo
-    
-    # 2. Marcamos el estado como "Pendiente"
     acta.estado_transcripcion = Acta.ESTADO_PENDIENTE
     acta.save()
-
-    # 3. ¡Llamamos a la tarea de Celery!
-    # Le pasamos el ID del acta para que el worker la busque.
     procesar_audio_vosk.delay(acta.pk)
 
     messages.success(request, f"¡Audio subido! El procesamiento ha comenzado en segundo plano. El acta se actualizará al finalizar.")
@@ -525,7 +492,6 @@ def subir_audio_acta(request, pk):
 @login_required
 @role_required("actas", "edit") 
 def lista_grabaciones(request):
-    # Filtramos las reuniones que tienen acta Y esa acta tiene un archivo de audio
     reuniones_con_audio = Reunion.objects.filter(
         acta__archivo_audio__isnull=False
     ).exclude(
@@ -538,19 +504,10 @@ def lista_grabaciones(request):
     }
     return render(request, "reuniones/grabaciones_list.html", context)
 
-# =================================================
-# --- PASO 1: NUEVA VISTA DE API PARA POLLING ---
-# =================================================
+
 @login_required
 def get_acta_estado(request, pk):
-    """
-    Una simple vista de API que devuelve el estado de transcripción
-    de un acta para que el frontend pueda hacer polling.
-    """
-    # Usamos get_object_or_404 para manejar si el acta no existe
-    # (Aunque usamos la 'pk' de la reunión, que es la misma del acta)
     acta = get_object_or_404(Acta, pk=pk)
-    
     return JsonResponse({
         'estado': acta.estado_transcripcion,
         'estado_display': acta.get_estado_transcripcion_display()

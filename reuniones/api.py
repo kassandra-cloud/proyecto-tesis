@@ -7,36 +7,32 @@ from .serializers import ReunionSerializer, ActaSerializer,AsistenciaSerializer
 from django.utils import timezone
 from datetime import timedelta
 from django.db.models import Q, Count
-from django.db import transaction # <-- Necesario para asegurar la consistencia del ETL
+from django.db import transaction 
 from .models import Reunion, EstadoReunion
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import action
 from rest_framework.response import Response 
 
-# 🆕 IMPORTACIONES DEL DATA MART (Necesarias para el mini-ETL síncrono)
 from datamart.models import FactConsultaActa, DimVecino, DimActa 
 
-# =========================================================================
-# 🆕 FUNCIÓN AUXILIAR: Mini-ETL SÍNCRONO para Consultas de Actas
-# =========================================================================
-# Esta lógica debe ser idéntica a la que está en procesar_etl.py para este hecho.
+
+# FUNCIÓN AUXILIAR: Mini-ETL SÍNCRONO para Consultas de Actas
 def actualizar_fact_consulta_actas_sincrono():
     """
     Realiza una carga completa (full load) de FactConsultaActa basada en LogConsultaActa.
     ASUME que las dimensiones DimVecino y DimActa ya han sido pobladas.
     """
     with transaction.atomic():
-        # 1. Eliminar datos antiguos (full load)
         FactConsultaActa.objects.all().delete()
         
-        # 2. Extracción y mapeo de dimensiones (Data Mart ID -> Objeto Dimensión)
+        #Extracción y mapeo de dimensiones 
         vecino_map = {d.vecino_id_oltp: d for d in DimVecino.objects.all()}
         acta_map = {d.acta_id_oltp: d for d in DimActa.objects.all()}
 
-        # 3. Extraer logs transaccionales
+        # Extraer logs transaccionales
         logs = LogConsultaActa.objects.all().select_related('acta', 'vecino')
 
-        # 4. Transformación y Carga
+        # Transformación y Carga
         fact_consultas = []
         for log in logs:
             dim_vecino = vecino_map.get(log.vecino_id) 
@@ -51,9 +47,7 @@ def actualizar_fact_consulta_actas_sincrono():
                 
         FactConsultaActa.objects.bulk_create(fact_consultas)
 
-# =========================================================================
 # FIN DE FUNCIÓN AUXILIAR
-# =========================================================================
 
 class DefaultPagination(PageNumberPagination):
     page_size = 20
@@ -61,7 +55,6 @@ class DefaultPagination(PageNumberPagination):
     max_page_size = 100
     
 class ReunionViewSet(viewsets.ReadOnlyModelViewSet):
-    # ... (código ReunionViewSet existente)
     serializer_class = ReunionSerializer
     permission_classes = [permissions.AllowAny]
     pagination_class = DefaultPagination
@@ -90,7 +83,6 @@ class ReunionViewSet(viewsets.ReadOnlyModelViewSet):
         return qs
 
 class ActaViewSet(viewsets.ReadOnlyModelViewSet):
-    # ... (código ActaViewSet existente)
     serializer_class = ActaSerializer
     permission_classes = [permissions.AllowAny]
     pagination_class = DefaultPagination
@@ -108,7 +100,7 @@ class ActaViewSet(viewsets.ReadOnlyModelViewSet):
             qs = qs.filter(Q(contenido__icontains=search) | Q(reunion__titulo__icontains=search))
         return qs
     
-    # --- ACCIÓN PARA REGISTRAR LA CONSULTA (CORREGIDA) ---
+    # --- ACCIÓN PARA REGISTRAR LA CONSULTA  ---
     @action(detail=True, methods=["post"], permission_classes=[permissions.IsAuthenticated], url_path="consultar")
     def registrar_consulta(self, request, pk=None):
         try:
@@ -128,10 +120,9 @@ class ActaViewSet(viewsets.ReadOnlyModelViewSet):
         # 3. FIX: SERIALIZAR Y DEVOLVER LOS DATOS DEL ACTA (Cambio de 204 No Content a 200 OK + Data)
         serializer = self.get_serializer(acta)
         return Response(serializer.data, status=status.HTTP_200_OK)
-    # ---------------------------------------------
+ 
 
 class AsistenciaViewSet(viewsets.ReadOnlyModelViewSet):
-    # ... (código AsistenciaViewSet existente)
     queryset = Asistencia.objects.select_related("reunion", "vecino")
     serializer_class = AsistenciaSerializer
     permission_classes = [IsAuthenticated]
