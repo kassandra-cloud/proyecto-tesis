@@ -2,7 +2,8 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.db import transaction
 from django.db.models import Count
-from django.core.mail import send_mail
+from django.utils.html import strip_tags
+from usuarios.utils import enviar_correo_via_webhook
 from django.conf import settings
 
 from rest_framework.decorators import (
@@ -59,52 +60,72 @@ def abiertas(request):
     data = [_dto_votacion(v, request.user) for v in qs]
     return Response(data)
 
-
 @api_view(["POST"])
 @authentication_classes([TokenAuthentication])
 @permission_classes([IsAuthenticated])
 def solicitar_codigo_voto(request):
     """
     Genera un código MFA y lo envía al correo del usuario
-    para confirmar el voto.
+    para confirmar el voto (vía Webhook Google Apps Script).
     """
     user = request.user
+
+    # Validaciones mínimas
+    if not hasattr(user, "perfil"):
+        return Response(
+            {"ok": False, "mensaje": "El usuario no tiene perfil asociado."},
+            status=400,
+        )
+
+    if not user.email:
+        return Response(
+            {"ok": False, "mensaje": "El usuario no tiene correo registrado."},
+            status=400,
+        )
 
     # Generar el código
     codigo = user.perfil.generar_mfa()
 
-    subject = f"Tu código de votación: {codigo}"
-    message = f"""
-Hola {user.first_name or user.username},
+    subject = "Tu código de votación"
+    nombre = (user.first_name or user.username or "vecino").strip()
 
-Estás a punto de emitir un voto en la plataforma vecinal.
-Tu código de seguridad es:
+    
+    html_body = f"""
+    <div style="font-family: Arial, sans-serif; line-height:1.5">
+      <h2>Código de votación</h2>
+      <p>Hola <b>{nombre}</b>,</p>
+      <p>Estás a punto de emitir un voto en la plataforma vecinal.</p>
+      <p>Tu código de seguridad es:</p>
+      <p style="font-size:24px; font-weight:bold; letter-spacing:2px">{codigo}</p>
+      <p><i>Este código expira en 5 minutos.</i></p>
+      <p>Si no fuiste tú, por favor ignora este correo.</p>
+    </div>
+    """
+    text_body = strip_tags(html_body)
 
-{codigo}
+    # Enviar por webhook (sin SMTP)
+    ok = enviar_correo_via_webhook(
+        to_email=user.email,
+        subject=subject,
+        html_body=html_body,
+        text_body=text_body,
+    )
 
-Este código expira en 5 minutos.
-Si no fuiste tú, por favor ignora este correo.
-"""
-
-    try:
-        send_mail(
-            subject,
-            message,
-            settings.DEFAULT_FROM_EMAIL,  # Remitente
-            [user.email],  # Destinatario
-            fail_silently=False,
-        )
-        print(f"Correo enviado a {user.email} con el código {codigo}")
+    if ok:
         return Response({"ok": True, "mensaje": f"Código enviado a {user.email}"})
-    except Exception as e:
-        print(f"Error al intentar enviar correo: {e}")
-        return Response(
-            {
-                "ok": False,
-                "mensaje": "Error en el servidor al enviar el correo. Revise la configuración SMTP.",
-            },
-            status=500,
-        )
+
+    # Si falla el webhook, NO colgar el worker: responde 500 controlado
+    return Response(
+        {
+            "ok": False,
+            "mensaje": (
+                "No se pudo enviar el correo (webhook). "
+                "Revisa APPSCRIPT_WEBHOOK_URL / APPSCRIPT_WEBHOOK_SECRET en Render "
+                "y permisos del Apps Script."
+            ),
+        },
+        status=500,
+    )
 
 
 @api_view(["POST"])
