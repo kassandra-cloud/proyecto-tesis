@@ -114,8 +114,8 @@
         {# LÓGICA 2: El botón de transcribir SOLO aparece si la reunión está EN CURSO #}
         {% if reunion.estado == 'EN_CURSO' %}
         <div class="d-flex align-items-center gap-2 mb-3 p-3 border rounded bg-light">
-            <button id="btnStartSTT" class="btn btn-danger">🎙️ Iniciar Transcripción</button>
-            <button id="btnStopSTT"  class="btn btn-outline-secondary" disabled>⏹️ Detener</button>
+            <button id="btnStartSTT" class="btn btn-danger">Iniciar Transcripción</button>
+            <button id="btnStopSTT"  class="btn btn-outline-secondary" disabled> Detener</button>
             <span id="sttStatus" class="text-muted small">Micrófono inactivo</span>
         </div>
         <div id="audioPreviewContainer" class="mt-3 p-3 border rounded bg-light" style="display: none;">
@@ -269,7 +269,6 @@
 {% endif %} 
 {# Fin del if reunion.estado != 'PROGRAMADA' #}
 
-
 <div class="modal fade" id="modalEnviarActa" tabindex="-1" aria-labelledby="modalEnviarActaLabel" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-scrollable">
     <div class="modal-content">
@@ -277,50 +276,66 @@
         <h5 class="modal-title" id="modalEnviarActaLabel">Enviar Acta por Correo</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
+
       <form id="formEnviarEmail">
         <div class="modal-body">
           <p>Selecciona los destinatarios para enviar el PDF del acta.</p>
-          
-          <div id="email-error-msg" class="alert alert-danger" style="display: none;"></div>
-          <div id="email-success-msg" class="alert alert-success" style="display: none;"></div>
 
+          <div id="email-error-msg" class="alert alert-danger" style="display:none;"></div>
+          <div id="email-success-msg" class="alert alert-success" style="display:none;"></div>
+
+          <!-- Correos adicionales -->
           <div class="mb-3">
-            <label for="correos_adicionales" class="form-label">Correos adicionales (separados por coma):</label>
-            <textarea class="form-control" id="correos_adicionales" rows="2"></textarea>
+            <label for="correos_adicionales" class="form-label">
+              Correos adicionales (separados por coma):
+            </label>
+            <textarea class="form-control" id="correos_adicionales" rows="2"
+              placeholder="ej: vecino1@gmail.com, vecino2@gmail.com"></textarea>
           </div>
-          
-          <div class="p-3 border rounded" style="max-height: 300px; overflow-y: auto;">
+
+          <div class="p-3 border rounded" style="max-height: 300px; overflow-y:auto;">
+            <!-- Enviar a todos -->
             <div class="form-check">
               <input class="form-check-input" type="checkbox" id="chkTodosVecinos">
               <label class="form-check-label fw-bold" for="chkTodosVecinos">
                 Enviar a todos los vecinos ({{ total_vecinos }})
               </label>
             </div>
+
             <hr>
-            <p class="small text-muted">O selecciona individualmente (solo vecinos que NO asistieron):</p>
+
+            <!-- CAMBIO: ya no dice "NO asistieron" -->
+            <p class="small text-muted mb-2">
+              O selecciona individualmente (todos los vecinos con correo registrado):
+            </p>
+
             <ul class="list-unstyled" id="lista-correos-vecinos">
               {% for perfil in vecinos_para_email %}
                 {% if perfil.usuario.email %}
                 <li class="form-check">
-                  <input class="form-check-input chk-email" type="checkbox" 
-                         value="{{ perfil.usuario.email }}" id="chk-vecino-{{ perfil.id }}">
+                  <input class="form-check-input chk-email" type="checkbox"
+                         value="{{ perfil.usuario.email }}"
+                         id="chk-vecino-{{ perfil.id }}">
                   <label class="form-check-label" for="chk-vecino-{{ perfil.id }}">
-                    {{ perfil.usuario.get_full_name }} ({{ perfil.usuario.email }})
+                    {{ perfil.usuario.get_full_name|default:perfil.usuario.username }}
+                    ({{ perfil.usuario.email }})
                   </label>
                 </li>
                 {% endif %}
               {% empty %}
-                <li>Todos los vecinos asistieron o no hay vecinos registrados.</li>
+                <li class="text-muted">No hay vecinos con correo registrado.</li>
               {% endfor %}
             </ul>
           </div>
-          
+
         </div>
+
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
           <button type="submit" class="btn btn-primary" id="btnEnviarCorreo">
             <span id="btnEnviarTexto">Enviar</span>
-            <span id="btnEnviarSpinner" class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="display: none;"></span>
+            <span id="btnEnviarSpinner" class="spinner-border spinner-border-sm" role="status"
+                  aria-hidden="true" style="display:none;"></span>
           </button>
         </div>
       </form>
