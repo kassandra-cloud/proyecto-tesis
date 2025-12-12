@@ -134,26 +134,46 @@ def lista_usuarios(request):
     }
     return render(request, "usuarios/lista.html", ctx)
 
-
 @login_required
 @role_required("usuarios", "create")
 @require_http_methods(["GET", "POST"])
 def crear_usuario(request):
-    if request.method == 'POST':
+    if request.method == "POST":
         form = UsuarioCrearForm(request.POST)
         if form.is_valid():
             try:
-                form.save()
-                messages.success(request, 'Usuario creado exitosamente')
-                return redirect('lista_usuarios')
+                user = form.save()
+
+                # === Enviar correo (NO rompe la creación) ===
+                if user.email:
+                    try:
+                        html = render_to_string("usuarios/email_bienvenida.html", {"user": user})
+                        txt = strip_tags(html)
+                        ok = enviar_correo_via_webhook(
+                            to_email=user.email,
+                            subject="Bienvenido(a) - Junta de Vecinos",
+                            html_body=html,
+                            text_body=txt,
+                        )
+                        if not ok:
+                            messages.warning(request, "Usuario creado, pero no se pudo enviar el correo.")
+                    except Exception:
+                        # Importante: NO romper flujo por correo
+                        messages.warning(request, "Usuario creado, pero falló el envío de correo.")
+
+                messages.success(request, "Usuario creado exitosamente")
+                return redirect("lista_usuarios")
+
             except ValidationError as e:
-                form.add_error('email', e)
+                form.add_error(None, e)
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).exception("Error creando usuario")
+                messages.error(request, f"Error interno creando usuario: {e}")
     else:
         form = UsuarioCrearForm()
 
-    return render(request, 'usuarios/form.html', {'form': form})
-
-
+    return render(request, "usuarios/form.html", {"form": form})
 @login_required
 @role_required("usuarios", "edit")
 def editar_usuario(request, pk: int):

@@ -11,7 +11,7 @@ from django.conf import settings
 
 from core.models import Perfil
 from core.rut import normalizar_rut, dv_mod11, validar_rut
-
+from usuarios.utils import enviar_correo_via_webhook
 User = get_user_model()
 
 # ------------------ Validadores reutilizables ------------------
@@ -35,10 +35,8 @@ def _armar_rut_desde_cuerpo(cuerpo_str: str) -> tuple[str, str]:
     validar_rut(rut)
     return rut, dv
 
-
 # ================== CREAR USUARIO ==================
 class UsuarioCrearForm(forms.ModelForm):
-    # Nombre: misma lógica que apellidos (solo letras y espacios)
     first_name = forms.CharField(
         label="Nombre",
         max_length=150,
@@ -46,17 +44,15 @@ class UsuarioCrearForm(forms.ModelForm):
         validators=[NAME_VALIDATOR],
     )
 
-    # UI extra para RUT
-    rut_cuerpo = forms.CharField(label="RUT", help_text="Solo números (8 dígitos)")
-    rut_dv     = forms.CharField(
+    rut_cuerpo = forms.CharField(label="RUT", help_text="Solo números (7 u 8 dígitos)")
+    rut_dv = forms.CharField(
         label="DV",
         required=False,
-        widget=forms.TextInput(attrs={'readonly': 'readonly'})
+        widget=forms.TextInput(attrs={"readonly": "readonly"})
     )
-    
+
     rol = forms.ChoiceField(label="Rol", choices=Perfil.Roles.choices)
 
-    # Apellidos obligatorios + NAME_VALIDATOR
     apellido_paterno = forms.CharField(
         label="Apellido paterno",
         max_length=100,
@@ -75,25 +71,23 @@ class UsuarioCrearForm(forms.ModelForm):
         label="Nombre de la Calle/Pasaje",
         max_length=255,
         required=True,
-        widget=forms.TextInput(attrs={'placeholder': 'Ej: Av. Principal, Pasaje 5'})
+        widget=forms.TextInput(attrs={"placeholder": "Ej: Av. Principal, Pasaje 5"})
     )
-    
     numero_casa = forms.CharField(
         label="N° Casa/Depto/Lote",
         max_length=20,
         required=False,
-        widget=forms.TextInput(attrs={'placeholder': 'Ej: 123, Dpto 45, Lote B'})
+        widget=forms.TextInput(attrs={"placeholder": "Ej: 123, Dpto 45, Lote B"})
     )
-    
     telefono = forms.CharField(
-        label="Teléfono de Contacto", 
-        max_length=8,  # solo los 8 dígitos
+        label="Teléfono de Contacto",
+        max_length=8,
         required=True,
         widget=forms.TextInput(attrs={
-            "class": "form-control", 
-            "placeholder": "12345678", 
+            "class": "form-control",
+            "placeholder": "12345678",
             "type": "number",
-            "maxlength": "8"
+            "maxlength": "8",
         })
     )
 
@@ -103,23 +97,21 @@ class UsuarioCrearForm(forms.ModelForm):
         initial=1,
         required=True
     )
-    
     total_ninos = forms.IntegerField(
         label="N° de Niños (< 12)",
         min_value=0,
         initial=0,
         required=False
     )
-    
+
     class Meta:
-        model  = User
+        model = User
         fields = ["username", "email", "first_name"]
         labels = {"first_name": "Nombre"}
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        # Estética general
         for name in (
             "username", "email", "first_name",
             "rut_cuerpo", "rut_dv",
@@ -139,17 +131,15 @@ class UsuarioCrearForm(forms.ModelForm):
 
     # ----- VALIDACIÓN TELÉFONO (+569) -----
     def clean_telefono(self):
-        data = self.cleaned_data.get('telefono')
+        data = self.cleaned_data.get("telefono")
         if not data:
-            return None 
-        
+            return None
+
         data = data.strip()
         if not data.isdigit():
             raise forms.ValidationError("El teléfono debe contener solo números.")
-        
         if len(data) != 8:
             raise forms.ValidationError("Debe ingresar exactamente 8 dígitos (sin el +569).")
-
         return f"+569{data}"
 
     # ----- VALIDACIÓN USERNAME -----
@@ -157,7 +147,6 @@ class UsuarioCrearForm(forms.ModelForm):
         u = (self.cleaned_data.get("username") or "").strip()
         if " " in u:
             raise forms.ValidationError("El nombre de usuario no puede tener espacios.")
-        
         if User.objects.filter(username__iexact=u).exists():
             raise forms.ValidationError("Este nombre de usuario ya está en uso.")
         return u
@@ -166,7 +155,6 @@ class UsuarioCrearForm(forms.ModelForm):
     def clean(self):
         cleaned = super().clean()
 
-        # RUT normalizado + unicidad
         cuerpo_rut = cleaned.get("rut_cuerpo")
         if cuerpo_rut:
             try:
@@ -178,33 +166,36 @@ class UsuarioCrearForm(forms.ModelForm):
                 cleaned["rut_dv"] = dv
             except forms.ValidationError as e:
                 self.add_error("rut_cuerpo", e.message)
-        
+
         return cleaned
 
-    # ----- SAVE: User + Perfil + Email -----
+    # ----- SAVE: User + Perfil + Email (WEBHOOK) -----
     @transaction.atomic
     def save(self, commit=True):
         if not self.cleaned_data.get("rut"):
             raise forms.ValidationError("No se puede guardar sin RUT válido.")
 
         user = super().save(commit=False)
-        user.username   = self.cleaned_data["username"].strip()
-        user.email      = (self.cleaned_data.get("email") or "").strip()
+        user.username = self.cleaned_data["username"].strip()
+        user.email = (self.cleaned_data.get("email") or "").strip()
         user.first_name = (self.cleaned_data.get("first_name") or "").strip().title()
 
         ap = (self.cleaned_data.get("apellido_paterno") or "").strip().title()
         am = (self.cleaned_data.get("apellido_materno") or "").strip().title()
-        user.last_name  = f"{ap} {am}".strip()
+        user.last_name = f"{ap} {am}".strip()
 
-        # GENERACIÓN DE CONTRASEÑA
+        # ✅ Contraseña provisoria (16 chars) compatible con min_length=14
         alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
         while True:
-            password_provisoria = ''.join(secrets.choice(alphabet) for _ in range(12))
-            if (any(c.islower() for c in password_provisoria) and 
-                any(c.isupper() for c in password_provisoria) and 
-                any(c in "!@#$%^&*" for c in password_provisoria)):
+            password_provisoria = "".join(secrets.choice(alphabet) for _ in range(16))
+            if (
+                any(c.islower() for c in password_provisoria)
+                and any(c.isupper() for c in password_provisoria)
+                and any(c.isdigit() for c in password_provisoria)
+                and any(c in "!@#$%^&*" for c in password_provisoria)
+            ):
                 break
-        
+
         user.set_password(password_provisoria)
 
         if commit:
@@ -217,33 +208,50 @@ class UsuarioCrearForm(forms.ModelForm):
             rut=self.cleaned_data["rut"],
             apellido_paterno=ap,
             apellido_materno=am,
-            direccion=self.cleaned_data.get("direccion", "").strip(),
-            numero_casa=self.cleaned_data.get("numero_casa", "").strip(),
-            telefono=self.cleaned_data['telefono'],  # Ya viene con +569
+            direccion=(self.cleaned_data.get("direccion") or "").strip(),
+            numero_casa=(self.cleaned_data.get("numero_casa") or "").strip(),
+            telefono=self.cleaned_data["telefono"],  # viene con +569
             total_residentes=self.cleaned_data.get("total_residentes", 1),
             total_ninos=self.cleaned_data.get("total_ninos") or 0,
-            debe_cambiar_password=True
+            debe_cambiar_password=True,
         )
 
-        # ENVIAR CORREO
+        # ✅ Enviar correo por WEBHOOK (no rompe el flujo si falla)
         if user.email:
             asunto = "Bienvenido a la Comunidad - Tus credenciales"
-            mensaje = f"""
-Hola {user.first_name},
 
-Tu cuenta ha sido creada exitosamente.
+            html_body = f"""
+            <div style="font-family:Arial,sans-serif;font-size:14px;">
+              <p>Hola <b>{user.first_name}</b>,</p>
+              <p>Tu cuenta ha sido creada exitosamente.</p>
+              <p><b>Credenciales:</b></p>
+              <ul>
+                <li><b>Usuario:</b> {user.username}</li>
+                <li><b>Contraseña temporal:</b> {password_provisoria}</li>
+              </ul>
+              <p><b>IMPORTANTE:</b> Por tu seguridad, el sistema te pedirá cambiar esta contraseña la primera vez que inicies sesión.</p>
+            </div>
+            """
 
-Usuario: {user.username}
-Contraseña temporal: {password_provisoria}
+            text_body = (
+                f"Hola {user.first_name},\n\n"
+                "Tu cuenta ha sido creada exitosamente.\n\n"
+                f"Usuario: {user.username}\n"
+                f"Contraseña temporal: {password_provisoria}\n\n"
+                "IMPORTANTE: Por tu seguridad, el sistema te pedirá cambiar esta contraseña "
+                "la primera vez que inicies sesión.\n"
+            )
 
-IMPORTANTE:
-Por tu seguridad, la aplicación te pedirá cambiar esta contraseña 
-automáticamente la primera vez que inicies sesión.
-"""
             try:
-                send_mail(asunto, mensaje, settings.EMAIL_HOST_USER, [user.email], fail_silently=False)
-            except Exception as e:
-                print(f"Error enviando correo al usuario {user.username}: {e}")
+                enviar_correo_via_webhook(
+                    to_email=user.email,
+                    subject=asunto,
+                    html_body=html_body,
+                    text_body=text_body,
+                )
+            except Exception:
+                # No romper creación si el correo falla
+                pass
 
         return user
 
