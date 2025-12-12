@@ -34,7 +34,7 @@ if RENDER_EXTERNAL_HOSTNAME:
 # Agregar IPs locales para desarrollo si es necesario
 ALLOWED_HOSTS.extend([
     "10.0.2.2",
-    "192.168.0.103",
+    "192.168.231.132",
 ])
 
 # CSRF
@@ -42,7 +42,7 @@ CSRF_TRUSTED_ORIGINS = [
     "http://127.0.0.1",
     "http://localhost",
     "http://10.0.2.2",
-    "http://192.168.0.103:8000",
+    "http://192.168.231.132:8000",
 ]
 
 # -------------------------------------------------------------------
@@ -213,13 +213,13 @@ REST_FRAMEWORK = {
 # -----------------------------------------------------------------------------
 # Email (SMTP)
 # -----------------------------------------------------------------------------
-EMAIL_PORT = int(os.getenv("EMAIL_PORT", "465")) 
-EMAIL_USE_SSL = os.getenv("EMAIL_USE_SSL", "False").lower() == "true"
-EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "False").lower() == "true"
-EMAIL_HOST = os.getenv("EMAIL_HOST")
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.gmail.com")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
+EMAIL_USE_TLS = True
 EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
-DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER)
+DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
 # -----------------------------------------------------------------------------
 # Configuración adicional
