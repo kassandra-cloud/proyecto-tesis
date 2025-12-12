@@ -1,4 +1,4 @@
-from django.urls import path, include  # 💡 IMPORTANTE: Debes importar 'include'
+from django.urls import path, include 
 from . import views
 from rest_framework.routers import DefaultRouter
 from .api import ReunionViewSet, ActaViewSet,AsistenciaViewSet
@@ -6,7 +6,7 @@ from .api import ReunionViewSet, ActaViewSet,AsistenciaViewSet
 app_name = "reuniones"
 
 urlpatterns = [
-    # -- RUTAS WEB --
+    #  Rutas Web
     path("", views.reunion_list, name="lista_reuniones"),
     path("nueva/", views.reunion_create, name="crear_reunion"),
     path("<int:pk>/", views.reunion_detail, name="detalle_reunion"),
@@ -14,7 +14,6 @@ urlpatterns = [
     path("<int:pk>/asistencia/", views.asistencia_list, name="lista_asistencia"),
     path("<int:pk>/acta/pdf/", views.acta_export_pdf, name="exportar_acta_pdf"),
     path('grabaciones/', views.lista_grabaciones, name='lista_grabaciones'),
-    
     path("<int:pk>/acta/rechazar/", views.rechazar_acta, name="rechazar_acta"),
     path("actas/<int:pk>/enviar-pdf/", views.enviar_acta_pdf_por_correo, name="enviar_acta_pdf_por_correo"),
     path("<int:pk>/borrador/guardar/", views.guardar_borrador_acta, name="guardar_borrador_acta"),
@@ -22,8 +21,6 @@ urlpatterns = [
     path("<int:pk>/acta/subir-audio/", views.subir_audio_acta, name="subir_audio_acta"),
     path("api/acta/<int:pk>/estado/", views.get_acta_estado, name="get_acta_estado"),
     path('reunion/<int:pk>/calificar_acta/', views.calificar_acta, name='calificar_acta'),
-
-    # --- NUEVAS RUTAS DE ESTADO ---
     path('<int:pk>/iniciar/', views.iniciar_reunion, name='iniciar_reunion'),
     path('<int:pk>/finalizar/', views.finalizar_reunion, name='finalizar_reunion'),
     path('<int:pk>/cancelar/', views.cancelar_reunion, name='cancelar_reunion'),
@@ -36,7 +33,6 @@ router.register(r"reuniones", ReunionViewSet, basename="reunion_api")
 router.register(r"actas", ActaViewSet, basename="acta_api")
 router.register(r"asistencias", AsistenciaViewSet, basename="asistencia_api")
 
-# 💡 CORRECCIÓN CLAVE: Incluimos las rutas del router BAJO el prefijo 'api/'
 urlpatterns += [
     path('api/', include(router.urls)),
 ]

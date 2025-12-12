@@ -7,17 +7,11 @@ import ffmpeg
 import tempfile
 import traceback
 import logging
-
 from django.conf import settings
 from django.utils import timezone
-
 from .models import Acta, Reunion
 from core.models import Perfil, DispositivoFCM
-
-# VOSK
 from vosk import Model, KaldiRecognizer
-
-# FIREBASE
 import firebase_admin
 from firebase_admin import messaging, credentials
 
@@ -66,9 +60,7 @@ def inicializar_firebase():
     return firebase_app
 
 
-# --- TAREAS DE NOTIFICACIÓN ---
-
-
+#Tareas de notificacion
 def _obtener_tokens_dispositivos():
     """
     Obtiene TODOS los tokens registrados en DispositivoFCM (multi-dispositivo).
@@ -85,15 +77,11 @@ def enviar_notificacion_nueva_reunion(reunion_id):
     try:
         inicializar_firebase()
         reunion = Reunion.objects.get(pk=reunion_id)
-
         tokens = _obtener_tokens_dispositivos()
         if not tokens:
             return
-
         fecha_local = timezone.localtime(reunion.fecha)
         body = f"{reunion.titulo} el {fecha_local.strftime('%d/%m/%Y %H:%M')}"
-
-        # Envío uno a uno (puedes cambiar a Multicast si quieres)
         for token in tokens:
             try:
                 msg = messaging.Message(
@@ -109,7 +97,6 @@ def enviar_notificacion_nueva_reunion(reunion_id):
                 )
                 messaging.send(msg)
             except Exception:
-                # No reventamos toda la tarea por un token malo
                 pass
     except Exception as e:
         logger.error(f"Error notif nueva reunion: {e}")
@@ -196,8 +183,7 @@ def enviar_notificacion_acta_aprobada(acta_id):
         logger.error(f"Error notif acta aprobada: {e}")
 
 
-# --- TAREA DE TRANSCRIPCIÓN (VOSK) ---
-
+# Tarea de transcripcion con Vosk
 
 @shared_task(name="procesar_audio_vosk")
 def procesar_audio_vosk(acta_pk):
