@@ -306,3 +306,8 @@ AUTHENTICATION_BACKENDS = [
     'core.authentication.LoginConCorreo',
     'django.contrib.auth.backends.ModelBackend',
 ]
+# =================================================
+# --- WEBHOOK GOOGLE APPS SCRIPT (ENVÍO DE CORREO) ---
+# =================================================
+APPSCRIPT_WEBHOOK_URL = os.getenv("APPSCRIPT_WEBHOOK_URL")
+APPSCRIPT_WEBHOOK_SECRET = os.getenv("APPSCRIPT_WEBHOOK_SECRET")
