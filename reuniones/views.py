@@ -291,62 +291,46 @@ def acta_export_pdf(request, pk):
 @csrf_protect
 def enviar_acta_pdf_por_correo(request, pk):
     reunion = get_object_or_404(Reunion, pk=pk)
+
     try:
         acta = reunion.acta
     except Acta.DoesNotExist:
-        return HttpResponseBadRequest("Esta reunión no tiene acta.")
+        return JsonResponse({"ok": False, "message": "La reunión no tiene acta"}, status=400)
 
-    # ✅ ENVIAR A TODOS (presentes + no presentes)
-    correos = list(
-        Perfil.objects.select_related("usuario")
-        .filter(usuario__is_active=True)
-        .exclude(usuario__email__isnull=True)
-        .exclude(usuario__email__exact="")
-        .values_list("usuario__email", flat=True)
-    )
-
-    # Quitar duplicados + orden
-    correos = sorted(set([c.strip() for c in correos if c and c.strip()]))
-
+    correos = request.POST.getlist("correos[]")
     if not correos:
-        return HttpResponseBadRequest("No hay correos disponibles para enviar.")
+        return JsonResponse({"ok": False, "message": "No se recibieron correos"}, status=400)
 
-    # Generar PDF
-    template_path = "reuniones/acta_pdf_template.html"
-    pdf_bytes = _pdf_bytes_desde_xhtml(template_path, {"reunion": reunion, "acta": acta})
-    if not pdf_bytes:
-        return HttpResponse("Error al generar el PDF", status=500)
-
-    filename = f"Acta_{slugify(getattr(reunion, 'titulo', f'reunion-{reunion.pk}'))}.pdf"
-
-    asunto = f"Acta de Reunión: {reunion.titulo}"
-    cuerpo = (
-        f"Estimado(a) vecino(a),\n\n"
-        f"Adjuntamos el acta oficial de la reunión \"{reunion.titulo}\", "
-        f"realizada el {reunion.fecha.strftime('%d/%m/%Y')}.\n\n"
-        f"Saludos cordiales,\n"
-        f"La Directiva\n"
+    # 1️⃣ Generar PDF
+    pdf_bytes = _pdf_bytes_desde_xhtml(
+        "reuniones/acta_pdf_template.html",
+        {"reunion": reunion, "acta": acta}
     )
 
-    try:
-        email = EmailMessage(
-            subject=asunto,
-            body=cuerpo,
-            to=correos,
+    if not pdf_bytes:
+        return JsonResponse({"ok": False, "message": "Error al generar el PDF"}, status=500)
+
+    enviados = 0
+
+    # 2️⃣ Enviar correo usando Google Script (NO SMTP)
+    for correo in correos:
+        ok = enviar_correo_via_webhook(
+            to_email=correo,
+            subject=f"Acta de Reunión: {reunion.titulo}",
+            html_body=f"""
+                <p>Estimado/a vecino/a,</p>
+                <p>Se adjunta el acta oficial de la reunión <strong>{reunion.titulo}</strong>.</p>
+                <p>Saludos cordiales,<br>La Directiva</p>
+            """,
+            text_body="Se adjunta acta de reunión."
         )
-        email.attach(filename, pdf_bytes, "application/pdf")
-        email.send(fail_silently=False)
+        if ok:
+            enviados += 1
 
-        return JsonResponse({
-            "ok": True,
-            "message": f"Correo enviado a {len(correos)} destinatario(s)."
-        })
-
-    except Exception as e:
-        print(f"Error al enviar correo: {e}")
-        return HttpResponseBadRequest(f"Error al enviar correo: {e}")
-
-
+    return JsonResponse({
+        "ok": True,
+        "message": f"Acta enviada correctamente a {enviados} destinatarios."
+    })
 @require_POST
 @login_required
 @role_required("reuniones", "change_estado")
