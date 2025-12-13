@@ -311,3 +311,17 @@ AUTHENTICATION_BACKENDS = [
 # =================================================
 APPSCRIPT_WEBHOOK_URL = os.getenv("APPSCRIPT_WEBHOOK_URL")
 APPSCRIPT_WEBHOOK_SECRET = os.getenv("APPSCRIPT_WEBHOOK_SECRET")
+
+# =================================================
+# --- CONFIGURACIÓN DE CACHÉ (REDIS) ---
+# =================================================
+# Esto es vital para que Celery (Worker) y Django (Web) compartan el estado
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": os.environ.get('REDIS_URL', 'redis://localhost:6379/1'),
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        }
+    }
+}

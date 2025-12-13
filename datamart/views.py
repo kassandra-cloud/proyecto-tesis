@@ -2,6 +2,7 @@ import json
 import re
 from datetime import timedelta
 
+from django.core.cache import cache
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.core.management import call_command
@@ -12,6 +13,7 @@ from django.shortcuts import render, redirect
 from django.template.loader import get_template
 from django.utils import timezone
 from xhtml2pdf import pisa
+from datamart.tasks import tarea_actualizar_bi_async
 
 from datamart.models import (
     FactInscripcionTaller,
@@ -248,6 +250,28 @@ def construir_datos_panel_bi(mes=None, anio=None):
         "tiempo_segundos": tiempo_segundos,
         "detalle_disponibilidad": detalle_disponibilidad,
     }
+
+@login_required
+@user_passes_test(es_usuario_directiva)
+def panel_bi_view(request):
+    
+    # Definimos una clave única para el "cooldown"
+    CACHE_KEY_COOLDOWN = 'cooldown_etl_bi'
+    TIEMPO_COOLDOWN_SEGUNDOS = 300  # 5 minutos (ajustable)
+
+    # Verificamos si estamos en periodo de enfriamiento
+    if not cache.get(CACHE_KEY_COOLDOWN):
+        print(" Disparando actualización BI en segundo plano...")
+        
+        # 1. Lanzamos la tarea a Celery (no bloquea la pantalla)
+        tarea_actualizar_bi_async.delay()
+        
+        # 2. Activamos el cooldown para no repetir esto por 5 minutos
+        cache.set(CACHE_KEY_COOLDOWN, True, TIEMPO_COOLDOWN_SEGUNDOS)
+        
+        # Opcional: Avisar al usuario
+        messages.info(request, " Actualizando datos en segundo plano... Recarga en unos instantes.")
+
 
 @login_required
 @user_passes_test(es_usuario_directiva)
