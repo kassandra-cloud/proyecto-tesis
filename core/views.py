@@ -7,7 +7,7 @@ from datetime import timedelta
 import calendar
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
-
+from usuarios.utils import enviar_correo_via_webhook
 # --- IMPORTACIONES DE TUS MODELOS ---
 from reuniones.models import Reunion
 from foro.models import Publicacion
@@ -35,10 +35,7 @@ def sin_permiso(request):
 
 class RequestRecoveryCodeAPI(APIView):
     """
-    1. Recibe { "email": "..." }
-    2. Genera un código de 6 dígitos.
-    3. Lo guarda en el perfil del usuario.
-    4. Envía el correo CON DISEÑO PROFESIONAL.
+    Versión CORREGIDA: Usa Webhook en lugar de SMTP para evitar Timeouts.
     """
     permission_classes = [AllowAny]
 
@@ -53,47 +50,45 @@ class RequestRecoveryCodeAPI(APIView):
             # 1. Generar código
             code = get_random_string(length=6, allowed_chars='0123456789')
             
-            # 2. Guardar en perfil 
+            # 2. Guardar en perfil (si existe)
             if hasattr(user, 'perfil'):
                 user.perfil.recovery_code = code
                 user.perfil.recovery_code_expires = timezone.now() + timedelta(minutes=15)
                 user.perfil.save()
             else:
-                # Si el usuario no tiene perfil, no podemos guardar el código
-                # Retornamos éxito por seguridad, pero logueamos el error interno si quieres
+                # Si no tiene perfil, simulamos éxito por seguridad
                 return Response({'message': 'Código enviado correctamente'})
 
-            # 3. Enviar Correo con Template HTML
-            subject = 'Recuperación de Clave - Villa Vista al Mar'
+            # 3. Preparar Contenido
+            asunto = 'Recuperación de Clave - Villa Vista al Mar'
             
-            # Contexto para el template
             contexto = {
                 'codigo': code
             }
 
-            # Renderizar HTML y Texto Plano
-            html_message = render_to_string('registration/email_reset_password_app.html', contexto)
-            plain_message = strip_tags(html_message)
+            # Renderizamos los templates (asegúrate de que el archivo exista)
+            html_body = render_to_string('registration/email_reset_password_app.html', contexto)
+            text_body = strip_tags(html_body)
             
-            send_mail(
-                subject,
-                plain_message,      # Versión texto plano (para clientes antiguos/spam filters)
-                None,               # Remitente (usa DEFAULT_FROM_EMAIL del settings)
-                [email],
-                html_message=html_message, # Versión HTML con diseño naranja
-                fail_silently=False,
+            # 4. ENVIAR POR WEBHOOK (¡Aquí estaba el fallo antes!)
+            # Usamos la función que no bloquea el puerto SMTP
+            enviar_correo_via_webhook(
+                to_email=email,
+                subject=asunto,
+                html_body=html_body,
+                text_body=text_body
             )
             
             return Response({'message': 'Código enviado correctamente'})
 
         except User.DoesNotExist:
-            # Por seguridad, respondemos éxito aunque el correo no exista para no revelar usuarios
             return Response({'message': 'Código enviado correctamente'})
             
         except Exception as e:
-            # Es buena práctica imprimir el error en consola para depurar en Render
-            print(f"Error enviando correo de recuperación: {e}")
-            return Response({'error': 'Error interno al procesar la solicitud'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            print(f"Error en recuperación: {e}")
+            # En producción, a veces es mejor devolver 200 aunque falle el log interno
+            # para no dar pistas, pero por ahora devolvemos 500 para que lo veas.
+            return Response({'error': 'Error procesando solicitud'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class ResetPasswordWithCodeAPI(APIView):
     """
