@@ -43,7 +43,9 @@ class TallerViewSet(viewsets.ReadOnlyModelViewSet):
 
         Inscripcion.objects.create(vecino=user, taller=taller)
         taller.refresh_from_db()
-        return Response(TallerSerializer(taller).data, status=status.HTTP_201_CREATED)
+        
+        # 🔑 CORRECCIÓN: Pasar el contexto de la request al serializador.
+        return Response(TallerSerializer(taller, context={'request': request}).data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated])
     def desinscribir(self, request, pk=None):
@@ -51,4 +53,6 @@ class TallerViewSet(viewsets.ReadOnlyModelViewSet):
         user = request.user
         Inscripcion.objects.filter(vecino=user, taller=taller).delete()
         taller.refresh_from_db()
-        return Response(TallerSerializer(taller).data)
+        
+        # 🔑 CORRECCIÓN: Pasar el contexto de la request al serializador.
+        return Response(TallerSerializer(taller, context={'request': request}).data)
