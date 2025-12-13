@@ -157,6 +157,12 @@ def construir_datos_panel_bi(mes=None, anio=None):
         # Si no hubo actividad en el periodo, dejamos 0 para todos
         vecinos_demografia = DimVecino.objects.none()
 
+    vecinos_demografia = DimVecino.objects.all()
+
+    # Opcional: Si quisieras ver SOLO la demografía de los "Participantes del mes",
+    # podrías descomentar la lógica anterior, pero para un panel general
+    # es mejor ver el universo completo.
+
     data_demografia_sector = list(
         vecinos_demografia
         .values("direccion_sector")
@@ -164,11 +170,13 @@ def construir_datos_panel_bi(mes=None, anio=None):
         .order_by("-total_vecinos")
     )
 
-    # Limpiar números de las direcciones para agrupar mejor
+    # Limpiar números de las direcciones para agrupar mejor (Ej: "Pasaje 1 #123" -> "Pasaje 1")
     for row in data_demografia_sector:
         original = row["direccion_sector"] or ""
-        solo_texto = re.sub(r"\d+", "", original).strip()
-        row["direccion_sector"] = solo_texto or "Sin Dirección"
+        # Regex simple para quitar números al final
+        solo_texto = re.sub(r"\d+$", "", original).strip() 
+        # Si queda vacío, poner "Sin Dirección"
+        row["direccion_sector"] = solo_texto if len(solo_texto) > 2 else (original or "Sin Dirección")
 
     # 5) ASISTENCIA A REUNIONES (ya la tenías filtrada, la dejamos igual pero con helper)
     asistencia_qs = FactAsistenciaReunion.objects.all()
