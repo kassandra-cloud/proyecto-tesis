@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Código de Votación</title>
+    <style>
+        /* Estilos base idénticos al anterior para consistencia */
+        body { margin: 0; padding: 0; background-color: #f4f4f4; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; }
+        .wrapper { width: 100%; background-color: #f4f4f4; padding-bottom: 40px; }
+        .main-table { background-color: #ffffff; margin: 0 auto; width: 600px; max-width: 600px; border-radius: 4px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        
+        /* Diferenciación visual: Encabezado verde para procesos democráticos */
+        .header { background-color: #28a745; padding: 20px; text-align: center; }
+        .header h1 { color: #ffffff; margin: 0; font-size: 20px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+        
+        .content { padding: 40px 30px; text-align: center; color: #333333; }
+        .greeting { font-size: 18px; font-weight: bold; margin-bottom: 20px; display: block; color: #2c3e50; }
+        .text { font-size: 15px; line-height: 1.6; color: #555555; margin-bottom: 30px; }
+        
+        /* Caja del Código */
+        .otp-box { background-color: #f0fff4; border: 2px dashed #28a745; border-radius: 6px; padding: 15px; margin: 25px 0; display: inline-block; min-width: 200px; }
+        .otp-code { font-size: 32px; font-weight: 700; color: #28a745; letter-spacing: 6px; font-family: monospace; display: block; }
+        .otp-label { font-size: 12px; color: #28a745; text-transform: uppercase; letter-spacing: 1px; margin-top: 5px; display: block; font-weight: 600; }
+        
+        .footer { background-color: #e9ecef; padding: 20px; text-align: center; font-size: 12px; color: #6c757d; }
+    </style>
+</head>
+<body>
+    <div class="wrapper">
+        <table class="main-table" align="center">
+            <tr>
+                <td class="header">
+                    <h1>Proceso de Votación Digital</h1>
+                </td>
+            </tr>
+            <tr>
+                <td class="content">
+                    <span class="greeting">Estimado(a) Vecino(a)</span>
+                    <p class="text">
+                        Se ha habilitado su participación para la votación en curso. Para ejercer su derecho a voto de manera segura y auditable, ingrese el siguiente código único:
+                    </p>
+                    
+                    <div class="otp-box">
+                        <span class="otp-code">{{ codigo }}</span>
+                        <span class="otp-label">Código de Autorización</span>
+                    </div>
+                    
+                    <p class="text" style="font-size: 13px; color: #856404; background-color: #fff3cd; padding: 10px; border-radius: 4px; margin-top: 30px;">
+                        <strong>Confidencial:</strong> Este código asegura que su voto sea único e inalterable. No lo comparta con terceros.
+                    </p>
+                </td>
+            </tr>
+            <tr>
+                <td class="footer">
+                    <strong>Junta de Vecinos Villa Vista al Mar</strong><br>
+                    Plataforma de Participación Ciudadana
+                </td>
+            </tr>
+        </table>
+    </div>
+</body>
+</html>

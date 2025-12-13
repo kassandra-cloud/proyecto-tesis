@@ -5,6 +5,8 @@ from django.utils import timezone
 from django.db.models import Count, F
 from datetime import timedelta
 import calendar
+from django.template.loader import render_to_string
+from django.utils.html import strip_tags
 
 # --- IMPORTACIONES DE TUS MODELOS ---
 from reuniones.models import Reunion
@@ -36,7 +38,7 @@ class RequestRecoveryCodeAPI(APIView):
     1. Recibe { "email": "..." }
     2. Genera un código de 6 dígitos.
     3. Lo guarda en el perfil del usuario.
-    4. Envía el correo real.
+    4. Envía el correo CON DISEÑO PROFESIONAL.
     """
     permission_classes = [AllowAny]
 
@@ -52,41 +54,46 @@ class RequestRecoveryCodeAPI(APIView):
             code = get_random_string(length=6, allowed_chars='0123456789')
             
             # 2. Guardar en perfil 
-            # (Asegúrate de que el modelo Perfil tenga los campos 'recovery_code' y 'recovery_code_expires')
-            user.perfil.recovery_code = code
-            user.perfil.recovery_code_expires = timezone.now() + timedelta(minutes=15)
-            user.perfil.save()
+            if hasattr(user, 'perfil'):
+                user.perfil.recovery_code = code
+                user.perfil.recovery_code_expires = timezone.now() + timedelta(minutes=15)
+                user.perfil.save()
+            else:
+                # Si el usuario no tiene perfil, no podemos guardar el código
+                # Retornamos éxito por seguridad, pero logueamos el error interno si quieres
+                return Response({'message': 'Código enviado correctamente'})
 
-            # 3. Enviar Correo
-            asunto = 'Código de Recuperación - Villa Vista al Mar'
-            mensaje = f"""
-            Hola {user.first_name},
+            # 3. Enviar Correo con Template HTML
+            subject = 'Recuperación de Clave - Villa Vista al Mar'
+            
+            # Contexto para el template
+            contexto = {
+                'codigo': code
+            }
 
-            Has solicitado restablecer tu contraseña.
-            Tu código de verificación es:
-
-            {code}
-
-            Este código expira en 15 minutos.
-            Si no fuiste tú, ignora este mensaje.
-            """
+            # Renderizar HTML y Texto Plano
+            html_message = render_to_string('registration/email_reset_password_app.html', contexto)
+            plain_message = strip_tags(html_message)
             
             send_mail(
-                asunto,
-                mensaje,
-                None, # Usa el correo configurado en settings.py
+                subject,
+                plain_message,      # Versión texto plano (para clientes antiguos/spam filters)
+                None,               # Remitente (usa DEFAULT_FROM_EMAIL del settings)
                 [email],
+                html_message=html_message, # Versión HTML con diseño naranja
                 fail_silently=False,
             )
             
             return Response({'message': 'Código enviado correctamente'})
 
         except User.DoesNotExist:
-            # Por seguridad, respondemos éxito aunque el correo no exista
+            # Por seguridad, respondemos éxito aunque el correo no exista para no revelar usuarios
             return Response({'message': 'Código enviado correctamente'})
+            
         except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
+            # Es buena práctica imprimir el error en consola para depurar en Render
+            print(f"Error enviando correo de recuperación: {e}")
+            return Response({'error': 'Error interno al procesar la solicitud'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class ResetPasswordWithCodeAPI(APIView):
     """

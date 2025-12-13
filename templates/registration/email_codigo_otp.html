@@ -2,63 +2,72 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Código de Recuperación</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Código de Verificación</title>
+    <style>
+        /* Reset y estilos base para clientes de correo */
+        body { margin: 0; padding: 0; background-color: #f4f4f4; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+        table { border-spacing: 0; width: 100%; }
+        td { padding: 0; }
+        img { border: 0; }
+        
+        /* Contenedor principal */
+        .wrapper { width: 100%; table-layout: fixed; background-color: #f4f4f4; padding-bottom: 40px; }
+        .main-table { background-color: #ffffff; margin: 0 auto; width: 600px; max-width: 600px; border-radius: 4px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        
+        /* Encabezado */
+        .header { background-color: #0056b3; padding: 20px; text-align: center; } /* Azul institucional */
+        .header h1 { color: #ffffff; margin: 0; font-size: 20px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+        
+        /* Contenido */
+        .content { padding: 40px 30px; text-align: center; color: #333333; }
+        .greeting { font-size: 18px; font-weight: bold; margin-bottom: 20px; display: block; color: #2c3e50; }
+        .text { font-size: 15px; line-height: 1.6; color: #555555; margin-bottom: 30px; }
+        
+        /* Caja del Código */
+        .otp-box { background-color: #f8f9fa; border: 2px dashed #0056b3; border-radius: 6px; padding: 15px; margin: 25px 0; display: inline-block; min-width: 200px; }
+        .otp-code { font-size: 32px; font-weight: 700; color: #0056b3; letter-spacing: 6px; font-family: monospace; display: block; }
+        .otp-label { font-size: 12px; color: #6c757d; text-transform: uppercase; letter-spacing: 1px; margin-top: 5px; display: block; font-weight: 600; }
+        
+        /* Pie de página */
+        .footer { background-color: #e9ecef; padding: 20px; text-align: center; font-size: 12px; color: #6c757d; line-height: 1.5; }
+        .footer strong { color: #495057; }
+    </style>
 </head>
-<body style="margin: 0; padding: 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f4f6f9;">
-    
-    <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
-        <tr>
-            <td style="padding: 20px 0 30px 0;">
-                
-                <table align="center" border="0" cellpadding="0" cellspacing="0" width="600" style="border-collapse: separate; border-spacing: 0; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #ffffff; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.05);">
+<body>
+    <div class="wrapper">
+        <table class="main-table" align="center">
+            <tr>
+                <td class="header">
+                    <h1>Junta de Vecinos<br>Villa Vista al Mar</h1>
+                </td>
+            </tr>
+            
+            <tr>
+                <td class="content">
+                    <span class="greeting">Solicitud de Acceso</span>
+                    <p class="text">
+                        Hemos recibido una solicitud para iniciar sesión en la plataforma de gestión administrativa. Utilice el siguiente código de verificación temporal:
+                    </p>
                     
-                    <tr>
-                        <td align="center" bgcolor="#0d6efd" style="padding: 30px 0; color: #ffffff;">
-                            <h1 style="font-size: 24px; margin: 0; font-weight: bold;">Recuperación de Cuenta</h1>
-                            <p style="margin: 5px 0 0 0; opacity: 0.9; font-size: 14px;">Junta de Vecinos "Villa vista al mar"</p>
-                        </td>
-                    </tr>
-
-                    <tr>
-                        <td style="padding: 40px 30px; text-align: center;">
-                            <p style="font-size: 18px; color: #333333; margin-top: 0;">Hola <strong>{{ user.username }}</strong>,</p>
-                            
-                            <p style="font-size: 15px; color: #555555; line-height: 1.5;">
-                                Hemos recibido una solicitud para restablecer tu contraseña. <br>
-                                Usa el siguiente código de seguridad en la aplicación para continuar:
-                            </p>
-                            
-                            <div style="margin: 30px 0;">
-                                <span style="
-                                    background-color: #f0f7ff; 
-                                    color: #0d6efd; 
-                                    border: 2px dashed #0d6efd; 
-                                    padding: 15px 30px; 
-                                    border-radius: 8px; 
-                                    font-size: 32px; 
-                                    font-weight: bold; 
-                                    letter-spacing: 8px; 
-                                    display: inline-block;">
-                                    {{ codigo }}
-                                </span>
-                            </div>
-
-                            <p style="font-size: 13px; color: #888888; margin-bottom: 0;">
-                                ⚠️ Este código expira en <strong>15 minutos</strong>.
-                            </p>
-                        </td>
-                    </tr>
-
-                    <tr>
-                        <td bgcolor="#f8f9fa" style="padding: 20px 30px; font-size: 12px; color: #999999; text-align: center; border-top: 1px solid #eeeeee;">
-                            <p style="margin: 0;">Si no solicitaste este cambio, por favor ignora este mensaje. Tu cuenta sigue segura.</p>
-                        </td>
-                    </tr>
-
-                </table>
-            </td>
-        </tr>
-    </table>
-
+                    <div class="otp-box">
+                        <span class="otp-code">{{ codigo }}</span>
+                        <span class="otp-label">Código de Seguridad</span>
+                    </div>
+                    
+                    <p class="text" style="font-size: 13px; color: #888; margin-top: 30px;">
+                        Este código expirará en 5 minutos. Si usted no solicitó este acceso, por favor ignore este mensaje y no comparta el código con nadie.
+                    </p>
+                </td>
+            </tr>
+            
+            <tr>
+                <td class="footer">
+                    <strong>Sistema de Gestión Comunitaria</strong><br>
+                    Este es un mensaje automático generado por el sistema. Por favor no responder a este correo.
+                </td>
+            </tr>
+        </table>
+    </div>
 </body>
 </html>

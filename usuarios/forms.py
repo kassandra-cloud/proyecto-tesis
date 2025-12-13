@@ -8,7 +8,9 @@ from django.db import transaction
 from django.core.validators import RegexValidator
 from django.core.mail import send_mail
 from django.conf import settings
-
+from django.template.loader import render_to_string  
+from django.utils.html import strip_tags             
+from django.conf import settings
 from core.models import Perfil
 from core.rut import normalizar_rut, dv_mod11, validar_rut
 from usuarios.utils import enviar_correo_via_webhook
@@ -218,39 +220,39 @@ class UsuarioCrearForm(forms.ModelForm):
 
         # ✅ Enviar correo por WEBHOOK (no rompe el flujo si falla)
         if user.email:
-            asunto = "Bienvenido a la Comunidad - Tus credenciales"
-
-            html_body = f"""
-            <div style="font-family:Arial,sans-serif;font-size:14px;">
-              <p>Hola <b>{user.first_name}</b>,</p>
-              <p>Tu cuenta ha sido creada exitosamente.</p>
-              <p><b>Credenciales:</b></p>
-              <ul>
-                <li><b>Usuario:</b> {user.username}</li>
-                <li><b>Contraseña temporal:</b> {password_provisoria}</li>
-              </ul>
-              <p><b>IMPORTANTE:</b> Por tu seguridad, el sistema te pedirá cambiar esta contraseña la primera vez que inicies sesión.</p>
-            </div>
-            """
-
-            text_body = (
-                f"Hola {user.first_name},\n\n"
-                "Tu cuenta ha sido creada exitosamente.\n\n"
-                f"Usuario: {user.username}\n"
-                f"Contraseña temporal: {password_provisoria}\n\n"
-                "IMPORTANTE: Por tu seguridad, el sistema te pedirá cambiar esta contraseña "
-                "la primera vez que inicies sesión.\n"
-            )
-
             try:
+                # 1. Definir la URL de login para el botón del correo
+                # Usamos la variable de entorno de Render o localhost por defecto
+                host = getattr(settings, 'RENDER_EXTERNAL_HOSTNAME', '127.0.0.1:8000')
+                protocol = 'https' if getattr(settings, 'RENDER_EXTERNAL_HOSTNAME', None) else 'http'
+                link_login = f"{protocol}://{host}/accounts/login/"
+
+                # 2. Preparar los datos para la plantilla HTML
+                contexto = {
+                    'nombre': user.first_name,
+                    'rut': user.username,
+                    'password': password_provisoria, # Usamos la variable que generaste antes del hash
+                    'link_login': link_login
+                }
+
+                # 3. Renderizar el HTML bonito
+                html_body = render_to_string("usuarios/email_bienvenida.html", contexto)
+                
+                # 4. Generar versión texto plano automáticamente
+                text_body = strip_tags(html_body)
+
+                # 5. Enviar
+                asunto = "Bienvenido a Villa Vista al Mar - Credenciales de Acceso"
+                
                 enviar_correo_via_webhook(
                     to_email=user.email,
                     subject=asunto,
                     html_body=html_body,
                     text_body=text_body,
                 )
-            except Exception:
-                # No romper creación si el correo falla
+            except Exception as e:
+                # No romper creación si el correo falla, pero loguear si es necesario
+                print(f"Error enviando correo bienvenida: {e}")
                 pass
 
         return user
