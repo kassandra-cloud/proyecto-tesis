@@ -142,24 +142,18 @@ def crear_usuario(request):
         form = UsuarioCrearForm(request.POST)
         if form.is_valid():
             try:
-                user = form.save()
+                # Al guardar el formulario, se ejecuta el método save() 
+                # que pusimos en forms.py, el cual YA ENVÍA el correo correcto.
+                user = form.save() 
 
-                # === Enviar correo (NO rompe la creación) ===
-                if user.email:
-                    try:
-                        html = render_to_string("usuarios/email_bienvenida.html", {"user": user})
-                        txt = strip_tags(html)
-                        ok = enviar_correo_via_webhook(
-                            to_email=user.email,
-                            subject="Bienvenido(a) - Junta de Vecinos",
-                            html_body=html,
-                            text_body=txt,
-                        )
-                        if not ok:
-                            messages.warning(request, "Usuario creado, pero no se pudo enviar el correo.")
-                    except Exception:
-                        # Importante: NO romper flujo por correo
-                        messages.warning(request, "Usuario creado, pero falló el envío de correo.")
+                # --- BORRAR DESDE AQUÍ ---
+                # if user.email:
+                #    try:
+                #        html = render_to_string(...) 
+                #        ... (toda la lógica vieja de envío) ...
+                #    except Exception:
+                #        ...
+                # --- HASTA AQUÍ ---
 
                 messages.success(request, "Usuario creado exitosamente")
                 return redirect("lista_usuarios")
@@ -174,6 +168,7 @@ def crear_usuario(request):
         form = UsuarioCrearForm()
 
     return render(request, "usuarios/form.html", {"form": form})
+
 @login_required
 @role_required("usuarios", "edit")
 def editar_usuario(request, pk: int):
