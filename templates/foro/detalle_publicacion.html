@@ -16,14 +16,23 @@
                     <small class="text-muted">{{ publicacion.fecha_creacion|date:"d M Y, H:i" }}</small>
                 </div>
             </div>
-            
+
             {% if user == publicacion.autor %}
             <div class="dropdown">
                 <button class="btn btn-light btn-sm" type="button" data-bs-toggle="dropdown">
                     <i class="fas fa-ellipsis-v"></i>
                 </button>
                 <ul class="dropdown-menu dropdown-menu-end">
-                    <li><a class="dropdown-item text-danger" href="#">Eliminar</a></li>
+                    <li>
+                        <form method="post"
+                              action="{% url 'foro:eliminar_publicacion_web' pk=publicacion.pk %}"
+                              onsubmit="return confirm('¿Seguro que deseas eliminar esta publicación?');">
+                            {% csrf_token %}
+                            <button type="submit" class="dropdown-item text-danger">
+                                <i class="fas fa-trash-alt me-2"></i> Eliminar
+                            </button>
+                        </form>
+                    </li>
                 </ul>
             </div>
             {% endif %}
@@ -37,6 +46,7 @@
                 {% for adjunto in publicacion.adjuntos.all %}
                     {% if not adjunto.es_mensaje %}
                         <div class="col-md-4 col-sm-6">
+
                             {% if adjunto.tipo_archivo == 'imagen' %}
                                 <a href="{{ adjunto.archivo.url }}" target="_blank">
                                     <img src="{{ adjunto.archivo.url }}" class="img-fluid rounded shadow-sm border" alt="Adjunto" style="height: 200px; width: 100%; object-fit: cover;">
@@ -52,13 +62,68 @@
                                     {{ adjunto.archivo.name|truncatechars:20 }}
                                 </a>
                             {% endif %}
+
+                            {# ✅ ACCIONES PARA ADJUNTOS NO MENSAJE #}
+                            <div class="d-flex justify-content-start align-items-center mt-2">
+
+                                {# 👍 Like #}
+                                <form method="post"
+                                      action="{% url 'foro:reaccionar_adjunto_web' pk=adjunto.pk %}"
+                                      style="display:inline;">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-link text-decoration-none">
+                                        {% if request.user in adjunto.likes.all %}
+                                            <i class="fas fa-thumbs-up me-1 text-primary"></i>
+                                        {% else %}
+                                            <i class="far fa-thumbs-up me-1 text-muted"></i>
+                                        {% endif %}
+                                        <span class="text-muted">{{ adjunto.likes.count }}</span>
+                                    </button>
+                                </form>
+
+                                {# 💬 Responder al adjunto #}
+                                <button class="btn btn-sm btn-link text-decoration-none text-muted me-2"
+                                        data-reply-adjunto="{{ adjunto.pk }}">
+                                    <i class="fas fa-reply me-1"></i> Responder
+                                </button>
+
+                                {# 🗑️ Eliminar (solo mío) #}
+                                {% if user.is_authenticated and adjunto.autor_id == user.id %}
+                                    <form method="post"
+                                          action="{% url 'foro:eliminar_adjunto_web' pk=adjunto.pk %}"
+                                          style="display:inline;"
+                                          onsubmit="return confirm('¿Eliminar este adjunto?');">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-sm btn-link text-decoration-none text-danger">
+                                            <i class="fas fa-trash-alt me-1"></i> Eliminar
+                                        </button>
+                                    </form>
+                                {% endif %}
+                            </div>
+
+                            {# ✅ FORM oculto respuesta a adjunto (no mensaje) #}
+                            <div id="reply-adjunto-form-{{ adjunto.pk }}" style="display:none;" class="mt-2">
+                                <form method="post" action="{% url 'foro:detalle_publicacion' pk=publicacion.pk %}">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="reply_to_adjunto_id" value="{{ adjunto.pk }}">
+                                    <div class="d-flex">
+                                        <textarea name="contenido"
+                                                  class="form-control form-control-sm me-2"
+                                                  rows="2"
+                                                  placeholder="Tu respuesta al adjunto..."
+                                                  required></textarea>
+                                        <button type="submit" class="btn btn-sm btn-secondary text-nowrap">Enviar</button>
+                                    </div>
+                                </form>
+                            </div>
+
                         </div>
                     {% endif %}
                 {% endfor %}
                 </div>
             {% endif %}
         </div>
-        
+
         <div class="card-footer bg-light text-muted">
             <small><i class="far fa-comment-alt"></i> {{ conversacion|length }} Interacciones</small>
         </div>
@@ -70,11 +135,10 @@
 
     <div class="conversation-stream mb-5">
         {% for item in conversacion %}
-            {# APLICAMOS INDENTACIÓN TIPO ESCALERA: si es un comentario y tiene un padre, añadimos margen y borde #}
             <div class="d-flex mb-4 animate__animated animate__fadeIn {% if item.parent and not item.archivo %}ms-5 border-start ps-3 border-secondary{% endif %}">
-                
+
                 <div class="flex-shrink-0">
-                    <div class="rounded-circle text-white d-flex justify-content-center align-items-center fw-bold shadow-sm" 
+                    <div class="rounded-circle text-white d-flex justify-content-center align-items-center fw-bold shadow-sm"
                          style="width: 40px; height: 40px; background-color: #6c757d;">
                         {{ item.autor.username|make_list|first|upper }}
                     </div>
@@ -86,15 +150,15 @@
                         <small class="text-muted" style="font-size: 0.85rem;">{{ item.fecha_creacion|timesince }} atrás</small>
                     </div>
 
-                    {# TIPO A: Es un Archivo (Foto/Audio/Documento) #}
+                    {# TIPO A: Archivo (chat) #}
                     {% if item.archivo %}
                         <div class="d-inline-block p-2 rounded border bg-white shadow-sm" style="max-width: 80%; min-width: 200px;">
-                            
+
                             {% if item.tipo_archivo == 'imagen' %}
                                 <a href="{{ item.archivo.url }}" target="_blank">
-                                    <img src="{{ item.archivo.url }}" 
-                                         class="img-fluid rounded" 
-                                         style="max-height: 300px; width: 100%; object-fit: cover;" 
+                                    <img src="{{ item.archivo.url }}"
+                                         class="img-fluid rounded"
+                                         style="max-height: 300px; width: 100%; object-fit: cover;"
                                          alt="Imagen chat">
                                 </a>
                             {% elif item.tipo_archivo == 'audio' %}
@@ -120,46 +184,114 @@
                             {% endif %}
                         </div>
 
-                    {# TIPO B: Es un Comentario de Texto #}
-                    {% else %}
-                        <div class="bg-light p-3 rounded text-dark border position-relative" 
-                             style="display: inline-block; max-width: 90%; border-radius: 0px 15px 15px 15px !important;">
-                            
-                            {# Mostrar a quién responde (si es que tiene padre) #}
-                            {% if item.parent %}
-                                <small class="text-muted d-block mb-1">
-                                    <i class="fas fa-level-up-alt fa-rotate-90 me-1"></i> Respondiendo a **{{ item.parent.autor.username }}**
-                                </small>
-                            {% endif %}
-                            
-                            {{ item.contenido|linebreaksbr }}
-                        </div>
-                        
-                        {# Botón y Formulario de Respuesta para Comentarios #}
+                        {# ✅ ACCIONES EN ADJUNTO CHAT: LIKE + RESPONDER + ELIMINAR SI ES MÍO #}
                         <div class="d-flex justify-content-start align-items-center mt-1">
-                            <button class="btn btn-sm btn-link text-decoration-none text-muted me-3" data-reply="{{ item.pk }}">
-                                <i class="fas fa-reply me-1"></i> Responder
-                            </button>
-                            
-                            {# INICIO: Formulario de Reacción funcional #}
-                            <form method="post" action="{% url 'foro:reaccionar_comentario_web' pk=item.pk %}" style="display: inline;">
+
+                            {# 👍 Like adjunto #}
+                            <form method="post"
+                                  action="{% url 'foro:reaccionar_adjunto_web' pk=item.pk %}"
+                                  style="display:inline;">
                                 {% csrf_token %}
                                 <button type="submit" class="btn btn-sm btn-link text-decoration-none">
-                                    {# Lógica para cambiar el ícono y color si ya reaccionó #}
                                     {% if request.user in item.likes.all %}
-                                        <i class="fas fa-thumbs-up me-1 text-primary"></i> 
+                                        <i class="fas fa-thumbs-up me-1 text-primary"></i>
                                     {% else %}
                                         <i class="far fa-thumbs-up me-1 text-muted"></i>
                                     {% endif %}
                                     <span class="text-muted">{{ item.likes.count }}</span>
                                 </button>
                             </form>
-                            {# FIN: Formulario de Reacción #}
 
-                            {# Agregar más acciones como editar/eliminar si corresponde #}
+                            {# 💬 Responder adjunto chat #}
+                            <button class="btn btn-sm btn-link text-decoration-none text-muted me-2"
+                                    data-reply-adjunto="{{ item.pk }}">
+                                <i class="fas fa-reply me-1"></i> Responder
+                            </button>
+
+                            {# 🗑️ Eliminar adjunto (solo mío) #}
+                            {% if user.is_authenticated and item.autor_id == user.id %}
+                                <form method="post"
+                                      action="{% url 'foro:eliminar_adjunto_web' pk=item.pk %}"
+                                      style="display:inline;"
+                                      onsubmit="return confirm('¿Seguro que deseas eliminar este archivo?');">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-link text-decoration-none text-danger">
+                                        <i class="fas fa-trash-alt me-1"></i> Eliminar
+                                    </button>
+                                </form>
+                            {% endif %}
                         </div>
-                        
-                        {# Formulario Oculto de Respuesta #}
+
+                        {# ✅ FORM oculto respuesta a adjunto (chat) #}
+                        <div id="reply-adjunto-form-{{ item.pk }}" style="display:none;" class="mt-2">
+                            <form method="post" action="{% url 'foro:detalle_publicacion' pk=publicacion.pk %}">
+                                {% csrf_token %}
+                                <input type="hidden" name="reply_to_adjunto_id" value="{{ item.pk }}">
+                                <div class="d-flex">
+                                    <textarea name="contenido"
+                                              class="form-control form-control-sm me-2"
+                                              rows="2"
+                                              placeholder="Tu respuesta al archivo de {{ item.autor.username }}..."
+                                              required></textarea>
+                                    <button type="submit" class="btn btn-sm btn-secondary text-nowrap">Enviar</button>
+                                </div>
+                            </form>
+                        </div>
+
+                    {# TIPO B: Comentario de texto #}
+                    {% else %}
+                        <div class="bg-light p-3 rounded text-dark border position-relative"
+                             style="display: inline-block; max-width: 90%; border-radius: 0px 15px 15px 15px !important;">
+
+                            {# ✅ Respuesta a comentario #}
+                            {% if item.parent %}
+                                <small class="text-muted d-block mb-1">
+                                    <i class="fas fa-level-up-alt fa-rotate-90 me-1"></i>
+                                    Respondiendo a <strong>{{ item.parent.autor.username }}</strong>
+                                </small>
+                            {% endif %}
+
+                            {# ✅ Respuesta a adjunto #}
+                            {% if item.reply_to_adjunto %}
+                                <small class="text-muted d-block mb-1">
+                                    <i class="fas fa-level-up-alt fa-rotate-90 me-1"></i>
+                                    Respondiendo al archivo de <strong>{{ item.reply_to_adjunto.autor.username }}</strong>
+                                </small>
+                            {% endif %}
+
+                            {{ item.contenido|linebreaksbr }}
+                        </div>
+
+                        <div class="d-flex justify-content-start align-items-center mt-1">
+                            <button class="btn btn-sm btn-link text-decoration-none text-muted me-3" data-reply="{{ item.pk }}">
+                                <i class="fas fa-reply me-1"></i> Responder
+                            </button>
+
+                            <form method="post" action="{% url 'foro:reaccionar_comentario_web' pk=item.pk %}" style="display: inline;">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-link text-decoration-none">
+                                    {% if request.user in item.likes.all %}
+                                        <i class="fas fa-thumbs-up me-1 text-primary"></i>
+                                    {% else %}
+                                        <i class="far fa-thumbs-up me-1 text-muted"></i>
+                                    {% endif %}
+                                    <span class="text-muted">{{ item.likes.count }}</span>
+                                </button>
+                            </form>
+
+                            {% if user.is_authenticated and item.autor_id == user.id %}
+                                <form method="post"
+                                      action="{% url 'foro:eliminar_comentario_web' pk=item.pk %}"
+                                      style="display:inline;"
+                                      onsubmit="return confirm('¿Seguro que deseas eliminar tu comentario?');">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-link text-decoration-none text-danger">
+                                        <i class="fas fa-trash-alt me-1"></i> Eliminar
+                                    </button>
+                                </form>
+                            {% endif %}
+                        </div>
+
                         <div id="reply-form-{{ item.pk }}" style="display: none;" class="mt-2" data-parent-id="{{ item.pk }}">
                             <form method="post" action="{% url 'foro:detalle_publicacion' pk=publicacion.pk %}" class="needs-validation">
                                 {% csrf_token %}
@@ -170,7 +302,7 @@
                                 </div>
                             </form>
                         </div>
-                        
+
                     {% endif %}
                 </div>
             </div>
@@ -181,12 +313,11 @@
         {% endfor %}
     </div>
 
-    {# Formulario principal y controles de adjunto, incluyendo audio #}
     <div class="card shadow-sm border-0 sticky-bottom">
         <div class="card-body bg-light border-top">
             <form method="post" action="{% url 'foro:detalle_publicacion' pk=publicacion.pk %}" enctype="multipart/form-data">
                 {% csrf_token %}
-                
+
                 {% if form.non_field_errors %}
                     <div class="alert alert-danger">{{ form.non_field_errors }}</div>
                 {% endif %}
@@ -199,16 +330,22 @@
                                 <div class="text-danger small">{{ form.contenido.errors }}</div>
                             {% endif %}
                         </div>
-                        
-                        {# Área de Adjuntos (Archivos/Imágenes) - Contiene el input file original #}
+
                         <div class="collapse" id="collapseAdjunto">
                             <div class="card card-body p-2 bg-white mb-2">
                                 <label class="small text-muted mb-1"><i class="fas fa-camera"></i> Adjuntar imagen o archivo:</label>
-                                {{ form.archivo }} 
+                                {{ form.archivo }}
+
+                                <div id="file-preview-container" class="mt-2" style="display: none;">
+                                    <div id="dynamic-file-list" class="d-flex flex-column gap-2 mb-2"></div>
+
+                                    <button type="button" id="clear-file-btn" class="btn btn-sm btn-outline-danger mt-1">
+                                        <i class="fas fa-times me-1"></i> Quitar Archivos
+                                    </button>
+                                </div>
                             </div>
                         </div>
 
-                        {# ÁREA PARA GRABACIÓN DE AUDIO #}
                         <div class="collapse" id="collapseAudio">
                             <div class="card card-body p-2 bg-white mb-2" id="audio-recorder-ui">
                                 <div class="d-flex align-items-center">
@@ -229,7 +366,6 @@
                                 </div>
                             </div>
                         </div>
-                        {# FIN ÁREA DE AUDIO #}
                     </div>
 
                     <div class="col-md-2 col-sm-3 d-flex flex-column gap-2">
@@ -238,12 +374,12 @@
                         </button>
                     </div>
                 </div>
-                
+
                 <div class="mt-1 d-flex gap-3">
                     <button class="btn btn-sm btn-link text-decoration-none ps-0" type="button" data-bs-toggle="collapse" data-bs-target="#collapseAdjunto">
                         <i class="fas fa-paperclip"></i> Adjuntar foto/archivo
                     </button>
-                    
+
                     <button class="btn btn-sm btn-link text-decoration-none ps-0" type="button" data-bs-toggle="collapse" data-bs-target="#collapseAudio">
                         <i class="fas fa-headset text-danger"></i> Grabar mensaje de voz
                     </button>
@@ -258,4 +394,30 @@
 
 {% block extra_js %}
 <script src="{% static 'js/foro_detalle.js' %}"></script>
+
+<script>
+document.addEventListener("click", function (e) {
+    // Responder comentario (ya lo tienes, pero lo dejo compatible)
+    const btnReplyComment = e.target.closest("[data-reply]");
+    if (btnReplyComment) {
+        const id = btnReplyComment.getAttribute("data-reply");
+        const form = document.getElementById(`reply-form-${id}`);
+        if (form) {
+            form.style.display = (form.style.display === "none" || form.style.display === "") ? "block" : "none";
+        }
+        return;
+    }
+
+    // ✅ Responder adjunto (imagen/archivo/audio)
+    const btnReplyAdj = e.target.closest("[data-reply-adjunto]");
+    if (btnReplyAdj) {
+        const id = btnReplyAdj.getAttribute("data-reply-adjunto");
+        const form = document.getElementById(`reply-adjunto-form-${id}`);
+        if (form) {
+            form.style.display = (form.style.display === "none" || form.style.display === "") ? "block" : "none";
+        }
+        return;
+    }
+});
+</script>
 {% endblock %}

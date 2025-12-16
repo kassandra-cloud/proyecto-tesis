@@ -8,11 +8,6 @@ class PublicacionForm(forms.ModelForm):
     class Meta:
         model = Publicacion
 
-        fields = ['contenido']
-        widgets = {
-            'contenido': forms.Textarea(attrs={'rows': 3, 'placeholder': 'Escribe tu publicación aquí...'}),
-        }
-
         fields = ["contenido"]
         widgets = {
             "contenido": forms.Textarea(attrs={
@@ -31,21 +26,26 @@ class ComentarioCreateForm(forms.ModelForm):
     # Le ponemos una clase para poder estilizarlo o seleccionarlo con JS si es necesario
     archivo = forms.FileField(
         required=False, 
-        widget=forms.FileInput(attrs={'class': 'form-control form-control-sm mt-2'})
+        widget=forms.FileInput(attrs={
+            'class': 'form-control form-control-sm mt-2',
+            'accept': 'image/*',  # <--- CORRECCIÓN 1: ID AÑADIDO
+        })
     )
 
     class Meta:
         model = Comentario
-        fields = ["contenido"]
+        fields = ["contenido", "archivo"]
         widgets = {
             "contenido": forms.Textarea(attrs={
-                "rows": 2,
                 "class": "form-control",
-                "placeholder": "Escribe un comentario o adjunta una foto...",
+                "rows": 2,
+                "placeholder": "Escribe un comentario..."
+            }),
+            "archivo": forms.ClearableFileInput(attrs={
+                "id": "id_comentario_archivo",
+                "class": "form-control form-control-sm"
             })
         }
-        labels = {"contenido": ""}
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # 3. 🔹 Hacemos que el texto NO sea obligatorio a nivel de campo
@@ -87,4 +87,3 @@ class ComentarioCreateForm(forms.ModelForm):
         if commit:
             comentario.save()
         return comentario
-

@@ -39,17 +39,16 @@ class ArchivoAdjuntoSerializer(serializers.ModelSerializer):
         return False
 
 class ComentarioSerializer(serializers.ModelSerializer):
-    autor_username = serializers.CharField(source="autor.username", read_only=True)
+    autor = serializers.CharField(source="autor.username", read_only=True)
     fecha_creacion = serializers.DateTimeField(format="%Y-%m-%d %H:%M:%S")
-    
-    # 🔹 Campos para likes en comentarios de texto
+
     total_likes = serializers.SerializerMethodField()
     me_gusta_usuario = serializers.SerializerMethodField()
 
     class Meta:
         model = Comentario
         fields = (
-            "id", "autor_username", "contenido", 
+            "id", "autor", "contenido",
             "fecha_creacion", "parent",
             "total_likes", "me_gusta_usuario"
         )
@@ -62,6 +61,7 @@ class ComentarioSerializer(serializers.ModelSerializer):
         if request and request.user.is_authenticated:
             return obj.likes.filter(pk=request.user.pk).exists()
         return False
+
 
 class ComentarioCreateSerializer(serializers.Serializer):
     # Este serializer solo se usa para validar la entrada (POST)

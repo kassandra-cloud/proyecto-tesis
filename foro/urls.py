@@ -34,4 +34,7 @@ urlpatterns = [
     path("comentario/<int:pk>/reaccionar/", views.reaccionar_comentario_web, name="reaccionar_comentario_web"),
     path('api/v1/adjuntos/<int:pk>/', views.api_eliminar_adjunto, name='api_eliminar_adjunto'),
     path('api/v1/adjuntos/<int:pk>/like/', views.api_toggle_like_adjunto, name='api_toggle_like_adjunto'),
+    path("adjunto/<int:pk>/reaccionar/", views.reaccionar_adjunto_web, name="reaccionar_adjunto_web"),
+    path("adjunto/<int:pk>/eliminar/", views.eliminar_adjunto_web, name="eliminar_adjunto_web"),
+
 ]
