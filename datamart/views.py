@@ -13,6 +13,7 @@ from django.shortcuts import render, redirect
 from django.template.loader import get_template
 from django.utils import timezone
 from xhtml2pdf import pisa
+
 from datamart.tasks import tarea_actualizar_bi_async
 
 from datamart.models import (
@@ -39,6 +40,7 @@ def es_usuario_directiva(user):
     # Si quieres restringir a grupo "Directiva", puedes usar:
     # return user.is_authenticated and (user.is_staff or user.groups.filter(name="Directiva").exists())
     return user.is_authenticated
+
 
 def construir_datos_panel_bi(mes=None, anio=None):
     """
@@ -112,56 +114,34 @@ def construir_datos_panel_bi(mes=None, anio=None):
     }
 
     # 4) DEMOGRAFÍA POR SECTOR filtrada POR ACTIVIDAD en el período
-    #
-    # En vez de tomar a TODOS los vecinos,
-    # tomamos solo los que tuvieron alguna actividad en:
-    # - Inscripción a talleres
-    # - Asistencia a reuniones
-    # - Participación en votaciones
-    # - Consulta de actas
     vecinos_ids_actividad = set()
 
     # Inscripciones
     ins_qs = FactInscripcionTaller.objects.all()
     ins_qs = filtrar_por_fecha(ins_qs, "fecha_inscripcion")
-    vecinos_ids_actividad.update(
-        ins_qs.values_list("vecino_id", flat=True)
-    )
+    vecinos_ids_actividad.update(ins_qs.values_list("vecino_id", flat=True))
 
     # Asistencia
     asis_qs = FactAsistenciaReunion.objects.all()
     asis_qs = filtrar_por_fecha(asis_qs, "reunion__fecha")
-    vecinos_ids_actividad.update(
-        asis_qs.values_list("vecino_id", flat=True)
-    )
+    vecinos_ids_actividad.update(asis_qs.values_list("vecino_id", flat=True))
 
     # Votaciones
     voto_qs_ids = FactParticipacionVotacion.objects.all()
     voto_qs_ids = filtrar_por_fecha(voto_qs_ids, "fecha_voto")
-    vecinos_ids_actividad.update(
-        voto_qs_ids.values_list("vecino_id", flat=True)
-    )
+    vecinos_ids_actividad.update(voto_qs_ids.values_list("vecino_id", flat=True))
 
     # Consultas de actas
     cons_qs_ids = FactConsultaActa.objects.all()
     cons_qs_ids = filtrar_por_fecha(cons_qs_ids, "fecha_consulta")
-    vecinos_ids_actividad.update(
-        cons_qs_ids.values_list("vecino_id", flat=True)
-    )
+    vecinos_ids_actividad.update(cons_qs_ids.values_list("vecino_id", flat=True))
 
     if vecinos_ids_actividad:
-        vecinos_demografia = DimVecino.objects.filter(
-            id__in=vecinos_ids_actividad
-        )
+        vecinos_demografia = DimVecino.objects.filter(id__in=vecinos_ids_actividad)
     else:
-        # Si no hubo actividad en el periodo, dejamos 0 para todos
         vecinos_demografia = DimVecino.objects.none()
 
-    vecinos_demografia = DimVecino.objects.all()
-
-    # Opcional: Si quisieras ver SOLO la demografía de los "Participantes del mes",
-    # podrías descomentar la lógica anterior, pero para un panel general
-    # es mejor ver el universo completo.
+    # ✅ IMPORTANTE: ya NO sobrescribimos con DimVecino.objects.all() (eso rompía el filtro)
 
     data_demografia_sector = list(
         vecinos_demografia
@@ -173,12 +153,10 @@ def construir_datos_panel_bi(mes=None, anio=None):
     # Limpiar números de las direcciones para agrupar mejor (Ej: "Pasaje 1 #123" -> "Pasaje 1")
     for row in data_demografia_sector:
         original = row["direccion_sector"] or ""
-        # Regex simple para quitar números al final
-        solo_texto = re.sub(r"\d+$", "", original).strip() 
-        # Si queda vacío, poner "Sin Dirección"
+        solo_texto = re.sub(r"\d+$", "", original).strip()
         row["direccion_sector"] = solo_texto if len(solo_texto) > 2 else (original or "Sin Dirección")
 
-    # 5) ASISTENCIA A REUNIONES (ya la tenías filtrada, la dejamos igual pero con helper)
+    # 5) ASISTENCIA A REUNIONES
     asistencia_qs = FactAsistenciaReunion.objects.all()
     asistencia_qs = filtrar_por_fecha(asistencia_qs, "reunion__fecha")
 
@@ -198,6 +176,7 @@ def construir_datos_panel_bi(mes=None, anio=None):
     ]
 
     # 6) MÉTRICAS TÉCNICAS (último registro)
+    # ⚠️ Esto NO se filtra por mes/año. Si quieres filtrarlo por periodo, dime el campo fecha de FactMetricasDiarias.
     metricas = FactMetricasDiarias.objects.last()
 
     # 7) PRECISIÓN PROMEDIO (solo actas del periodo)
@@ -259,31 +238,20 @@ def construir_datos_panel_bi(mes=None, anio=None):
         "detalle_disponibilidad": detalle_disponibilidad,
     }
 
+
 @login_required
 @user_passes_test(es_usuario_directiva)
 def panel_bi_view(request):
-    
-    # Definimos una clave única para el "cooldown"
-    CACHE_KEY_COOLDOWN = 'cooldown_etl_bi'
-    TIEMPO_COOLDOWN_SEGUNDOS = 300  # 5 minutos (ajustable)
+    # --- Cooldown ETL (Celery) ---
+    CACHE_KEY_COOLDOWN = "cooldown_etl_bi"
+    TIEMPO_COOLDOWN_SEGUNDOS = 300  # 5 minutos
 
-    # Verificamos si estamos en periodo de enfriamiento
     if not cache.get(CACHE_KEY_COOLDOWN):
-        print(" Disparando actualización BI en segundo plano...")
-        
-        # 1. Lanzamos la tarea a Celery (no bloquea la pantalla)
         tarea_actualizar_bi_async.delay()
-        
-        # 2. Activamos el cooldown para no repetir esto por 5 minutos
         cache.set(CACHE_KEY_COOLDOWN, True, TIEMPO_COOLDOWN_SEGUNDOS)
-        
-        # Opcional: Avisar al usuario
-        messages.info(request, " Actualizando datos en segundo plano... Recarga en unos instantes.")
+        messages.info(request, "Actualizando datos en segundo plano... Recarga en unos instantes.")
 
-
-@login_required
-@user_passes_test(es_usuario_directiva)
-def panel_bi_view(request):
+    # --- Filtros ---
     mes = request.GET.get("mes")
     anio = request.GET.get("anio")
     try:
@@ -333,7 +301,6 @@ def panel_bi_view(request):
 def ejecutar_etl_view(request):
     if request.method == "POST":
         try:
-            # Usas tu management command existente
             call_command("procesar_etl")
             messages.success(request, "Datos actualizados.")
         except Exception as e:

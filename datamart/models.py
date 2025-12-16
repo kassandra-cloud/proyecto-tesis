@@ -95,7 +95,7 @@ class LogRendimiento(models.Model):
     metodo = models.CharField(max_length=10) # GET o POST
     tiempo_ms = models.IntegerField(help_text="Milisegundos que tardó")
     fecha = models.DateTimeField(auto_now_add=True)
-    # 👇 NUEVO CAMPO: Para guardar el código (200, 404, 500)
+    #  NUEVO CAMPO: Para guardar el código (200, 404, 500)
     status_code = models.IntegerField(default=200) 
     fecha = models.DateTimeField(auto_now_add=True)
 

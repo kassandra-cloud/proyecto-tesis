@@ -27,48 +27,6 @@
         {% endfor %}
     {% endif %}
 
-    <!-- Filtros de asistencia -->
-    <div class="card mb-4 border-0 bg-light shadow-sm">
-        <div class="card-body py-2">
-            <form method="get" class="row g-2 align-items-center">
-                <div class="col-auto fw-bold text-secondary">
-                    <i class="fas fa-filter me-1"></i> Filtrar Asistencia:
-                </div>
-                
-                <div class="col-auto">
-                    <select name="mes" class="form-select form-select-sm">
-                        <option value="">Todos los Meses</option>
-                        {% for m in meses_opciones %}
-                            <option value="{{ m.num }}" {% if m.num == mes_seleccionado %}selected{% endif %}>
-                                {{ m.nombre }}
-                            </option>
-                        {% endfor %}
-                    </select>
-                </div>
-                
-                <div class="col-auto">
-                    <select name="anio" class="form-select form-select-sm">
-                        <option value="">Todos los Años</option>
-                        {% for a in anios_opciones %}
-                            <option value="{{ a }}" {% if a == anio_seleccionado %}selected{% endif %}>
-                                {{ a }}
-                            </option>
-                        {% endfor %}
-                    </select>
-                </div>
-                
-                <div class="col-auto">
-                    <button type="submit" class="btn btn-sm btn-secondary">Aplicar</button>
-                    {% if mes_seleccionado or anio_seleccionado %}
-                        <a href="{% url 'panel_bi' %}" class="btn btn-sm btn-outline-secondary ms-1">
-                            <i class="fas fa-times"></i> Limpiar
-                        </a>
-                    {% endif %}
-                </div>
-            </form>
-        </div>
-    </div>
-
     <!-- Tarjetas KPI -->
     <div class="row mb-4">
         <!-- Disponibilidad -->
@@ -366,7 +324,7 @@ document.addEventListener('DOMContentLoaded', function() {
         JSON.parse('{{ data_consulta_actas|safe }}' || "[]"),
         JSON.parse('{{ data_participacion|safe }}' || "{}"),
         JSON.parse('{{ data_demografia_sector|safe }}' || "[]"),
-        JSON.parse('{{ data_asistencia|safe }}' || "[]"),
+        JSON.parse('{{ data_asistencia|safe }}' || "[]")
     );
 });
 </script>
