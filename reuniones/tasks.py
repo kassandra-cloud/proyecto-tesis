@@ -9,13 +9,6 @@ import traceback
 import logging
 from django.conf import settings
 from django.utils import timezone
-from django.shortcuts import get_object_or_404 # <-- NUEVA IMPORTACIÓN
-from django.utils.text import slugify # <-- NUEVA IMPORTACIÓN
-from django.core.mail import EmailMessage # <-- NUEVA IMPORTACIÓN
-from django.template.loader import get_template # <-- NUEVA IMPORTACIÓN
-from io import BytesIO # <-- NUEVA IMPORTACIÓN
-from xhtml2pdf import pisa # <-- NUEVA IMPORTACIÓN
-
 from .models import Acta, Reunion
 from core.models import Perfil, DispositivoFCM
 from vosk import Model, KaldiRecognizer
@@ -67,27 +60,7 @@ def inicializar_firebase():
     return firebase_app
 
 
-# Funciones Auxiliares para PDF (Movidas aquí para que Celery pueda accederlas)
-def _pdf_bytes_desde_xhtml(template_path: str, context: dict) -> bytes:
-    """
-    Renderiza un template HTML a PDF (bytes) usando xhtml2pdf.
-    Devuelve bytes del PDF listo para adjuntar.
-    """
-    template = get_template(template_path)
-    html = template.render(context)
-
-    result = BytesIO()
-    # pisa.pisaDocument es la operación pesada
-    pdf = pisa.pisaDocument(BytesIO(html.encode("UTF-8")), dest=result, encoding='UTF-8')
-
-    if not pdf.err:
-        return result.getvalue()
-    logger.error(f"Error al generar PDF en Celery: {pdf.err}")
-    return b""
-
-
-# Tareas de notificacion
-
+#Tareas de notificacion
 def _obtener_tokens_dispositivos():
     """
     Obtiene TODOS los tokens registrados en DispositivoFCM (multi-dispositivo).
@@ -233,7 +206,7 @@ def procesar_audio_vosk(acta_pk):
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f_out:
             output_wav_path = f_out.name
 
-        # Convertir con FFMPEG (proceso CPU intensivo)
+        # Convertir con FFMPEG
         (
             ffmpeg
             .input(input_webm_path)
@@ -249,7 +222,7 @@ def procesar_audio_vosk(acta_pk):
             .run(capture_stdout=True, capture_stderr=True, overwrite_output=True)
         )
 
-        # Transcribir (proceso CPU intensivo)
+        # Transcribir
         wf = wave.open(output_wav_path, "rb")
         rec = KaldiRecognizer(vosk_model, wf.getframerate())
         rec.SetWords(True)
@@ -286,57 +259,4 @@ def procesar_audio_vosk(acta_pk):
             a.save()
         except:
             pass
-        logger.error(f"Error procesando audio para acta {acta_pk}: {traceback.format_exc()}")
         return f"Error procesando: {e}"
-
-
-# Tarea de generación y envío de PDF (Offloading de la vista HTTP)
-@shared_task
-def generar_y_enviar_acta_pdf_async(reunion_pk, correos):
-    """
-    Tarea asíncrona CRÍTICA: Genera el PDF (pesado) y envía correos (lento).
-    """
-    try:
-        # Optimización: Cargar la reunión y el acta en una sola consulta
-        reunion = Reunion.objects.select_related('acta').get(pk=reunion_pk)
-        acta = reunion.acta
-    except (Reunion.DoesNotExist, Acta.DoesNotExist):
-        logger.error(f"No se encontró Reunión o Acta para PK {reunion_pk} durante el envío.")
-        return
-
-    # 1. Generar PDF (Operación que era lenta en el hilo HTTP)
-    pdf_bytes = _pdf_bytes_desde_xhtml(
-        "reuniones/acta_pdf_template.html",
-        {"reunion": reunion, "acta": acta}
-    )
-
-    if not pdf_bytes:
-        logger.error(f"Fallo al generar PDF para reunion PK {reunion_pk}")
-        return
-
-    filename = f"Acta_{slugify(getattr(reunion, 'titulo', f'reunion-{reunion.pk}'))}.pdf"
-    
-    # 2. Enviar correos (Operación lenta en el hilo HTTP)
-    enviados = 0
-    for correo in correos:
-        # Usamos EmailMessage para enviar el correo con el PDF adjunto
-        msg = EmailMessage(
-            subject=f"Acta de Reunión: {reunion.titulo}",
-            body=f"""
-                <p>Estimado/a vecino/a,</p>
-                <p>Se adjunta el acta oficial de la reunión <strong>{reunion.titulo}</strong>.</p>
-                <p>Saludos cordiales,<br>La Directiva</p>
-            """,
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            to=[correo],
-        )
-        msg.content_subtype = "html"
-        msg.attach(filename, pdf_bytes, 'application/pdf')
-        
-        try:
-            msg.send() # Envío de correo síncrono (dentro de la tarea Celery)
-            enviados += 1
-        except Exception as e:
-            logger.error(f"Fallo al enviar correo a {correo}: {e}")
-
-    logger.info(f"Acta {reunion_pk} enviada con éxito a {enviados} destinatarios.")
