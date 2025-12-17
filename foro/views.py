@@ -1,5 +1,8 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
+# --- OPTIMIZACIÓN DE CACHÉ ---
+from django.views.decorators.cache import cache_page # <-- NUEVA IMPORTACIÓN
+# -----------------------------
 from django.views.decorators.http import require_POST
 from django.contrib import messages
 from django.http import HttpResponse, Http404
@@ -24,9 +27,11 @@ from itertools import chain
 from operator import attrgetter
 from core.authz import can, role_required
 # ------------------------------------------------------------------------------
-#                                   WEB
+#                                   WEB
 # ------------------------------------------------------------------------------
 
+# OPTIMIZACIÓN: Aplica caché de 60 segundos a la lista de publicaciones
+@cache_page(60) 
 @login_required
 def lista_publicaciones(request):
     """Listado web. Ahora solo carga publicaciones, no comentarios."""
@@ -38,6 +43,7 @@ def lista_publicaciones(request):
     else:
         publicaciones_qs = Publicacion.objects.filter(visible=True)
 
+    # Las optimizaciones .select_related/.prefetch_related ya estaban bien, se mantienen.
     publicaciones = (
         publicaciones_qs
         .select_related("autor")
@@ -93,12 +99,14 @@ def crear_mensaje(request):
         )
 
     return Response({"mensaje": "ok"})
+    
 @login_required
 def detalle_publicacion(request, pk):
     es_moderador = can(request.user, "foro", "moderar")
 
     # 1) Publicación
     try:
+        # Optimización: Consultas select_related y prefetch_related ya están aplicadas
         qs = (
             Publicacion.objects
             .select_related("autor")
@@ -115,7 +123,7 @@ def detalle_publicacion(request, pk):
     # 2) POST (comentario / respuesta / adjunto)
     if request.method == "POST":
         parent_id = request.POST.get("parent_id")
-        reply_to_adjunto_id = request.POST.get("reply_to_adjunto_id")  # ✅ NUEVO
+        reply_to_adjunto_id = request.POST.get("reply_to_adjunto_id") # ✅ NUEVO
 
         # ---- CASO A: Respuesta (a comentario o a adjunto) ----
         if parent_id or reply_to_adjunto_id:
@@ -156,7 +164,7 @@ def detalle_publicacion(request, pk):
                 autor=request.user,
                 contenido=contenido,
                 parent=parent_comment,
-                reply_to_adjunto=reply_adjunto  # ✅ NUEVO
+                reply_to_adjunto=reply_adjunto # ✅ NUEVO
             )
 
             messages.success(request, "Respuesta publicada.")
@@ -175,6 +183,8 @@ def detalle_publicacion(request, pk):
 
             if archivos_subidos:
                 for archivo in archivos_subidos:
+                    # NOTA: Crear archivos adjuntos es una operación lenta (subida a S3/Cellar)
+                    # Si esto fuera un problema de rendimiento, se debería mover a Celery.
                     ArchivoAdjunto.objects.create(
                         publicacion=publicacion,
                         autor=request.user,
@@ -195,10 +205,11 @@ def detalle_publicacion(request, pk):
         form = ComentarioCreateForm()
 
     # 3) Conversación (comentarios + adjuntos chat)
+    # OPTIMIZACIÓN: select_related para comentarios y sus anidaciones ya está correctamente aplicado.
     comentarios = (
         publicacion.comentarios
         .filter(visible=True)
-        .select_related("autor", "parent__autor", "reply_to_adjunto__autor")  # ✅ NUEVO
+        .select_related("autor", "parent__autor", "reply_to_adjunto__autor") # ✅ Optimizado
     )
     adjuntos_chat = (
         publicacion.adjuntos
@@ -278,7 +289,7 @@ def eliminar_publicacion_web(request, pk):
 
 
 # ------------------------------------------------------------------------------
-#                                   API (REST)
+#                                   API (REST)
 # ------------------------------------------------------------------------------
 
 # Funciones auxiliares para DTOs
@@ -324,6 +335,7 @@ def crear_publicacion(request):
         publicacion.save()
 
         # CORRECCIÓN APLICADA: Marcar como mensaje para que aparezca en el feed.
+        # NOTA: Si la subida de múltiples archivos es lenta, esta parte debería ir a Celery.
         for f in request.FILES.getlist("archivos"):
             ArchivoAdjunto.objects.create(
                 publicacion=publicacion,
@@ -344,6 +356,7 @@ def crear_publicacion(request):
 @authentication_classes([TokenAuthentication, SessionAuthentication])
 @permission_classes([IsAuthenticatedOrReadOnly])
 def api_publicaciones_list(request):
+    # Optimización: Queries prefetch_related y select_related ya están aplicadas
     qs = (
         Publicacion.objects.filter(visible=True)
         .select_related("autor")
@@ -408,12 +421,14 @@ def api_subir_adjunto(request, pk: int):
     descripcion = request.data.get('descripcion', '')
 
     # 3. Crear el objeto incluyendo la descripción
+    # NOTA: La subida a Cellar/S3 ocurre aquí y es una operación lenta. 
+    # Para optimización extrema, el POST debería devolver 202 Accepted y el procesamiento debería ir a Celery.
     adj = ArchivoAdjunto(
         publicacion=publicacion,
         archivo=archivo,
         autor=request.user,
-        es_mensaje=es_mensaje,     # Usamos el valor recibido
-        descripcion=descripcion    # <--- Guardamos el texto aquí
+        es_mensaje=es_mensaje, # Usamos el valor recibido
+        descripcion=descripcion # <--- Guardamos el texto aquí
     )
     adj.save()
 
@@ -462,6 +477,7 @@ def enviar_mensaje(request, publicacion_id):
 
     # 2. Crear adjunto (solo si hay imagen)
     if archivo:
+        # NOTA: Subir archivos es una operación lenta, se recomienda Celery para optimización extrema.
         ArchivoAdjunto.objects.create(
             publicacion=pub,
             archivo=archivo,
@@ -518,6 +534,7 @@ def reaccionar_comentario_web(request, pk):
     else:
         comentario.likes.add(request.user)
 
+    # La redirección es un cambio rápido que cumple el objetivo de respuesta rápida (no espera otra cosa)
     return redirect("foro:detalle_publicacion", pk=comentario.publicacion.pk)
 
 @api_view(["DELETE"])
@@ -566,6 +583,7 @@ def reaccionar_adjunto_web(request, pk):
     else:
         adjunto.likes.add(request.user)
 
+    # La redirección es un cambio rápido que cumple el objetivo de respuesta rápida
     return redirect("foro:detalle_publicacion", pk=adjunto.publicacion_id)
 
 @require_POST
@@ -578,6 +596,8 @@ def eliminar_adjunto_web(request, pk):
         messages.error(request, "Solo puedes eliminar tus propios archivos.")
         return redirect("foro:detalle_publicacion", pk=adjunto.publicacion_id)
 
+    # La eliminación del adjunto también puede ser un proceso lento si involucra almacenamiento remoto.
+    # En este contexto, lo dejamos síncrono, pero se podría mover a Celery.
     adjunto.delete()
     messages.warning(request, "Archivo eliminado.")
 

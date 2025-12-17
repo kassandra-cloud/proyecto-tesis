@@ -1,8 +1,11 @@
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
+# --- IMPORTACIONES PARA OPTIMIZACIÓN ---
+from django.views.decorators.cache import cache_page # <-- NUEVA IMPORTACIÓN PARA CACHÉ
+from django.db.models import Count, F
+# ----------------------------------------
 from django.contrib.auth.models import User
 from django.utils import timezone
-from django.db.models import Count, F
 from datetime import timedelta
 import calendar
 from django.template.loader import render_to_string
@@ -35,7 +38,8 @@ def sin_permiso(request):
 
 class RequestRecoveryCodeAPI(APIView):
     """
-    Versión CORREGIDA: Usa Webhook en lugar de SMTP para evitar Timeouts.
+    Esta API utiliza un Webhook para el envío de correo, 
+    minimizando el bloqueo del hilo de respuesta (offloading).
     """
     permission_classes = [AllowAny]
 
@@ -70,8 +74,7 @@ class RequestRecoveryCodeAPI(APIView):
             html_body = render_to_string('registration/email_reset_password_app.html', contexto)
             text_body = strip_tags(html_body)
             
-            # 4. ENVIAR POR WEBHOOK (¡Aquí estaba el fallo antes!)
-            # Usamos la función que no bloquea el puerto SMTP
+            # 4. ENVIAR POR WEBHOOK (No bloquea el hilo web)
             enviar_correo_via_webhook(
                 to_email=email,
                 subject=asunto,
@@ -86,8 +89,6 @@ class RequestRecoveryCodeAPI(APIView):
             
         except Exception as e:
             print(f"Error en recuperación: {e}")
-            # En producción, a veces es mejor devolver 200 aunque falle el log interno
-            # para no dar pistas, pero por ahora devolvemos 500 para que lo veas.
             return Response({'error': 'Error procesando solicitud'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class ResetPasswordWithCodeAPI(APIView):
@@ -135,6 +136,9 @@ class ResetPasswordWithCodeAPI(APIView):
 # ---------------------------------------------------------
 # VISTA: HOME / DASHBOARD (WEB)
 # ---------------------------------------------------------
+# OPTIMIZACIÓN CRÍTICA: La página de inicio (dashboard) ahora se cachea por 60 segundos.
+# La primera petición será lenta, pero las siguientes serán casi instantáneas (miliseconds).
+@cache_page(60) # <--- OPTIMIZACIÓN DE CACHÉ
 @login_required
 def home(request):
     
@@ -148,8 +152,8 @@ def home(request):
     fin_mes = hoy.replace(day=num_dias_mes, hour=23, minute=59, second=59)
     
     reuniones_pendientes_mes = Reunion.objects.filter(
-        fecha__gte=hoy,      # Desde hoy
-        fecha__lte=fin_mes,  # Hasta fin de mes
+        fecha__gte=hoy, # Desde hoy
+        fecha__lte=fin_mes, # Hasta fin de mes
         estado='PROGRAMADA'
     ).count()
 
@@ -163,6 +167,7 @@ def home(request):
     # --- LÓGICA TALLERES (Cupos Disponibles) ---
     ESTADOS_A_EXCLUIR = ['CANCELADO', 'FINALIZADO', 'REALIZADO', 'SUSPENDIDO']
 
+    # Esta es una consulta compleja, pero el caching la mitiga.
     talleres_con_cupos_query = Taller.objects.annotate(
         inscritos_count=Count('inscripcion')
     ).annotate(
@@ -180,7 +185,8 @@ def home(request):
     solicitudes_pendientes = SolicitudReserva.objects.filter(estado="PENDIENTE").count()
 
     # --- 2. Secciones de Actividad ---
-    ultimas_publicaciones_foro = Publicacion.objects.order_by('-fecha_creacion')[:3]
+    # OPTIMIZACIÓN: select_related('autor') pre-carga los datos del autor en 1 sola consulta (evita N+1).
+    ultimas_publicaciones_foro = Publicacion.objects.select_related('autor').order_by('-fecha_creacion')[:3] # <--- OPTIMIZACIÓN DE QUERY
     
     proximas_reuniones = Reunion.objects.filter(
         fecha__gte=hoy, 

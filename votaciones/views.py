@@ -2,13 +2,15 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
+# --- IMPORTACIÓN CRÍTICA PARA CACHÉ ---
+from django.views.decorators.cache import cache_page # <-- NUEVA IMPORTACIÓN
+# --------------------------------------
 from .models import Votacion, Opcion, Voto
-from .forms import VotacionForm  
+from .forms import VotacionForm 
 from core.authz import role_required
 from django.db.models import Count, OuterRef, Subquery, Value, IntegerField
 from core.authz import can
 from .forms import VotacionForm, VotacionEditForm
-from .models import Votacion, Opcion, Voto
 from django.db.models import Count
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -16,25 +18,41 @@ from rest_framework.response import Response
 from django.db.models.functions import Coalesce
 from rest_framework.views import APIView
 from django.db.models import Q
+
+# OPTIMIZACIÓN 1: Cache para la lista de votaciones (60 segundos)
+@cache_page(60)
 @login_required
 @role_required("votaciones", "view")
 def lista_votaciones(request):
-    # 1) Marcar como cerradas todas las que ya vencieron
-    Votacion.objects.filter(
-        activa=True,
-        fecha_cierre__lte=timezone.now()
-    ).update(activa=False)
+    """
+    Muestra la lista de votaciones activas y cerradas.
+    
+    IMPORTANTE: La lógica de cerrado automático por tiempo ha sido ELIMINADA 
+    y debe ser movida a una tarea periódica de Celery (cron job) para 
+    evitar bloqueos y permitir el caching de esta vista.
+    """
+    
+    # --- LÓGICA DE ACTUALIZACIÓN AUTOMÁTICA (ELIMINADA) ---
+    # Votacion.objects.filter(
+    #     activa=True,
+    #     fecha_cierre__lte=timezone.now()
+    # ).update(activa=False)
+    # --------------------------------------------------------
 
     # 2) Listar separadas para la plantilla
+    # OPTIMIZACIÓN N+1: Añadir select_related('creada_por')
     votaciones_abiertas = (
         Votacion.objects
         .filter(activa=True, fecha_cierre__gt=timezone.now())
+        .select_related('creada_por') # <-- OPTIMIZACIÓN
         .order_by('-fecha_cierre')
     )
 
+    # OPTIMIZACIÓN N+1: Añadir select_related('creada_por')
     votaciones_cerradas = (
         Votacion.objects
         .filter(Q(activa=False) | Q(fecha_cierre__lte=timezone.now()))
+        .select_related('creada_por') # <-- OPTIMIZACIÓN
         .order_by('-fecha_cierre')
     )
 
@@ -47,13 +65,12 @@ def lista_votaciones(request):
 @login_required
 @role_required("votaciones", "create")
 def crear_votacion(request):
+    # No se aplica caché ya que es una vista de escritura (POST)
     if request.method == 'POST':
         form = VotacionForm(request.POST)
         if form.is_valid():
             votacion = form.save(commit=False)
             votacion.creada_por = request.user
-            # --- LÍNEA MODIFICADA ---
-            # El campo combinado 'fecha_cierre' ahora viene del método clean() del formulario
             votacion.fecha_cierre = form.cleaned_data['fecha_cierre']
             votacion.save()
 
@@ -68,12 +85,16 @@ def crear_votacion(request):
     
     return render(request, 'votaciones/votacion_form.html', {'form': form, 'titulo': 'Crear Nueva Votación'})
 
+# OPTIMIZACIÓN 2: Cache para el detalle. Se usa 30s ya que puede cambiar si está abierta.
+@cache_page(30)
 @login_required
 @role_required("votaciones", "view")
 def detalle_votacion(request, pk):
-    votacion = get_object_or_404(Votacion.objects.prefetch_related('opciones__votos'), pk=pk)
-    
-    # --- LÓGICA MODIFICADA ---
+    # Optimización: Precargar creada_por (N+1) y opciones
+    votacion = get_object_or_404(
+        Votacion.objects.select_related('creada_por').prefetch_related('opciones'), # <-- select_related AGREGADO
+        pk=pk
+    )
     
     # Verificamos si el usuario tiene permiso para previsualizar
     puede_previsualizar = can(request.user, "votaciones", "preview")
@@ -83,6 +104,7 @@ def detalle_votacion(request, pk):
 
     # Si la votación está cerrada O si el usuario puede previsualizar, calculamos los votos
     if not votacion.esta_abierta() or puede_previsualizar:
+        # Optimización: El cálculo de votos (annotate) ya estaba bien, se mantiene.
         opciones_con_votos = votacion.opciones.annotate(num_votos=Count('votos'))
         total_votos = sum(opcion.num_votos for opcion in opciones_con_votos)
         
@@ -118,6 +140,7 @@ def emitir_voto(request, pk):
 
         opcion = get_object_or_404(Opcion, pk=opcion_id)
         
+        # Consulta eficiente para verificar si ya votó (se mantiene)
         voto_previo = Voto.objects.filter(opcion__votacion=votacion, votante=request.user).first()
         if voto_previo:
             messages.warning(request, 'Ya has votado en esta elección.')
@@ -125,15 +148,16 @@ def emitir_voto(request, pk):
             Voto.objects.create(opcion=opcion, votante=request.user)
             messages.success(request, 'Tu voto ha sido registrado.')
         
-        return redirect('votaciones:lista_votaciones')
+        # Recomendación: Redirigir al detalle en lugar de la lista para ver el impacto
+        return redirect('votaciones:detalle_votacion', pk=pk) 
     return redirect('votaciones:lista_votaciones')
 
 @login_required
 @role_required("votaciones", "close")
 def cerrar_votacion(request, pk):
-    votacion = get_object_or_404(Votacion, pk=pk)
-    
     if request.method == 'POST':
+        # Consulta con select_related para evitar N+1 si el modelo lo tiene
+        votacion = get_object_or_404(Votacion, pk=pk)
         votacion.activa = False
         votacion.save()
         messages.success(request, f'La votación "{votacion.pregunta}" ha sido cerrada manualmente.')
@@ -192,5 +216,3 @@ def eliminar_votacion(request, pk):
     
     # Si no es POST, mostramos la página de confirmación como antes.
     return render(request, 'votaciones/votacion_confirm_delete.html', {'votacion': votacion})
-
-

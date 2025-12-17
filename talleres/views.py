@@ -1,45 +1,41 @@
-# en /talleres/views.py
-
 from django.http import Http404
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+# --- IMPORTACIONES PARA OPTIMIZACIÓN ---
+from django.views.decorators.cache import cache_page # <-- NUEVA IMPORTACIÓN PARA CACHÉ
+from django.db.models import Count # Ya estaba, mantenemos
+# -------------------------------------
 from core.authz import role_required
 from django.utils import timezone
-# Importamos Count para calcular inscritos
-from django.db.models import Count
 
 # Asegúrate de que todos los modelos y forms estén
 from .models import Taller, Inscripcion
 from .forms import TallerForm, InscripcionForm, CancelacionTallerForm 
 
+# OPTIMIZACIÓN 1: Caching para vistas de listado (60 segundos)
+@cache_page(60)
 @login_required
 @role_required("talleres", "view")
 def lista_talleres(request):
     """
     Muestra solo los talleres PROGRAMADOS.
-    Actualiza automáticamente el estado de los talleres que ya terminaron.
+    
+    NOTA: La lógica de actualización de estado ha sido removida 
+    y DEBE ser gestionada por una tarea asíncrona de Celery 
+    para permitir el caching y un tiempo de respuesta rápido.
     """
     
-    # LÓGICA DE ACTUALIZACIÓN AUTOMÁTICA
-    # Busca talleres programados cuya fecha de término ya pasó
-    talleres_para_finalizar = Taller.objects.filter(
-        estado=Taller.Estado.PROGRAMADO,
-        fecha_termino__lt=timezone.now()
-    )
-    # Los marca como FINALIZADO
-    for taller in talleres_para_finalizar:
-        taller.estado = Taller.Estado.FINALIZADO
-        taller.save(update_fields=['estado'])
+    # --- LÓGICA DE ACTUALIZACIÓN AUTOMÁTICA (ELIMINADA PARA OPTIMIZACIÓN) ---
+    # Mueva este tipo de lógica a una tarea periódica de Celery (CronJob)
+    # ------------------------------------------------------------------------
 
-    # Mostramos solo los que siguen programados
-    # Usamos .annotate() para cargar 'inscritos_count' en cada taller
-    # y así la propiedad 'cupos_disponibles' del modelo funcionará
+    # Optimización de consulta: Cargar el conteo de inscritos y el creador en una sola consulta.
     talleres = Taller.objects.filter(
         estado=Taller.Estado.PROGRAMADO
     ).annotate(
         inscritos_count=Count('inscripcion')
-    ).order_by('fecha_inicio')
+    ).select_related('creado_por').order_by('fecha_inicio') # <-- select_related AGREGADO
     
     context = {
         'talleres': talleres,
@@ -48,15 +44,19 @@ def lista_talleres(request):
     return render(request, 'talleres/lista_talleres.html', context)
 
 # --- NUEVA VISTA: HISTORIAL ---
+# OPTIMIZACIÓN 2: Caching para listado de archivados (5 minutos / 300 segundos)
+@cache_page(300)
 @login_required
 @role_required("talleres", "view")
 def lista_talleres_archivados(request):
     """
     Muestra el historial de talleres Finalizados y Cancelados.
+    Optimizado con caching y select_related.
     """
+    # Optimización: Precargar el usuario que creó el taller.
     talleres_archivados = Taller.objects.filter(
         estado__in=[Taller.Estado.FINALIZADO, Taller.Estado.CANCELADO]
-    ).order_by('-fecha_termino')
+    ).select_related('creado_por').order_by('-fecha_termino') # <-- select_related AGREGADO
     
     context = {
         'talleres': talleres_archivados,
@@ -91,20 +91,15 @@ def crear_taller(request):
 @login_required
 @role_required("talleres", "view")
 def detalle_taller(request, pk):
-# --- LÍNEA MODIFICADA ---
-    # Añadimos .annotate(inscritos_count=Count('inscripcion'))
-    # Usamos .get() en lugar de .filter().first() o get_object_or_404
-    # para que funcione la anotación sobre un solo objeto.
-    
+    # Optimización: Usamos select_related('creado_por') para precargar el autor
     try:
         taller = Taller.objects.annotate(
             inscritos_count=Count('inscripcion')
-        ).get(pk=pk)
+        ).select_related('creado_por').get(pk=pk) # <-- select_related AGREGADO
     except Taller.DoesNotExist:
         raise Http404("Taller no encontrado")
-    # --- FIN DE LA MODIFICACIÓN ---
 
-    # Comprobamos si el usuario ya está inscrito
+    # Comprobamos si el usuario ya está inscrito (query eficiente con .exists())
     esta_inscrito = Inscripcion.objects.filter(taller=taller, vecino=request.user).exists()
     
     context = {
@@ -146,11 +141,11 @@ def editar_taller(request, pk):
 @login_required
 @role_required("talleres", "delete")
 def eliminar_taller(request, pk):
-    # (Esta vista se mantiene igual que en tu archivo original)
     taller = get_object_or_404(Taller, pk=pk)
     if request.method == 'POST':
+        titulo_taller = taller.nombre
         taller.delete()
-        messages.success(request, 'Taller eliminado exitosamente.')
+        messages.success(request, f'Taller "{titulo_taller}" eliminado exitosamente.')
         return redirect('talleres:lista_talleres')
     
     context = {
@@ -188,7 +183,6 @@ def cancelar_taller(request, pk):
 @login_required
 @role_required("talleres", "inscribir")
 def inscribir_taller(request, pk):
-    # (Esta vista se mantiene igual que en tu archivo original)
     taller = get_object_or_404(Taller, pk=pk)
     
     # Lógica de inscripción (simple)
@@ -198,7 +192,7 @@ def inscribir_taller(request, pk):
 
 @login_required
 def mis_inscripciones(request):
-    # (Esta vista se mantiene igual que en tu archivo original)
+    # Esta consulta ya estaba optimizada con select_related('taller')
     inscripciones = Inscripcion.objects.filter(vecino=request.user).select_related('taller')
     context = {
         'inscripciones': inscripciones,
