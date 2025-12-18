@@ -20,12 +20,14 @@
     </div>
 
     {% if messages %}
-        {% for message in messages %}
-            <div class="alert alert-{{ message.tags }} alert-dismissible fade show">
-                {{ message }}
-            </div>
-        {% endfor %}
+    {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+        </div>
+    {% endfor %}
     {% endif %}
+
 
     <!-- Tarjetas KPI -->
     <div class="row mb-4">
@@ -44,12 +46,14 @@
             </div>
         </div>
 
-        <!-- Tiempo respuesta -->
+        <!-- Tiempo respuesta (Opción C: P95 como KPI principal) -->
         <div class="col-md-3">
             <div class="card bg-info text-white text-center p-3 shadow-sm h-100 position-relative">
-                <h2>{{ tiempo_segundos }} s</h2>
-                <div>Tiempo de Respuesta</div>
-                <span style="font-size: 0.8rem;"></span>
+                <h2>{{ tiempo_p95_seg }} s</h2>
+                <div>Tiempo de Respuesta (P95)</div>
+                <small style="font-size: 0.75rem;">
+                    Promedio: {{ tiempo_segundos }} s
+                </small>
                 <button type="button"
                         class="btn btn-sm btn-light position-absolute top-0 end-0 m-2" 
                         data-bs-toggle="modal"
@@ -208,12 +212,12 @@
       </div>
       <div class="modal-body">
         <p class="small text-muted">
-            Registro en tiempo real de cada página visitada (solo sitio web).
+            Registro de tiempos de respuesta del sistema durante el período seleccionado.
         </p>
         <table class="table table-sm table-hover" style="font-size: 0.85rem;">
             <thead>
                 <tr>
-                    <th>Página</th>
+                    <th>Página / Ruta</th>
                     <th>Usuario</th>
                     <th>Tiempo</th>
                 </tr>
@@ -228,7 +232,7 @@
                     </td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="3">No hay registros aún. Navega por la web.</td></tr>
+                <tr><td colspan="3">No hay registros aún. Navega por el sistema.</td></tr>
                 {% endfor %}
             </tbody>
         </table>

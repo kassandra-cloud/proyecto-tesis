@@ -1,6 +1,8 @@
 from django.db import models
 
-# --- DIMENSIONES ---
+# =========================
+# DIMENSIONES
+# =========================
 
 class DimVecino(models.Model):
     vecino_id_oltp = models.IntegerField(unique=True, help_text="ID original del modelo User")
@@ -12,6 +14,7 @@ class DimVecino(models.Model):
     def __str__(self):
         return self.nombre_completo
 
+
 class DimTaller(models.Model):
     taller_id_oltp = models.IntegerField(unique=True)
     nombre = models.CharField(max_length=255)
@@ -20,53 +23,107 @@ class DimTaller(models.Model):
     def __str__(self):
         return self.nombre
 
+
 class DimActa(models.Model):
     acta_id_oltp = models.IntegerField(unique=True)
     titulo = models.CharField(max_length=255)
     fecha_reunion = models.DateField()
     precision_transcripcion = models.FloatField(default=0.0, help_text="Porcentaje 0-100")
 
+    class Meta:
+        indexes = [
+            models.Index(fields=["fecha_reunion"]),
+        ]
+
     def __str__(self):
         return self.titulo
+
 
 class DimVotacion(models.Model):
     votacion_id_oltp = models.IntegerField(unique=True)
     pregunta = models.CharField(max_length=255)
     fecha_inicio = models.DateTimeField()
 
+    class Meta:
+        indexes = [
+            models.Index(fields=["fecha_inicio"]),
+        ]
+
     def __str__(self):
         return self.pregunta
+
 
 class DimReunion(models.Model):
     reunion_id_oltp = models.IntegerField(unique=True)
     titulo = models.CharField(max_length=255)
     fecha = models.DateField()
 
+    class Meta:
+        indexes = [
+            models.Index(fields=["fecha"]),
+        ]
+
     def __str__(self):
         return self.titulo
 
-# --- HECHOS ---
+
+# =========================
+# HECHOS
+# =========================
 
 class FactInscripcionTaller(models.Model):
     vecino = models.ForeignKey(DimVecino, on_delete=models.CASCADE)
     taller = models.ForeignKey(DimTaller, on_delete=models.CASCADE)
     fecha_inscripcion = models.DateTimeField()
 
+    class Meta:
+        indexes = [
+            models.Index(fields=["fecha_inscripcion"]),
+            models.Index(fields=["taller", "fecha_inscripcion"]),
+            models.Index(fields=["vecino", "fecha_inscripcion"]),
+        ]
+
+
 class FactConsultaActa(models.Model):
     vecino = models.ForeignKey(DimVecino, on_delete=models.CASCADE)
     acta = models.ForeignKey(DimActa, on_delete=models.CASCADE)
     fecha_consulta = models.DateTimeField()
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["fecha_consulta"]),
+            models.Index(fields=["acta", "fecha_consulta"]),
+            models.Index(fields=["vecino", "fecha_consulta"]),
+        ]
+
 
 class FactParticipacionVotacion(models.Model):
     vecino = models.ForeignKey(DimVecino, on_delete=models.CASCADE)
     votacion = models.ForeignKey(DimVotacion, on_delete=models.CASCADE)
     fecha_voto = models.DateTimeField()
 
+    class Meta:
+        indexes = [
+            models.Index(fields=["fecha_voto"]),
+            models.Index(fields=["votacion", "fecha_voto"]),
+            models.Index(fields=["vecino", "fecha_voto"]),
+        ]
+
+
 class FactAsistenciaReunion(models.Model):
     vecino = models.ForeignKey(DimVecino, on_delete=models.CASCADE)
     reunion = models.ForeignKey(DimReunion, on_delete=models.CASCADE)
 
-# --- ¡ESTAS SON LAS TABLAS QUE TE FALTABAN! ---
+    class Meta:
+        indexes = [
+            models.Index(fields=["reunion"]),
+            models.Index(fields=["vecino"]),
+        ]
+
+
+# =========================
+# EXTRA: CALIDAD / MÉTRICAS
+# =========================
 
 class FactCalidadTranscripcion(models.Model):
     fecha = models.DateField()
@@ -75,29 +132,57 @@ class FactCalidadTranscripcion(models.Model):
     precision_porcentaje = models.FloatField()
     origen = models.CharField(max_length=100, default="SIMULADO")
 
+    class Meta:
+        indexes = [
+            models.Index(fields=["fecha"]),
+            models.Index(fields=["origen", "fecha"]),
+        ]
+
+
 class FactMetricasDiarias(models.Model):
     fecha = models.DateField(auto_now_add=True)
     tiempo_respuesta_ms = models.IntegerField(help_text="Promedio en ms")
     disponibilidad_sistema = models.FloatField(help_text="Porcentaje 0-100")
     fallos_votacion = models.IntegerField(default=0)
 
-# Agregamos esta también por si el ETL antiguo la llama, para evitar errores
+    class Meta:
+        indexes = [
+            models.Index(fields=["fecha"]),
+        ]
+
+
+# (Opcional: la mantengo porque dijiste que un ETL antiguo podría llamarla)
 class FactMetricasTecnicas(models.Model):
     fecha = models.DateField(auto_now_add=True)
     tiempo_respuesta_ms = models.IntegerField()
     disponibilidad = models.FloatField()
     fallos_votacion = models.IntegerField(default=0)
 
-# 
+    class Meta:
+        indexes = [
+            models.Index(fields=["fecha"]),
+        ]
+
+
+# =========================
+# LOGS DE RENDIMIENTO (CLAVE PARA BI)
+# =========================
+
 class LogRendimiento(models.Model):
     usuario = models.CharField(max_length=150, null=True, blank=True)
     path = models.CharField(max_length=255, help_text="La página visitada")
-    metodo = models.CharField(max_length=10) # GET o POST
+    metodo = models.CharField(max_length=10)  # GET o POST
     tiempo_ms = models.IntegerField(help_text="Milisegundos que tardó")
+    status_code = models.IntegerField(default=200)
     fecha = models.DateTimeField(auto_now_add=True)
-    #  NUEVO CAMPO: Para guardar el código (200, 404, 500)
-    status_code = models.IntegerField(default=200) 
-    fecha = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["fecha"]),
+            models.Index(fields=["fecha", "path"]),
+            models.Index(fields=["fecha", "status_code"]),
+            models.Index(fields=["path"]),
+        ]
 
     def __str__(self):
         return f"{self.path} - {self.tiempo_ms}ms - {self.status_code}"

@@ -320,8 +320,10 @@ CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
         "LOCATION": os.environ.get('REDIS_URL', 'redis://localhost:6379/1'),
+        "TIMEOUT": 120,  # 2 minutos por defecto
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
-        }
+        },
+        "KEY_PREFIX": "tesis_bi",
     }
 }
