@@ -24,7 +24,11 @@
                 <tbody>
                     {% for taller in talleres %}
                     <tr>
-                        <td>{{ taller.nombre }}</td>
+                        <td>
+                            <a href="{% url 'talleres:detalle_taller' taller.pk %}" class="fw-bold text-decoration-none">
+                                {{ taller.nombre }}
+                            </a>
+                        </td>
                         <td>
                             {% if taller.estado == 'CANCELADO' %}
                                 <span class="badge bg-danger">{{ taller.get_estado_display }}</span>
