@@ -609,3 +609,7 @@ def web_recuperar_paso2(request):
         "¡Contraseña restablecida exitosamente! Ya puedes iniciar sesión."
     )
     return redirect('login')
+
+def alerta_movil(request):
+    """Vista de bloqueo para vecinos en la web."""
+    return render(request, 'usuarios/alerta_movil.html')

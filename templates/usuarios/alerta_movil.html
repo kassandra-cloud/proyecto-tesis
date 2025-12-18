@@ -1,0 +1,66 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acceso Restringido</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css" rel="stylesheet">
+    
+    <style>
+        body {
+            background-color: #f8f9fa;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container text-center">
+        <div class="row justify-content-center">
+            <div class="col-md-6">
+                <div class="card shadow-lg border-0">
+                    <div class="card-body p-5">
+                        <img src="{% static 'img/logo3.png' %}" alt="Logo" class="mb-4" style="max-height: 80px;">
+                        
+                        <h2 class="h4 text-danger mb-3">Solo Acceso App Móvil</h2>
+                        <p class="text-muted mb-4">
+                            Has iniciado sesión como <strong>Vecino</strong>. <br>
+                            Esta plataforma web es exclusiva para la Directiva.
+                        </p>
+
+                        <div class="d-grid gap-2">
+                            <form method="post" action="{% url 'logout' %}">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-dark w-100">
+                                    Cerrar Sesión
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Plataforma Equivocada',
+                text: 'Hola vecino. Para acceder a tus servicios, por favor utiliza la App Móvil. Esta web está restringida.',
+                confirmButtonText: 'Entendido',
+                confirmButtonColor: '#3085d6',
+                allowOutsideClick: false,
+                allowEscapeKey: false
+            });
+        });
+    </script>
+</body>
+</html>

@@ -11,6 +11,7 @@ urlpatterns = [
     path("<int:pk>/eliminar/", views.eliminar_usuario, name="eliminar_usuario"),
     path("usuarios/<int:pk>/deshabilitar/", u.deshabilitar_usuario, name="deshabilitar"),
     path("usuarios/<int:pk>/restaurar/", u.restaurar_usuario, name="restaurar"),
+    path('alerta-movil/', views.alerta_movil, name='alerta_movil'),
 
     # --- API (MOVIL) ---
     path('api/login/', views.login_api, name='login_api'),

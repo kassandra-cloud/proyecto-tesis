@@ -98,7 +98,7 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "core.middleware.ForcePasswordChangeMiddleware",
-    # Eliminado duplicado de SecurityMiddleware
+    'core.middleware.BloqueoTotalVecinosMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'proyecto_tesis.middleware.MonitorRendimientoMiddleware',
 ]
