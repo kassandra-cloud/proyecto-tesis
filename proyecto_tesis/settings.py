@@ -131,13 +131,31 @@ WSGI_APPLICATION = "proyecto_tesis.wsgi.application"
 # -----------------------------------------------------------------------------
 # Base de datos (MySQL via .env)
 # -----------------------------------------------------------------------------
+# 1. Extraemos la configuración de la URL
+db_config = dj_database_url.config(
+    default=os.getenv('DATABASE_URL', 'mysql://root:@127.0.0.1:3306/prueba'),
+    conn_max_age=600,
+    conn_health_checks=True,
+)
+
+# 2. Corregimos el problema del SSL para MySQL
+# Si estamos usando Aiven u otro servicio que requiera SSL
+if 'ssl-mode' in db_config.get('OPTIONS', {}):
+    # Quitamos el modo que causa error del diccionario principal
+    db_config['OPTIONS'].pop('ssl-mode')
+    # Añadimos la configuración correcta que mysqlclient sí entiende
+    db_config['OPTIONS']['ssl'] = {'ca': None} # 'ca': None obliga a usar SSL sin validar archivo físico
+
 DATABASES = {
-    'default': dj_database_url.config(
-        default=os.getenv('DATABASE_URL'),
-        conn_max_age=600,
-        conn_health_checks=True,
-    )
+    'default': db_config
 }
+
+# 3. Mantener opciones de compatibilidad
+DATABASES['default']['OPTIONS'].update({
+    "connect_timeout": 10,
+    "charset": "utf8mb4",
+    "init_command": "SET sql_mode='STRICT_TRANS_TABLES'",
+})
 
 # -----------------------------------------------------------------------------
 # Password validators
