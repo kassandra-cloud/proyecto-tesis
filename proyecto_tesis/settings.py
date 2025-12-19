@@ -15,7 +15,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Cargar variables desde .env en la raíz del proyecto
 load_dotenv(os.path.join(BASE_DIR, '.env'))
-
+import dj_database_url
 
 # -------------------------------------------------------------------
 # Seguridad / Debug
@@ -132,23 +132,12 @@ WSGI_APPLICATION = "proyecto_tesis.wsgi.application"
 # Base de datos (MySQL via .env)
 # -----------------------------------------------------------------------------
 DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.mysql",
-        "NAME": os.getenv("MYSQL_DATABASE", "prueba"),
-        "USER": os.getenv("MYSQL_USER", "root"),
-        "PASSWORD": os.getenv("MYSQL_PASSWORD", ""),
-        "HOST": os.getenv("MYSQL_HOST", "127.0.0.1"),
-        "PORT": os.getenv("MYSQL_PORT", "3306"),
-        "CONN_MAX_AGE": 0 if DEBUG else 60,
-        "CONN_HEALTH_CHECKS": True,
-        "OPTIONS": {
-            "connect_timeout": 10,
-            "charset": "utf8mb4",
-            "init_command": "SET sql_mode='STRICT_TRANS_TABLES'",
-        }
-    }
+    'default': dj_database_url.config(
+        default=os.getenv('DATABASE_URL'),
+        conn_max_age=600,
+        conn_health_checks=True,
+    )
 }
-
 
 # -----------------------------------------------------------------------------
 # Password validators
