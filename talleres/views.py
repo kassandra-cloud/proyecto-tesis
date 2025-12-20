@@ -22,8 +22,7 @@ from django.utils import timezone
 from .models import Taller, Inscripcion
 from .forms import TallerForm, InscripcionForm, CancelacionTallerForm 
 
-# OPTIMIZACIÓN 1: Caching para vistas de listado (60 segundos)
-@cache_page(60)
+
 @login_required
 @role_required("talleres", "view")
 def lista_talleres(request):

@@ -41,9 +41,10 @@ NAME_VALIDATOR = RegexValidator(
 
 #  Calle/Pasaje: letras + espacios + puntos + comas (SIN números)
 # Ej: "Av. Principal", "Pasaje Los Pinos", "Calle San Martín"
+# Calle/Pasaje: letras + espacios + puntos + comas + NÚMEROS
 DIRECCION_VALIDATOR = RegexValidator(
-    regex=r"^[A-Za-zÁÉÍÓÚÑáéíóúñ\s\.,\-°#]*$",
-    message="La dirección solo puede contener letras y caracteres básicos (sin números).",
+    regex=r"^[A-Za-zÁÉÍÓÚÑáéíóúñ\s\.,\-°#0-9]*$",  # Se agregó 0-9
+    message="La dirección contiene caracteres no permitidos.",
 )
 
 def _armar_rut_desde_cuerpo(cuerpo_str: str) -> tuple[str, str]:
@@ -170,8 +171,8 @@ class UsuarioCrearForm(forms.ModelForm):
         self.fields["direccion"].widget.attrs.update({
             "inputmode": "text",
             "autocomplete": "off",
-            # permite letras, espacios y . , - ° # (pero NO números)
-            "oninput": "this.value=this.value.replace(/[^A-Za-zÁÉÍÓÚÑáéíóúñ\\s\\.,\\-°#]/g,'')",
+            # Se agrega 0-9 al final de la expresión regular de JS
+            "oninput": "this.value=this.value.replace(/[^A-Za-zÁÉÍÓÚÑáéíóúñ\\s\\.,\\-°#0-9]/g,'')",
         })
 
         # Teléfono: solo números + máximo 8
@@ -197,16 +198,18 @@ class UsuarioCrearForm(forms.ModelForm):
         if not re.fullmatch(r"[A-Za-zÁÉÍÓÚÑáéíóúñ ]+", v):
             raise forms.ValidationError("Apellido materno: solo letras y espacios.")
         return v
-
     def clean_direccion(self):
         v = (self.cleaned_data.get("direccion") or "").strip()
-        if re.search(r"\d", v):
-            raise forms.ValidationError("Calle/Pasaje no debe contener números. Usa N° Casa/Depto/Lote.")
-        # valida caracteres permitidos
-        if not re.fullmatch(r"[A-Za-zÁÉÍÓÚÑáéíóúñ\s\.,\-°#]+", v):
-            raise forms.ValidationError("Dirección inválida. Solo letras y caracteres básicos (sin números).")
-        return v
+        
+        # 1. ELIMINA estas líneas para que no de error si hay números:
+        # if re.search(r"\d", v):
+        #     raise forms.ValidationError("Calle/Pasaje no debe contener números...")
 
+        # 2. ACTUALIZA esta validación para incluir 0-9:
+        if not re.fullmatch(r"[A-Za-zÁÉÍÓÚÑáéíóúñ\s\.,\-°#0-9]+", v):
+            raise forms.ValidationError("Dirección inválida.")
+        
+        return v
     # ----- VALIDACIÓN TELÉFONO (+569) -----
     def clean_telefono(self):
         data = (self.cleaned_data.get("telefono") or "").strip()
@@ -424,11 +427,12 @@ class UsuarioEditarForm(forms.ModelForm):
         self.fields["apellido_paterno"].widget.attrs.update(attrs_solo_letras)
         self.fields["apellido_materno"].widget.attrs.update(attrs_solo_letras)
 
-        #  Calle/Pasaje: SIN números
+        #  Calle/Pasaje
         self.fields["direccion"].widget.attrs.update({
             "inputmode": "text",
             "autocomplete": "off",
-            "oninput": "this.value=this.value.replace(/[^A-Za-zÁÉÍÓÚÑáéíóúñ\\s\\.,\\-°#]/g,'')",
+            # Se agrega 0-9 al final de la expresión regular de JS
+            "oninput": "this.value=this.value.replace(/[^A-Za-zÁÉÍÓÚÑáéíóúñ\\s\\.,\\-°#0-9]/g,'')",
         })
 
         #  Teléfono: solo números + máximo 8
