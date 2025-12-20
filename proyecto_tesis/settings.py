@@ -127,33 +127,34 @@ TEMPLATES = [
 ASGI_APPLICATION = "proyecto_tesis.asgi.application"
 WSGI_APPLICATION = "proyecto_tesis.wsgi.application"
 
-
-# Base de datos (MySQL corregido para Aiven/Contingencia)
 # -----------------------------------------------------------------------------
-# 1. Extraemos la configuración de la URL
+# Base de datos (Corrección Final: TiDB / Aiven)
+# -----------------------------------------------------------------------------
 db_config = dj_database_url.config(
     default=os.getenv('DATABASE_URL', 'mysql://root:@127.0.0.1:3306/prueba'),
     conn_max_age=600,
     conn_health_checks=True,
 )
 
-# 2. Asegurar que 'OPTIONS' exista para evitar KeyError
+# 1. Asegurar que 'OPTIONS' exista
 if 'OPTIONS' not in db_config:
     db_config['OPTIONS'] = {}
 
-# 3. Corregimos el problema del SSL para MySQL/Aiven
+# 2. Corregir el error 'unexpected keyword argument ssl_mode'
+# Eliminamos el parámetro de la URL y lo configuramos manualmente
+if 'ssl_mode' in db_config['OPTIONS']:
+    db_config['OPTIONS'].pop('ssl_mode')
 if 'ssl-mode' in db_config['OPTIONS']:
     db_config['OPTIONS'].pop('ssl-mode')
-    
-# Obligamos el uso de SSL para Aiven/GCP
-db_config['OPTIONS']['ssl'] = {'ca': None} 
 
-# 4. Asignamos la configuración
+# 3. Forzar conexión segura compatible con TiDB Cloud y Aiven
+db_config['OPTIONS']['ssl'] = {'ca': None}
+
 DATABASES = {
     'default': db_config
 }
 
-# 5. Aplicar opciones de compatibilidad de forma segura
+# 4. Opciones de compatibilidad adicionales
 DATABASES['default']['OPTIONS'].update({
     "connect_timeout": 10,
     "charset": "utf8mb4",
