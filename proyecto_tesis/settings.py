@@ -20,22 +20,29 @@ import dj_database_url
 # -------------------------------------------------------------------
 # Seguridad / Debug
 # -------------------------------------------------------------------
-# Clave secreta (debe venir desde .env en producción)
-SECRET_KEY = os.environ.get('SECRET_KEY', default='your secret key')
-# DEBUG=True/False en .env
-DEBUG = os.getenv("DEBUG", "True").lower() == "true"
-
-# Hosts permitidos
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
+
+# Host de Render
 RENDER_EXTERNAL_HOSTNAME = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
 if RENDER_EXTERNAL_HOSTNAME:
     ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
 
-# Agregar IPs locales para desarrollo si es necesario
-ALLOWED_HOSTS.extend([
-    "10.0.2.2",
-    "192.168.231.132",
-])
+# --- AGREGAR ESTO PARA RAILWAY ---
+# Esto detecta automáticamente el dominio que te dio Railway
+RAILWAY_STATIC_URL = os.environ.get('RAILWAY_STATIC_URL')
+if RAILWAY_STATIC_URL:
+    ALLOWED_HOSTS.append(RAILWAY_STATIC_URL)
+
+# Agregar manualmente tu dominio específico por seguridad
+ALLOWED_HOSTS.append("web-production-bb3bf.up.railway.app")
+# ---------------------------------
+
+# CSRF
+CSRF_TRUSTED_ORIGINS = [
+    "http://127.0.0.1",
+    "http://localhost",
+    "https://web-production-bb3bf.up.railway.app", # Agregado con https://
+]
 
 # CSRF
 CSRF_TRUSTED_ORIGINS = [
@@ -128,38 +135,37 @@ ASGI_APPLICATION = "proyecto_tesis.asgi.application"
 WSGI_APPLICATION = "proyecto_tesis.wsgi.application"
 
 # -----------------------------------------------------------------------------
-# Base de datos (Corrección Final: TiDB / Aiven)
+# Base de datos (Local WAMPP / Producción)
 # -----------------------------------------------------------------------------
-db_config = dj_database_url.config(
-    default=os.getenv('DATABASE_URL', 'mysql://root:@127.0.0.1:3306/prueba'),
-    conn_max_age=600,
-    conn_health_checks=True,
-)
-
-# 1. Asegurar que 'OPTIONS' exista
-if 'OPTIONS' not in db_config:
-    db_config['OPTIONS'] = {}
-
-# 2. Corregir el error 'unexpected keyword argument ssl_mode'
-# Eliminamos el parámetro de la URL y lo configuramos manualmente
-if 'ssl_mode' in db_config['OPTIONS']:
-    db_config['OPTIONS'].pop('ssl_mode')
-if 'ssl-mode' in db_config['OPTIONS']:
-    db_config['OPTIONS'].pop('ssl-mode')
-
-# 3. Forzar conexión segura compatible con TiDB Cloud y Aiven
-db_config['OPTIONS']['ssl'] = {'ca': None}
-
-DATABASES = {
-    'default': db_config
-}
-
-# 4. Opciones de compatibilidad adicionales
-DATABASES['default']['OPTIONS'].update({
-    "connect_timeout": 10,
-    "charset": "utf8mb4",
-    "init_command": "SET sql_mode='STRICT_TRANS_TABLES'",
-})
+if DEBUG:
+    # Configuración para WAMPP Local
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.mysql',
+            'NAME': 'prueba',              # El nombre de la DB que creaste en phpMyAdmin
+            'USER': 'root',                # Usuario por defecto de WAMPP
+            'PASSWORD': '',                # WAMPP por defecto no tiene contraseña
+            'HOST': '127.0.0.1',
+            'PORT': '3306',
+            'OPTIONS': {
+                'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
+                'charset': 'utf8mb4',
+            },
+        }
+    }
+else:
+    # Mantiene tu configuración de Nube (Aiven/TiDB) para cuando subas a Render
+    db_config = dj_database_url.config(
+        default=os.getenv('DATABASE_URL'),
+        conn_max_age=600,
+        conn_health_checks=True,
+    )
+    if 'OPTIONS' not in db_config:
+        db_config['OPTIONS'] = {}
+    
+    # Solo forzar SSL si NO es local
+    db_config['OPTIONS']['ssl'] = {'ca': None}
+    DATABASES = {'default': db_config}
 # -----------------------------------------------------------------------------
 # Password validators
 # -----------------------------------------------------------------------------
