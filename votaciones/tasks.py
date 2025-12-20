@@ -1,3 +1,11 @@
+"""
+--------------------------------------------------------------------------------
+Integrantes:           Matias Pinilla, Herna Leris, Kassandra Ramos
+Fecha de Modificación: 19/12/2025
+Descripción:   Tareas asíncronas para enviar notificaciones Push (FCM) a los 
+               vecinos cuando se crea una nueva votación.
+--------------------------------------------------------------------------------
+"""
 # votaciones/tasks.py
 from celery import shared_task
 from django.conf import settings

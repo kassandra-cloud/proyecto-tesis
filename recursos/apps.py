@@ -1,3 +1,11 @@
+"""
+--------------------------------------------------------------------------------
+Integrantes:           Matias Pinilla, Herna Leris, Kassandra Ramos
+Fecha de Modificación: 19/12/2025
+Descripción:   Configuración de la aplicación 'recursos'. Carga las señales 
+               (signals) al iniciar para activar notificaciones automáticas.
+--------------------------------------------------------------------------------
+"""
 from django.apps import AppConfig
 
 class RecursosConfig(AppConfig):
@@ -5,4 +13,5 @@ class RecursosConfig(AppConfig):
     name = 'recursos'
 
     def ready(self):
-        import recursos.signals  
+        # Importa el módulo de señales cuando la app está lista
+        import recursos.signals

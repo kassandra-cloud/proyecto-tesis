@@ -1,16 +1,18 @@
 """
-WSGI config for proyecto_tesis project.
-
-It exposes the WSGI callable as a module-level variable named ``application``.
-
-For more information on this file, see
-https://docs.djangoproject.com/en/5.0/howto/deployment/wsgi/
+--------------------------------------------------------------------------------
+Integrantes:           Matias Pinilla, Herna Leris, Kassandra Ramos
+Fecha de Modificación: 19/12/2025
+Descripción:   Configuración WSGI para el proyecto. Es el punto de entrada estándar 
+               para servidores web compatibles con Python (como Gunicorn) en producción.
+--------------------------------------------------------------------------------
 """
 
-import os
+import os  # Importa módulo del sistema operativo
 
-from django.core.wsgi import get_wsgi_application
+from django.core.wsgi import get_wsgi_application  # Importa la aplicación WSGI de Django
 
+# Establece la variable de entorno que apunta a la configuración del proyecto
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'proyecto_tesis.settings')
 
+# Crea la aplicación WSGI invocable
 application = get_wsgi_application()

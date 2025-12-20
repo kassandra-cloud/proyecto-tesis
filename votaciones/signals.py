@@ -1,3 +1,11 @@
+"""
+--------------------------------------------------------------------------------
+Integrantes:           Matias Pinilla, Herna Leris, Kassandra Ramos
+Fecha de Modificación: 19/12/2025
+Descripción:   Definición de señales (signals) para reaccionar a la creación 
+               de nuevas votaciones y enviar notificaciones.
+--------------------------------------------------------------------------------
+"""
 # votaciones/signals.py
 from django.db.models.signals import post_save
 from django.dispatch import receiver

@@ -1,15 +1,25 @@
+"""
+--------------------------------------------------------------------------------
+Integrantes:           Matias Pinilla, Herna Leris, Kassandra Ramos
+Fecha de Modificación: 19/12/2025
+Descripción:   Definición de la estructura de datos. 
+               - Recurso: Elemento reservable (sala, proyector, etc.).
+               - SolicitudReserva: Petición con flujo de estados (Pendiente, Aprobada...).
+               - Reserva: Modelo histórico/espejo para compatibilidad.
+--------------------------------------------------------------------------------
+"""
 from django.db import models
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.utils import timezone
-from django.db import models
 from django.db.models import Q, F, UniqueConstraint
+
+# 1. MODELO RECURSO
 class Recurso(models.Model):
-    
     nombre = models.CharField(max_length=100, unique=True, verbose_name="Nombre del Recurso")
     descripcion = models.TextField(blank=True, verbose_name="Descripción")
     
-    # Campo para que la directiva decida si el recurso está activo o no
+    # Control maestro de disponibilidad (activar/desactivar recurso globalmente)
     disponible = models.BooleanField(default=True, help_text="Marcar si el recurso está disponible para ser reservado.")
 
     def __str__(self):
@@ -19,10 +29,8 @@ class Recurso(models.Model):
         verbose_name = "Recurso"
         verbose_name_plural = "Recursos"
 
+# 2. MODELO RESERVA (Modelo Legacy/Espejo para compatibilidad lógica)
 class Reserva(models.Model):
-    """
-    Representa la solicitud de reserva de un Recurso por parte de un Vecino.
-    """
     class Estado(models.TextChoices):
         PENDIENTE = "PENDIENTE", "Pendiente de Aprobación"
         APROBADA = "APROBADA", "Aprobada"
@@ -36,12 +44,7 @@ class Reserva(models.Model):
     fecha_fin = models.DateTimeField(verbose_name="Fin de la reserva")
     
     estado = models.CharField(max_length=20, choices=Estado.choices, default=Estado.PENDIENTE)
-    
     motivo = models.TextField(verbose_name="Motivo de la reserva")
-    
-    # Opcional: un campo para que la directiva deje notas (ej. motivo del rechazo)
-    # notas_directiva = models.TextField(blank=True, verbose_name="Notas de la Directiva")
-
     creada_el = models.DateTimeField(auto_now_add=True)
     
     def __str__(self):
@@ -53,28 +56,26 @@ class Reserva(models.Model):
         verbose_name_plural = "Reservas"
 
     def clean(self):
-        # 1. Validar que la fecha de fin sea posterior a la de inicio
+        # Validaciones de lógica de negocio para reservas directas
         if self.fecha_fin <= self.fecha_inicio:
             raise ValidationError("La fecha de finalización debe ser posterior a la fecha de inicio.")
         
-        # 2. Validar que la fecha de inicio no sea en el pasado (solo al crear)
         if not self.pk and self.fecha_inicio < timezone.now():
              raise ValidationError("No se pueden crear reservas en el pasado.")
 
-        # 3. Validar superposición de reservas APROBADAS o PENDIENTES
-        # (No queremos dos reservas pendientes para el mismo horario)
+        # Validación de superposición de horarios
         reservas_en_conflicto = Reserva.objects.filter(
             recurso=self.recurso,
             estado__in=[self.Estado.APROBADA, self.Estado.PENDIENTE]
         ).filter(
-            # (StartA < EndB) and (EndA > StartB)
             fecha_inicio__lt=self.fecha_fin,
             fecha_fin__gt=self.fecha_inicio
-        ).exclude(pk=self.pk) # Excluirse a sí mismo si se está editando
+        ).exclude(pk=self.pk)
 
         if reservas_en_conflicto.exists():
             raise ValidationError("El recurso ya tiene una solicitud aprobada o pendiente en este horario.")
-        
+
+# 3. MODELO SOLICITUD RESERVA (Modelo principal de gestión)
 class SolicitudReserva(models.Model):
     ESTADOS = [
         ("PENDIENTE", "Pendiente"),
@@ -83,25 +84,12 @@ class SolicitudReserva(models.Model):
         ("CANCELADA", "Cancelada por Vecino"),
     ]
 
-    recurso = models.ForeignKey(
-        "Recurso",
-        on_delete=models.CASCADE,
-        related_name="solicitudes",
-    )
-    solicitante = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name="solicitudes_recursos",
-    )
+    recurso = models.ForeignKey("Recurso", on_delete=models.CASCADE, related_name="solicitudes")
+    solicitante = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="solicitudes_recursos")
     fecha_inicio = models.DateField()
     fecha_fin = models.DateField()
     motivo = models.TextField(blank=True)
-    estado = models.CharField(
-        max_length=10,
-        choices=ESTADOS,
-        default="PENDIENTE",
-        db_index=True,
-    )
+    estado = models.CharField(max_length=10, choices=ESTADOS, default="PENDIENTE", db_index=True)
     creado_el = models.DateTimeField(auto_now_add=True)
     actualizado_el = models.DateTimeField(auto_now=True)
 
@@ -113,12 +101,12 @@ class SolicitudReserva(models.Model):
             models.Index(fields=["solicitante", "recurso"]),
         ]
         constraints = [
-            # fecha_fin >= fecha_inicio
+            # Restricción SQL: fecha fin debe ser mayor o igual a inicio
             models.CheckConstraint(
                 check=Q(fecha_fin__gte=F("fecha_inicio")),
                 name="solicitud_fin_gte_inicio",
             ),
-            # **Una PENDIENTE por (solicitante, recurso)**
+            # Restricción SQL: Solo una solicitud pendiente por usuario y recurso a la vez
             UniqueConstraint(
                 fields=["solicitante", "recurso"],
                 condition=Q(estado="PENDIENTE"),
@@ -132,11 +120,11 @@ class SolicitudReserva(models.Model):
     def clean(self):
         super().clean()
 
-        # 1) Rango válido
+        # Validación 1: Rango de fechas lógico
         if self.fecha_fin and self.fecha_inicio and self.fecha_fin < self.fecha_inicio:
             raise ValidationError("La fecha de fin no puede ser menor a la fecha de inicio.")
 
-        # 2) (Opcional) impedir solapamiento de APROBADAS del mismo recurso
+        # Validación 2: Impedir solapamiento con reservas YA APROBADAS
         if self.estado == "APROBADA":
             solapadas = (
                 SolicitudReserva.objects
@@ -149,14 +137,9 @@ class SolicitudReserva(models.Model):
                 .exists()
             )
             if solapadas:
-                raise ValidationError(
-                    "Ya existe una reserva APROBADA que se solapa en esas fechas para este recurso."
-                )
+                raise ValidationError("Ya existe una reserva APROBADA que se solapa en esas fechas para este recurso.")
 
-        # 3) **Regla de negocio principal (CORREGIDA)**:
-        #    Bloquear cualquier solicitud (PENDIENTE o APROBADA) del mismo solicitante
-        #    y recurso que se solape en el tiempo con esta nueva solicitud.
-        
+        # Validación 3: Impedir que el mismo usuario tenga múltiples solicitudes solapadas activas
         activa_solapada = (
             SolicitudReserva.objects
             .filter(
@@ -166,7 +149,6 @@ class SolicitudReserva(models.Model):
             )
             .exclude(pk=self.pk)
             .filter(
-                # Lógica de solapamiento: (FechaInicioExistente < FechaFinNueva) AND (FechaFinExistente > FechaInicioNueva)
                 fecha_inicio__lt=self.fecha_fin,
                 fecha_fin__gt=self.fecha_inicio
             )
@@ -174,12 +156,10 @@ class SolicitudReserva(models.Model):
         )
 
         if activa_solapada:
-            raise ValidationError(
-                "Ya tienes una solicitud PENDIENTE o APROBADA que se solapa con estas fechas para este recurso."
-            )
+            raise ValidationError("Ya tienes una solicitud PENDIENTE o APROBADA que se solapa con estas fechas para este recurso.")
 
     def save(self, *args, **kwargs):
-        self.full_clean()  # garantiza validaciones también vía admin o API
+        self.full_clean()  # Ejecuta las validaciones clean() antes de guardar
         return super().save(*args, **kwargs)
 
     @property

@@ -1,9 +1,18 @@
-# proyecto-tesis/foro/signals.py
+"""
+--------------------------------------------------------------------------------
+Integrantes:           Matias Pinilla, Herna Leris, Kassandra Ramos
+Fecha de Modificación: 19/12/2025
+Descripción:   Definición de señales (signals) para reaccionar a eventos del modelo,
+               como la creación de publicaciones o comentarios. Actualmente las 
+               notificaciones están desactivadas para evitar spam.
+--------------------------------------------------------------------------------
+"""
+
 
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from .models import Publicacion, Comentario
-# from .tasks import notificar_nueva_publicacion, notificar_nuevo_comentario  <-- COMENTA ESTA IMPORTACIÓN SI DA ERROR LUEGO
+# from .tasks import notificar_nueva_publicacion, notificar_nuevo_comentario  
 
 @receiver(post_save, sender=Publicacion)
 def trigger_notificacion_publicacion(sender, instance, created, **kwargs):

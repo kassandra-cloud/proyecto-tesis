@@ -1,5 +1,13 @@
+"""
+--------------------------------------------------------------------------------
+Integrantes:           Matias Pinilla, Herna Leris, Kassandra Ramos
+Fecha de Modificación: 19/12/2025
+Descripción:   Serializadores para transformar los modelos Votacion, Opcion y Voto 
+               a JSON. Incluye campos calculados para estado de voto y conteos.
+--------------------------------------------------------------------------------
+"""
 from rest_framework import serializers
-from .models import Votacion, OpcionVoto, Voto
+from .models import Votacion, Opcion as OpcionVoto, Voto  # Importa alias para claridad
 from django.db.models import Count
 
 class OpcionVotoSerializer(serializers.ModelSerializer):
@@ -14,8 +22,7 @@ class OpcionVotoSerializer(serializers.ModelSerializer):
         read_only_fields = ['votos_count']
 
     def get_votos_count(self, obj):
-        # Cuenta los objetos Voto que apuntan a esta opción
-        # Se asume que el related_name por defecto 'voto_set' está activo
+        # Cuenta los objetos Voto asociados a esta opción
         return obj.voto_set.count() 
 
 class VotacionSerializer(serializers.ModelSerializer):
@@ -36,7 +43,7 @@ class VotacionSerializer(serializers.ModelSerializer):
             'id', 
             'titulo', 
             'descripcion', 
-            'fecha_creacion',
+            'fecha_creacion', 
             'fecha_cierre',
             'activa',
             'opciones', 
@@ -47,14 +54,10 @@ class VotacionSerializer(serializers.ModelSerializer):
     def get_ha_votado(self, obj):
         """
         Determina si el usuario autenticado ha emitido un voto en esta votación.
-        Requiere que el request esté disponible en el contexto.
         """
         request = self.context.get('request', None)
         if request and request.user.is_authenticated:
-            # Asumimos que la relación inversa de Voto a Votacion es 'votos'
-            # y que la FK a User en Voto es 'vecino' (basado en otros módulos)
-            # Si el related_name del FK de Voto a Votacion es 'votos', esto funcionará:
-            # Voto.objects.filter(votacion=obj, vecino=request.user).exists()
+            # Verifica existencia de voto para este usuario en esta votación
             return obj.voto_set.filter(vecino=request.user).exists() 
             
         return False
@@ -63,12 +66,10 @@ class VotacionSerializer(serializers.ModelSerializer):
 class VotoRegistroSerializer(serializers.ModelSerializer):
     class Meta:
         model = Voto
-        # Solo necesitamos la opción elegida, ya que votacion y vecino (user) 
-        # se obtendrán del contexto o la URL
-        fields = ['opcion_voto'] 
+        fields = ['opcion_voto']  # Espera el ID de la opción
     
     def validate(self, data):
-        # Lógica de validación
+        # Validaciones de lógica de negocio (usuario, votación activa, unicidad)
         request = self.context.get('request')
         votacion = self.context.get('votacion')
         opcion = data['opcion_voto']

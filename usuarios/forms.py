@@ -1,21 +1,31 @@
+"""
+--------------------------------------------------------------------------------
+Integrantes:           Matias Pinilla, Herna Leris, Kassandra Ramos
+Fecha de Modificación: 19/12/2025
+Descripción:   Definición de formularios para Crear y Editar usuarios. 
+               Incluye validadores personalizados (Regex) para nombres, direcciones 
+               y teléfonos, además de lógica para generar contraseñas provisorias 
+               y enviar correos de bienvenida vía Webhook.
+--------------------------------------------------------------------------------
+"""
 # usuarios/forms.py
-import re
-import secrets
-import string
+import re  # Importa módulo de expresiones regulares
+import secrets  # Generación segura de números aleatorios
+import string  # Constantes de cadena (letras, dígitos)
 
-from django import forms
-from django.conf import settings
-from django.contrib.auth import get_user_model
-from django.core.validators import RegexValidator
-from django.db import transaction
-from django.template.loader import render_to_string
-from django.utils.html import strip_tags
+from django import forms  # Importa módulo de formularios de Django
+from django.conf import settings  # Importa configuraciones del proyecto
+from django.contrib.auth import get_user_model  # Obtiene el modelo de usuario activo
+from django.core.validators import RegexValidator  # Validador basado en regex
+from django.db import transaction  # Manejo de transacciones de base de datos
+from django.template.loader import render_to_string  # Renderiza templates a texto
+from django.utils.html import strip_tags  # Elimina etiquetas HTML
 
-from core.models import Perfil
-from core.rut import normalizar_rut, dv_mod11, validar_rut
-from usuarios.utils import enviar_correo_via_webhook
+from core.models import Perfil  # Importa el modelo Perfil
+from core.rut import normalizar_rut, dv_mod11, validar_rut  # Utilidades para RUT
+from usuarios.utils import enviar_correo_via_webhook  # Utilidad de envío de correo
 
-User = get_user_model()
+User = get_user_model()  # Referencia al modelo User
 
 # ------------------ Validadores reutilizables ------------------
 USERNAME_VALIDATOR = RegexValidator(
@@ -23,13 +33,13 @@ USERNAME_VALIDATOR = RegexValidator(
     message="Usa solo letras, números y @/./+/-/_",
 )
 
-# ✅ Solo letras (incluye acentos, Ñ) y espacios
+#Solo letras (incluye acentos, Ñ) y espacios
 NAME_VALIDATOR = RegexValidator(
     regex=r"^[A-Za-zÁÉÍÓÚÑáéíóúñ ]*$",
     message="Solo letras y espacios.",
 )
 
-# ✅ Calle/Pasaje: letras + espacios + puntos + comas (SIN números)
+#  Calle/Pasaje: letras + espacios + puntos + comas (SIN números)
 # Ej: "Av. Principal", "Pasaje Los Pinos", "Calle San Martín"
 DIRECCION_VALIDATOR = RegexValidator(
     regex=r"^[A-Za-zÁÉÍÓÚÑáéíóúñ\s\.,\-°#]*$",
@@ -37,6 +47,7 @@ DIRECCION_VALIDATOR = RegexValidator(
 )
 
 def _armar_rut_desde_cuerpo(cuerpo_str: str) -> tuple[str, str]:
+    """Helper para construir RUT completo desde el cuerpo numérico"""
     cuerpo = (cuerpo_str or "").replace(".", "").replace(" ", "")
     if not re.fullmatch(r"\d{7,8}", cuerpo):
         raise forms.ValidationError("El RUT debe tener 7 u 8 dígitos en el cuerpo.")
@@ -145,7 +156,7 @@ class UsuarioCrearForm(forms.ModelForm):
         if self.fields.get("rut_dv"):
             self.fields["rut_dv"].widget.attrs["readonly"] = "readonly"
 
-        # ✅ Bloqueo inmediato (frontend)
+        #  Bloqueo inmediato (frontend) mediante JavaScript inline en atributos
         attrs_solo_letras = {
             "inputmode": "text",
             "autocomplete": "off",
@@ -155,7 +166,7 @@ class UsuarioCrearForm(forms.ModelForm):
         self.fields["apellido_paterno"].widget.attrs.update(attrs_solo_letras)
         self.fields["apellido_materno"].widget.attrs.update(attrs_solo_letras)
 
-        # ✅ Calle/Pasaje: SIN números
+        #  Calle/Pasaje: SIN números
         self.fields["direccion"].widget.attrs.update({
             "inputmode": "text",
             "autocomplete": "off",
@@ -163,12 +174,12 @@ class UsuarioCrearForm(forms.ModelForm):
             "oninput": "this.value=this.value.replace(/[^A-Za-zÁÉÍÓÚÑáéíóúñ\\s\\.,\\-°#]/g,'')",
         })
 
-        # ✅ Teléfono: solo números + máximo 8
+        # Teléfono: solo números + máximo 8
         self.fields["telefono"].widget.attrs.update({
             "oninput": "this.value=this.value.replace(/\\D/g,'').slice(0,8);"
         })
 
-    # ✅ Backend (por si mandan números por POST)
+    #  Validaciones Backend (por si mandan datos crudos por POST)
     def clean_first_name(self):
         v = (self.cleaned_data.get("first_name") or "").strip()
         if not re.fullmatch(r"[A-Za-zÁÉÍÓÚÑáéíóúñ ]+", v):
@@ -216,7 +227,7 @@ class UsuarioCrearForm(forms.ModelForm):
             raise forms.ValidationError("Este nombre de usuario ya está en uso.")
         return u
 
-    # ----- CLEAN FORM -----
+    # ----- CLEAN FORM (Validación global) -----
     def clean(self):
         cleaned = super().clean()
 
@@ -224,6 +235,7 @@ class UsuarioCrearForm(forms.ModelForm):
         if cuerpo_rut:
             try:
                 rut, dv = _armar_rut_desde_cuerpo(cuerpo_rut)
+                # Verifica unicidad del RUT
                 if Perfil.objects.filter(rut__iexact=rut).exists():
                     self.add_error("rut_cuerpo", "Este RUT ya está registrado.")
                     self.add_error("rut_dv", "Este RUT ya está registrado.")
@@ -249,10 +261,11 @@ class UsuarioCrearForm(forms.ModelForm):
         am = (self.cleaned_data.get("apellido_materno") or "").strip().title()
         user.last_name = f"{ap} {am}".strip()
 
-        # ✅ Contraseña provisoria (16 chars)
+        #  Contraseña provisoria (16 chars)
         alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
         while True:
             password_provisoria = "".join(secrets.choice(alphabet) for _ in range(16))
+            # Garantiza complejidad mínima
             if (
                 any(c.islower() for c in password_provisoria)
                 and any(c.isupper() for c in password_provisoria)
@@ -266,6 +279,7 @@ class UsuarioCrearForm(forms.ModelForm):
         if commit:
             user.save()
 
+        # Crea el Perfil asociado con los datos extra
         Perfil.objects.create(
             usuario=user,
             rol=self.cleaned_data["rol"],
@@ -280,7 +294,7 @@ class UsuarioCrearForm(forms.ModelForm):
             debe_cambiar_password=True,
         )
 
-        # ✅ Enviar correo por WEBHOOK
+        #  Enviar correo por WEBHOOK
         if user.email:
             try:
                 host = getattr(settings, "RENDER_EXTERNAL_HOSTNAME", "127.0.0.1:8000")
@@ -298,6 +312,7 @@ class UsuarioCrearForm(forms.ModelForm):
                 text_body = strip_tags(html_body)
                 asunto = "Bienvenido a Villa Vista al Mar - Credenciales de Acceso"
 
+                # Llama a la utilidad de envío
                 enviar_correo_via_webhook(
                     to_email=user.email,
                     subject=asunto,
@@ -313,6 +328,7 @@ class UsuarioCrearForm(forms.ModelForm):
 
 # ================== EDITAR USUARIO ==================
 class UsuarioEditarForm(forms.ModelForm):
+    # (Definición similar a UsuarioCrearForm pero para edición)
     first_name = forms.CharField(
         label="Nombre",
         max_length=150,
@@ -383,6 +399,7 @@ class UsuarioEditarForm(forms.ModelForm):
         self.instance_user: User = kwargs.get("instance")  # type: ignore
         super().__init__(*args, **kwargs)
 
+        # Aplicación de clases Bootstrap
         for name in (
             "username", "email", "first_name",
             "rut_cuerpo", "rut_dv",
@@ -397,7 +414,7 @@ class UsuarioEditarForm(forms.ModelForm):
         if self.fields.get("rut_dv"):
             self.fields["rut_dv"].widget.attrs["readonly"] = "readonly"
 
-        # ✅ Bloqueo inmediato para nombre/apellidos
+        #  Bloqueo inmediato para nombre/apellidos
         attrs_solo_letras = {
             "inputmode": "text",
             "autocomplete": "off",
@@ -407,19 +424,19 @@ class UsuarioEditarForm(forms.ModelForm):
         self.fields["apellido_paterno"].widget.attrs.update(attrs_solo_letras)
         self.fields["apellido_materno"].widget.attrs.update(attrs_solo_letras)
 
-        # ✅ Calle/Pasaje: SIN números
+        #  Calle/Pasaje: SIN números
         self.fields["direccion"].widget.attrs.update({
             "inputmode": "text",
             "autocomplete": "off",
             "oninput": "this.value=this.value.replace(/[^A-Za-zÁÉÍÓÚÑáéíóúñ\\s\\.,\\-°#]/g,'')",
         })
 
-        # ✅ Teléfono: solo números + máximo 8
+        #  Teléfono: solo números + máximo 8
         self.fields["telefono"].widget.attrs.update({
             "oninput": "this.value=this.value.replace(/\\D/g,'').slice(0,8);"
         })
 
-        # Pre-cargar desde Perfil
+        # Pre-cargar datos desde el Perfil existente hacia el formulario
         if self.instance_user and hasattr(self.instance_user, "perfil"):
             p = self.instance_user.perfil
             rut = p.rut or ""
@@ -443,7 +460,7 @@ class UsuarioEditarForm(forms.ModelForm):
             else:
                 self.fields["telefono"].initial = fono
 
-    # ✅ Backend
+    #  Validaciones Backend (Repetición de lógica de limpieza para asegurar integridad)
     def clean_first_name(self):
         v = (self.cleaned_data.get("first_name") or "").strip()
         if not re.fullmatch(r"[A-Za-zÁÉÍÓÚÑáéíóúñ ]+", v):
@@ -481,6 +498,7 @@ class UsuarioEditarForm(forms.ModelForm):
         u = (self.cleaned_data.get("username") or "").strip()
         if " " in u:
             raise forms.ValidationError("El nombre de usuario no puede tener espacios.")
+        # Verifica duplicados excluyendo al usuario actual
         if User.objects.filter(username__iexact=u).exclude(pk=self.instance.pk).exists():
             raise forms.ValidationError("Este nombre de usuario ya está en uso.")
         return u
@@ -494,7 +512,7 @@ class UsuarioEditarForm(forms.ModelForm):
                 qs = Perfil.objects.filter(rut__iexact=rut)
                 perfil_pk = getattr(getattr(self.instance_user, "perfil", None), "pk", None)
                 if perfil_pk:
-                    qs = qs.exclude(pk=perfil_pk)
+                    qs = qs.exclude(pk=perfil_pk) # Excluye el perfil propio al chequear duplicados
                 if qs.exists():
                     self.add_error("rut_cuerpo", "Este RUT ya está registrado.")
                 cleaned["rut"] = rut
@@ -519,6 +537,7 @@ class UsuarioEditarForm(forms.ModelForm):
         if commit:
             user.save()
 
+        # Actualiza el perfil asociado
         perfil, _ = Perfil.objects.get_or_create(usuario=user)
         perfil.rol = self.cleaned_data["rol"]
         perfil.rut = self.cleaned_data["rut"]

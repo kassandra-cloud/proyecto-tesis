@@ -1,24 +1,31 @@
-# datamart/tasks.py
-from celery import shared_task
-from django.core.management import call_command
-from django.core.cache import cache
+"""
+--------------------------------------------------------------------------------
+Integrantes:           Matias Pinilla, Herna Leris, Kassandra Ramos
+Fecha de Modificación: 19/12/2025
+Descripción:   Definición de tareas asíncronas utilizando Celery para ejecutar 
+               el proceso ETL en segundo plano sin bloquear al usuario.
+--------------------------------------------------------------------------------
+"""
+from celery import shared_task  # Decorador para crear tareas compartidas de Celery
+from django.core.management import call_command  # Permite ejecutar comandos de management
+from django.core.cache import cache  # Para interactuar con la caché
 import logging
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)  # Configuración del logger
 
 @shared_task
 def tarea_actualizar_bi_async():
     """
     Ejecuta el ETL en segundo plano.
-    Se llama automáticamente cuando un usuario visita el panel BI.
+    Se llama automáticamente cuando un usuario visita el panel BI o solicita actualización.
     """
     logger.info("Iniciando ETL BI disparado por usuario...")
     try:
-        # Ejecutamos el comando existente
+        # Ejecuta el comando 'procesar_etl' definido en management/commands
         call_command("procesar_etl")
         
-        # Guardamos la marca de tiempo de cuándo terminó
-        # Esto nos sirve para saber cuándo fue la última actualización real
+        # Guarda la marca de tiempo de finalización en caché
+        # Esto permite saber cuándo fue la última actualización exitosa
         cache.set('ultima_actualizacion_bi_timestamp', True, timeout=None)
         
         logger.info(" ETL BI finalizado correctamente.")

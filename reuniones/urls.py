@@ -1,3 +1,11 @@
+"""
+--------------------------------------------------------------------------------
+Integrantes:           Matias Pinilla, Herna Leris, Kassandra Ramos
+Fecha de Modificación: 19/12/2025
+Descripción:   Definición de rutas URL (Web y API) para gestión de reuniones, 
+               actas, grabaciones y asistencia.
+--------------------------------------------------------------------------------
+"""
 from django.urls import path, include 
 from . import views
 from rest_framework.routers import DefaultRouter

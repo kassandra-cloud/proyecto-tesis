@@ -1,3 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+Integrantes:           Matias Pinilla, Herna Leris, Kassandra Ramos
+Fecha de Modificación: 19/12/2025
+Descripción:   Controladores (Vistas) para la aplicación Usuarios. Maneja:
+               - Listado, creación, edición y eliminación de usuarios (Web).
+               - API de autenticación y salud para la App Móvil.
+               - Lógica de recuperación de contraseña con código OTP.
+               - Cambio obligatorio de contraseña.
+--------------------------------------------------------------------------------
+"""
 from __future__ import annotations
 
 import json
@@ -61,7 +72,7 @@ SORT_MAP = {
 # -------------------------------------------------------------------
 def _paginar(request, queryset, default_per_page: int = 10):
     """
-    Devuelve (page_obj, per_page, paginator)
+    Devuelve (page_obj, per_page, paginator) para manejar paginación
     """
     try:
         per_page = int(request.GET.get("per_page") or default_per_page)
@@ -611,5 +622,5 @@ def web_recuperar_paso2(request):
     return redirect('login')
 
 def alerta_movil(request):
-    """Vista de bloqueo para vecinos en la web."""
+    """Vista de bloqueo para vecinos en la web (solo deben usar App Móvil)."""
     return render(request, 'usuarios/alerta_movil.html')

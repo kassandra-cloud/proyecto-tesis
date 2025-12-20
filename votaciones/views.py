@@ -1,9 +1,18 @@
+"""
+--------------------------------------------------------------------------------
+Integrantes:           Matias Pinilla, Herna Leris, Kassandra Ramos
+Fecha de Modificación: 19/12/2025
+Descripción:   Vistas de Django para la gestión web de votaciones. 
+               Incluye listado optimizado con caché, creación, votación, 
+               cierre y visualización de resultados.
+--------------------------------------------------------------------------------
+"""
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
 # --- IMPORTACIÓN CRÍTICA PARA CACHÉ ---
-from django.views.decorators.cache import cache_page # <-- NUEVA IMPORTACIÓN
+from django.views.decorators.cache import cache_page
 # --------------------------------------
 from .models import Votacion, Opcion, Voto
 from .forms import VotacionForm 
@@ -26,19 +35,9 @@ from django.db.models import Q
 def lista_votaciones(request):
     """
     Muestra la lista de votaciones activas y cerradas.
-    
-    IMPORTANTE: La lógica de cerrado automático por tiempo ha sido ELIMINADA 
-    y debe ser movida a una tarea periódica de Celery (cron job) para 
-    evitar bloqueos y permitir el caching de esta vista.
+    Optimizado con caché y select_related para reducir queries a BD.
     """
     
-    # --- LÓGICA DE ACTUALIZACIÓN AUTOMÁTICA (ELIMINADA) ---
-    # Votacion.objects.filter(
-    #     activa=True,
-    #     fecha_cierre__lte=timezone.now()
-    # ).update(activa=False)
-    # --------------------------------------------------------
-
     # 2) Listar separadas para la plantilla
     # OPTIMIZACIÓN N+1: Añadir select_related('creada_por')
     votaciones_abiertas = (
@@ -96,7 +95,7 @@ def detalle_votacion(request, pk):
         pk=pk
     )
     
-    # Verificamos si el usuario tiene permiso para previsualizar
+    # Verificamos si el usuario tiene permiso para previsualizar resultados
     puede_previsualizar = can(request.user, "votaciones", "preview")
 
     resultados = []
@@ -148,7 +147,7 @@ def emitir_voto(request, pk):
             Voto.objects.create(opcion=opcion, votante=request.user)
             messages.success(request, 'Tu voto ha sido registrado.')
         
-        # Recomendación: Redirigir al detalle en lugar de la lista para ver el impacto
+        # Redirigir al detalle para ver confirmación y resultados si aplica
         return redirect('votaciones:detalle_votacion', pk=pk) 
     return redirect('votaciones:lista_votaciones')
 
@@ -156,7 +155,6 @@ def emitir_voto(request, pk):
 @role_required("votaciones", "close")
 def cerrar_votacion(request, pk):
     if request.method == 'POST':
-        # Consulta con select_related para evitar N+1 si el modelo lo tiene
         votacion = get_object_or_404(Votacion, pk=pk)
         votacion.activa = False
         votacion.save()
@@ -214,5 +212,5 @@ def eliminar_votacion(request, pk):
         messages.success(request, f'La votación "{nombre_votacion}" ha sido eliminada.')
         return redirect('votaciones:lista_votaciones')
     
-    # Si no es POST, mostramos la página de confirmación como antes.
+    # Si no es POST, mostramos la página de confirmación.
     return render(request, 'votaciones/votacion_confirm_delete.html', {'votacion': votacion})

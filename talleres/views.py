@@ -1,15 +1,24 @@
+"""
+--------------------------------------------------------------------------------
+Integrantes:           Matias Pinilla, Herna Leris, Kassandra Ramos
+Fecha de Modificación: 19/12/2025
+Descripción:   Vistas de Django para la gestión web. Maneja listados optimizados 
+               con caché, creación/edición de talleres, inscripciones y 
+               cancelaciones.
+--------------------------------------------------------------------------------
+"""
 from django.http import Http404
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 # --- IMPORTACIONES PARA OPTIMIZACIÓN ---
-from django.views.decorators.cache import cache_page # <-- NUEVA IMPORTACIÓN PARA CACHÉ
+from django.views.decorators.cache import cache_page # IMPORTACIÓN PARA CACHÉ
 from django.db.models import Count # Ya estaba, mantenemos
 # -------------------------------------
 from core.authz import role_required
 from django.utils import timezone
 
-# Asegúrate de que todos los modelos y forms estén
+# Asegúrate de que todos los modelos y forms estén importados
 from .models import Taller, Inscripcion
 from .forms import TallerForm, InscripcionForm, CancelacionTallerForm 
 
@@ -35,7 +44,7 @@ def lista_talleres(request):
         estado=Taller.Estado.PROGRAMADO
     ).annotate(
         inscritos_count=Count('inscripcion')
-    ).select_related('creado_por').order_by('fecha_inicio') # <-- select_related AGREGADO
+    ).select_related('creado_por').order_by('fecha_inicio') # <-- select_related AGREGADO para evitar N+1 queries
     
     context = {
         'talleres': talleres,

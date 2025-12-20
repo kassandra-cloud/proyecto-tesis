@@ -1,12 +1,22 @@
+"""
+--------------------------------------------------------------------------------
+Integrantes:           Matias Pinilla, Herna Leris, Kassandra Ramos
+Fecha de Modificación: 19/12/2025
+Descripción:   Definición de formularios Django para crear, editar y cancelar 
+               talleres. Incluye validaciones de fecha y estilos Bootstrap.
+--------------------------------------------------------------------------------
+"""
 # en /talleres/forms.py
 
-from django import forms
-from .models import Taller, Inscripcion
-from django.utils import timezone
+from django import forms  # Importa módulo de formularios
+from .models import Taller, Inscripcion  # Importa modelos
+from django.utils import timezone  # Utilidad de tiempo
 
+# Formulario principal para crear/editar Taller
 class TallerForm(forms.ModelForm):
     class Meta:
         model = Taller
+        # Campos a incluir en el formulario
         fields = [
             'nombre', 
             'descripcion', 
@@ -15,7 +25,7 @@ class TallerForm(forms.ModelForm):
             'fecha_termino'
         ]
         
-        # Estos widgets se mantienen
+        # Widgets personalizados para inputs de fecha y hora
         widgets = {
             'fecha_inicio': forms.DateTimeInput(
                 attrs={'type': 'datetime-local'}, 
@@ -43,11 +53,11 @@ class TallerForm(forms.ModelForm):
             # Obtenemos la clase CSS existente, si hay alguna
             existing_class = existing_attrs.get('class', '')
             
-            # Añadimos 'form-control' a la lista de clases
+            # Añadimos 'form-control' a la lista de clases para estilizar con Bootstrap
             field.widget.attrs['class'] = f'{existing_class} form-control'.strip()
     # --- FIN DEL MÉTODO __init__ CORREGIDO ---
 
-    # --- VALIDACIÓN (Se mantiene igual) ---
+    # --- VALIDACIÓN PERSONALIZADA ---
     def clean(self):
         cleaned_data = super().clean()
         inicio = cleaned_data.get("fecha_inicio")
@@ -55,10 +65,12 @@ class TallerForm(forms.ModelForm):
         instancia = self.instance
 
         if inicio and fin:
+            # Valida que la fecha de término sea lógica
             if fin <= inicio:
                 raise forms.ValidationError(
                     "La fecha y hora de término debe ser posterior a la de inicio."
                 )
+            # Valida que no se creen talleres en el pasado (solo al crear nuevo)
             if not instancia.pk and inicio < timezone.now():
                  raise forms.ValidationError(
                     "No se puede programar un taller en una fecha/hora pasada."
@@ -66,7 +78,7 @@ class TallerForm(forms.ModelForm):
         return cleaned_data
 
 
-# --- FORMULARIO DE CANCELACIÓN (Añadimos 'form-control' también) ---
+# --- FORMULARIO DE CANCELACIÓN ---
 class CancelacionTallerForm(forms.ModelForm):
     class Meta:
         model = Taller
@@ -79,13 +91,13 @@ class CancelacionTallerForm(forms.ModelForm):
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['motivo_cancelacion'].required = True
+        self.fields['motivo_cancelacion'].required = True  # Obligatorio explicar motivo
         self.fields['motivo_cancelacion'].label = "Motivo de la Cancelación"
-        # Agregamos la clase aquí
+        # Agregamos la clase de estilo aquí
         self.fields['motivo_cancelacion'].widget.attrs['class'] = 'form-control'
 
 
-# --- FORMULARIO DE INSCRIPCIÓN (Se mantiene igual) ---
+# --- FORMULARIO DE INSCRIPCIÓN (Vacío, solo para validación CSRF en vistas simples) ---
 class InscripcionForm(forms.ModelForm):
     class Meta:
         model = Inscripcion

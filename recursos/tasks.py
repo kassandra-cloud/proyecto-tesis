@@ -1,4 +1,12 @@
-# recursos/tasks.py
+"""
+--------------------------------------------------------------------------------
+Integrantes:           Matias Pinilla, Herna Leris, Kassandra Ramos
+Fecha de Modificación: 19/12/2025
+Descripción:   Definición de tareas asíncronas (Celery) para enviar notificaciones 
+               Push (FCM) a los usuarios sobre el estado de sus reservas o 
+               nuevos recursos disponibles.
+--------------------------------------------------------------------------------
+"""
 from celery import shared_task
 from django.conf import settings
 import firebase_admin
@@ -9,9 +17,8 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-
 def inicializar_firebase():
-    """Inicializa Firebase si no está activo ya"""
+    """Inicializa la app de Firebase con las credenciales del entorno"""
     if not firebase_admin._apps:
         try:
             project_id = getattr(settings, "FIREBASE_PROJECT_ID", None)
@@ -39,19 +46,18 @@ def inicializar_firebase():
 @shared_task
 def notificar_actualizacion_solicitud(solicitud_id):
     """
-    Notifica al solicitante que el estado de su solicitud ha cambiado (Aprobada/Rechazada).
-    Ahora se envía a TODOS los dispositivos del usuario (DispositivoFCM).
+    Notifica al solicitante que el estado de su solicitud ha cambiado.
+    Busca todos los dispositivos registrados del usuario y envía la alerta.
     """
     inicializar_firebase()
     try:
-        # Usamos 'solicitante' (no 'vecino')
         solicitud = SolicitudReserva.objects.select_related(
             'solicitante__perfil',
             'recurso'
         ).get(pk=solicitud_id)
         usuario = solicitud.solicitante
 
-        # 🔹 Obtener TODOS los tokens de dispositivos del usuario
+        # Obtener tokens únicos de los dispositivos del usuario
         tokens = list(
             DispositivoFCM.objects
             .filter(usuario=usuario)
@@ -62,10 +68,9 @@ def notificar_actualizacion_solicitud(solicitud_id):
         if not tokens:
             return f"Usuario {usuario.username} no tiene dispositivos FCM registrados."
 
-        # Texto legible del estado (APROBADA -> "Aprobada", etc.)
         estado_legible = solicitud.get_estado_display()
 
-        # Enviar una notificación por cada dispositivo
+        # Enviar mensaje a cada dispositivo
         for token in tokens:
             try:
                 message = messaging.Message(
@@ -95,9 +100,7 @@ def notificar_actualizacion_solicitud(solicitud_id):
 @shared_task
 def notificar_nuevo_recurso(recurso_id):
     """
-    Avisa a TODOS los suscritos al topic 'recursos_generales'
-    que hay un nuevo recurso disponible.
-    (Este sigue siendo por topic, está bien así).
+    Avisa a TODOS los suscritos al topic 'recursos_generales' sobre un nuevo recurso.
     """
     inicializar_firebase()
     try:

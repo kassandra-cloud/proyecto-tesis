@@ -1,3 +1,12 @@
+"""
+--------------------------------------------------------------------------------
+Integrantes:           Matias Pinilla, Herna Leris, Kassandra Ramos
+Fecha de Modificación: 19/12/2025
+Descripción:   Serializadores de Django REST Framework para transformar los 
+               modelos del Foro (Publicacion, Comentario, ArchivoAdjunto) a JSON.
+               Incluye lógica para calcular URLs absolutas y estado de 'likes'.
+--------------------------------------------------------------------------------
+"""
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from foro.models import Publicacion, Comentario, ArchivoAdjunto
@@ -9,13 +18,12 @@ class ArchivoAdjuntoSerializer(serializers.ModelSerializer):
     url = serializers.SerializerMethodField()
     fecha_creacion = serializers.DateTimeField(format="%Y-%m-%d %H:%M:%S")
     
-    # 🔹 Campos para likes en fotos
+    # Campos para likes en fotos
     total_likes = serializers.SerializerMethodField()
     me_gusta_usuario = serializers.SerializerMethodField()
 
     class Meta:
         model = ArchivoAdjunto
-        # 🔹 CORRECCIÓN: Se agregan los campos de likes a la lista
         fields = (
             "id", "autor", "tipo_archivo", "url", 
             "fecha_creacion", "archivo", "es_mensaje", "descripcion",
@@ -28,7 +36,7 @@ class ArchivoAdjuntoSerializer(serializers.ModelSerializer):
             return request.build_absolute_uri(obj.archivo.url)
         return obj.archivo.url
 
-    # 🔹 Métodos necesarios para SerializerMethodField
+    # Métodos necesarios para SerializerMethodField
     def get_total_likes(self, obj):
         return obj.likes.count()
 
@@ -89,5 +97,5 @@ class PublicacionSerializer(serializers.ModelSerializer):
     def get_comentarios(self, obj):
         # Filtramos solo los comentarios visibles
         qs = obj.comentarios.filter(visible=True).order_by('fecha_creacion')
-        # 🔹 IMPORTANTE: Pasamos el contexto para que funcionen los likes
+        # IMPORTANTE: Pasamos el contexto para que funcionen los likes
         return ComentarioSerializer(qs, many=True, context=self.context).data

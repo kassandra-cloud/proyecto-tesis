@@ -26,6 +26,6 @@ try:
     server.sendmail(FROM_EMAIL, TO_EMAIL, msg.as_string())
 
     server.quit()
-    print("✅ Correo enviado exitosamente con script puro de Python.")
+    print(" Correo enviado exitosamente con script puro de Python.")
 except Exception as e:
-    print(f"❌ Fallo al enviar correo o conectar: {e}")
+    print(f" Fallo al enviar correo o conectar: {e}")

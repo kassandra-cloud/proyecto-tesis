@@ -1,3 +1,12 @@
+"""
+--------------------------------------------------------------------------------
+Integrantes:           Matias Pinilla, Herna Leris, Kassandra Ramos
+Fecha de Modificación: 19/12/2025
+Descripción:   Pruebas unitarias y de integración para validar el Datamart, 
+               incluyendo pruebas de rendimiento (SLA), lógica de KPIs, 
+               seguridad y concurrencia.
+--------------------------------------------------------------------------------
+"""
 import time
 import threading
 from django.test import TestCase, TransactionTestCase, Client
@@ -12,13 +21,12 @@ from datamart.views import construir_datos_panel_bi
 # -------------------------------------------------------------------------
 class DashboardSLATest(TestCase):
     def setUp(self):
-        # 1. Preparación: Creamos un usuario y lo logueamos
+        # Preparación: Creamos usuario admin y lo logueamos
         self.user = User.objects.create_user(username='admin_bi', password='123')
         self.client = Client()
         self.client.force_login(self.user)
         
-        # 2. Carga de Datos Simulada (Volumen):
-        # Creamos datos masivos para que el sistema tenga que procesar
+        # Carga de Datos Simulada (Volumen masivo)
         talleres = [
             DimTaller(taller_id_oltp=i, nombre=f"Taller {i}", cupos_totales=20)
             for i in range(100)
@@ -47,7 +55,7 @@ class DashboardSLATest(TestCase):
         
         print(f" -> Tiempo de respuesta obtenido: {duration:.4f} segundos")
         
-        # Validaciones
+        # Validaciones de éxito y tiempo
         self.assertEqual(response.status_code, 200, "El panel debe cargar correctamente (HTTP 200)")
         self.assertLess(duration, 8.0, f"Fallo SLA: Tardó {duration}s, límite es 8s")
 
@@ -57,10 +65,10 @@ class DashboardSLATest(TestCase):
 # -------------------------------------------------------------------------
 class KpiLogicTest(TestCase):
     def setUp(self):
-        # 1. Preparación de datos
+        # Preparación de datos de prueba
         self.vecino = DimVecino.objects.create(vecino_id_oltp=999, nombre_completo="Juan Perez")
         
-        # Creamos 2 actas distintas
+        # Creación de actas simuladas
         self.acta_popular = DimActa.objects.create(
             acta_id_oltp=10, 
             titulo="Acta Muy Leída", 
@@ -74,8 +82,8 @@ class KpiLogicTest(TestCase):
             precision_transcripcion=90
         )
 
-        # 2. Simulamos consultas (Hechos)
-        # - 3 consultas para el "Acta Muy Leída"
+        # Simulación de consultas (Hechos)
+        # 3 consultas para el acta popular
         for _ in range(3):
             FactConsultaActa.objects.create(
                 vecino=self.vecino, 
@@ -83,7 +91,7 @@ class KpiLogicTest(TestCase):
                 fecha_consulta=timezone.now()
             )
         
-        # - 1 consulta para el "Acta Poco Leída"
+        # 1 consulta para el acta impopular
         FactConsultaActa.objects.create(
             vecino=self.vecino, 
             acta=self.acta_impopular, 
@@ -96,16 +104,13 @@ class KpiLogicTest(TestCase):
         """
         print("\nEjecutando CP-BI-004: Prueba de Lógica KPI (Ranking)...")
 
-        # Llamamos directamente a la función lógica (Caja Blanca)
+        # Llama a la lógica de construcción de datos (Caja Blanca)
         datos = construir_datos_panel_bi()
         ranking = datos['consulta_actas']
         
-        # Verificaciones
-        # Validación 1: El primer lugar debe ser el Acta Popular (3 consultas)
+        # Validaciones del ordenamiento
         self.assertEqual(ranking[0]['acta__titulo'], "Acta Muy Leída")
         self.assertEqual(ranking[0]['consultas'], 3)
-        
-        # Validación 2: El segundo lugar debe ser el Acta Impopular (1 consulta)
         self.assertEqual(ranking[1]['acta__titulo'], "Acta Poco Leída")
         self.assertEqual(ranking[1]['consultas'], 1)
 
@@ -115,7 +120,7 @@ class KpiLogicTest(TestCase):
 # -------------------------------------------------------------------------
 class SecurityTest(TestCase):
     def setUp(self):
-        # Usuario malintencionado (pero autenticado)
+        # Usuario autenticado malintencionado
         self.user = User.objects.create_user(username='hacker', password='123')
         self.client = Client()
         self.client.force_login(self.user)
@@ -123,7 +128,6 @@ class SecurityTest(TestCase):
     def test_sql_injection_attempt(self):
         """
         CP-SEC-001: Verificar resistencia a Inyección SQL en filtros de fecha.
-        Intento: Manipular el parámetro 'anio'.
         """
         print("\nEjecutando CP-SEC-001: Prueba de Seguridad (SQL Injection)...")
         
@@ -132,14 +136,13 @@ class SecurityTest(TestCase):
         
         response = self.client.get(url)
         
-        # El sistema debe manejar el error o ignorar el filtro, pero NO caerse (500)
+        # El sistema no debe fallar (500) ni ejecutar la inyección
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, "OR 1=1")
 
     def test_xss_attempt(self):
         """
         CP-SEC-002: Verificar protección contra Cross-Site Scripting (XSS).
-        Intento: Inyectar un script en el parámetro 'mes'.
         """
         print("\nEjecutando CP-SEC-002: Prueba de Seguridad (XSS)...")
         
@@ -148,14 +151,13 @@ class SecurityTest(TestCase):
         
         response = self.client.get(url)
         
-        # El script NO debe aparecer ejecutable en el HTML (debe estar escapado)
+        # El script debe estar escapado y no presente tal cual en la respuesta
         self.assertNotContains(response, script)
 
 
 # -------------------------------------------------------------------------
 # 4. PRUEBA DE ESTRÉS Y CONCURRENCIA
 # -------------------------------------------------------------------------
-# Usamos TransactionTestCase para evitar bloqueos de base de datos con hilos en SQLite
 class ConcurrencyTest(TransactionTestCase):
     reset_sequences = True 
 
@@ -163,9 +165,7 @@ class ConcurrencyTest(TransactionTestCase):
         self.user = User.objects.create_user(username='stress_user', password='123')
         self.url = reverse('panel_bi')
         
-        # --- OPTIMIZACIÓN "SESIÓN COMPARTIDA" ---
-        # Iniciamos sesión UNA sola vez en el hilo principal para evitar
-        # condiciones de carrera escribiendo sesiones en SQLite.
+        # Login inicial en el hilo principal
         self.master_client = Client()
         self.master_client.force_login(self.user)
         self.session_cookie = self.master_client.cookies.get('sessionid')
@@ -173,8 +173,7 @@ class ConcurrencyTest(TransactionTestCase):
     def _make_request(self, results, index):
         """Función auxiliar que ejecutará cada hilo"""
         client = Client()
-        
-        # Inyectamos la cookie de sesión ya creada
+        # Inyecta la sesión compartida
         if self.session_cookie:
             client.cookies['sessionid'] = self.session_cookie.value
             
@@ -194,23 +193,22 @@ class ConcurrencyTest(TransactionTestCase):
         threads = []
         resultados = [None] * cantidad_usuarios
 
-        # 1. Crear e iniciar los hilos
+        # Crear e iniciar hilos
         for i in range(cantidad_usuarios):
             t = threading.Thread(target=self._make_request, args=(resultados, i))
             threads.append(t)
             t.start()
 
-        # 2. Esperar a que todos terminen
+        # Esperar terminación
         for t in threads:
             t.join()
 
-        # 3. Analizar resultados
+        # Análisis de resultados
         exitos = resultados.count(200)
         fallos = cantidad_usuarios - exitos
         
         print(f" -> Peticiones lanzadas: {cantidad_usuarios}")
         print(f" -> Éxitos (HTTP 200): {exitos}")
-        print(f" -> Fallos: {fallos}")
         
         if fallos > 0:
             errores = [r for r in resultados if r != 200]

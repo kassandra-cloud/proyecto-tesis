@@ -1,3 +1,11 @@
+"""
+--------------------------------------------------------------------------------
+Integrantes:           Matias Pinilla, Herna Leris, Kassandra Ramos
+Fecha de Modificación: 19/12/2025
+Descripción:   Serializadores para la API. Transforman modelos Reunion, Acta y 
+               Asistencia a JSON, incluyendo campos calculados y manejo de nulos.
+--------------------------------------------------------------------------------
+"""
 from rest_framework import serializers
 from .models import Reunion, Acta, Asistencia 
 from django.utils import timezone
@@ -10,7 +18,7 @@ class ReunionSerializer(serializers.ModelSerializer):
     """
     Serializer para la API de Reuniones.
     """
-    # 🆕 CORRECCIÓN: Usamos SerializerMethodField para manejar creador=None
+    #CORRECCIÓN: Usamos SerializerMethodField para manejar creador=None
     autor = serializers.SerializerMethodField() 
     
     fecha_inicio = serializers.DateTimeField(source="fecha", read_only=True)
@@ -51,7 +59,7 @@ class ReunionSerializer(serializers.ModelSerializer):
             "acta_id",
         ]
 
-    # 🆕 AJUSTE CLAVE: Retorna 0 si el autor es nulo para satisfacer al cliente móvil.
+    # AJUSTE CLAVE: Retorna 0 si el autor es nulo para satisfacer al cliente móvil.
     def get_autor(self, obj):
         """Devuelve el ID del creador o 0 si no existe."""
         if obj.creada_por:
@@ -86,14 +94,14 @@ class ReunionSerializer(serializers.ModelSerializer):
             return None
         return acta.pk
 
-class ActaSerializer(serializers.ModelSerializer):
+class ActaSerializer(serializers.ModelSerializer): # Serializador para Acta
     # Acta usa OneToOne(primary_key=True) con Reunion
     reunion = serializers.PrimaryKeyRelatedField(read_only=True)
     reunion_titulo = serializers.CharField(source="reunion.titulo", read_only=True)
     reunion_fecha = serializers.DateTimeField(source="reunion.fecha", read_only=True) 
     reunion_tipo = serializers.CharField(source="reunion.tipo", read_only=True)
     
-    # 🆕 CORRECCIÓN: Fuente aprobada_por y allow_null=True para manejar nulos
+    # CORRECCIÓN: Fuente aprobada_por y allow_null=True para manejar nulos
     autor_username = serializers.CharField(
         source="aprobado_por.username", # Campo correcto en Acta es 'aprobado_por'
         read_only=True,
@@ -108,13 +116,13 @@ class ActaSerializer(serializers.ModelSerializer):
             "autor_username"
         ]
         
-class AsistenciaSerializer(serializers.ModelSerializer):
+class AsistenciaSerializer(serializers.ModelSerializer): # Serializador para Asistencia
 
     nombre_usuario= serializers.CharField(source="vecino.username", read_only=True, default=None)
     rut  = serializers.CharField(source="vecino.rut", read_only=True, default=None)
     nombre_completo = serializers.SerializerMethodField()
 
-    def get_nombre_completo(self, obj):
+    def get_nombre_completo(self, obj): # Construye nombre completo
         v = getattr(obj, "vecino", None)
         if not v:
             return None
@@ -123,7 +131,7 @@ class AsistenciaSerializer(serializers.ModelSerializer):
             full = v.get_full_name()
             if full:
                 return full
-        # Lógica de construcción de nombre
+        # Lógica de construcción de nombre manual si get_full_name falla
         partes = []
         for a in ("first_name", "nombres", "nombre"):
             val = getattr(v, a, "") or ""

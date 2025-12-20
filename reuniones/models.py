@@ -1,3 +1,11 @@
+"""
+--------------------------------------------------------------------------------
+Integrantes:           Matias Pinilla, Herna Leris, Kassandra Ramos
+Fecha de Modificación: 19/12/2025
+Descripción:   Modelos de BD para la gestión de Reuniones, Actas, Asistencias 
+               y Logs. Define estados de reunión y de transcripción de actas.
+--------------------------------------------------------------------------------
+"""
 from django.db import models
 from django.contrib.auth import get_user_model
 from django.conf import settings
@@ -5,13 +13,13 @@ from django.conf import settings
 User = get_user_model()
 
 # --- CLASE MODIFICADA ---
-class EstadoReunion(models.TextChoices):
+class EstadoReunion(models.TextChoices): # Enumeración de estados de reunión
     PROGRAMADA = 'PROGRAMADA', 'Programada'
     EN_CURSO   = 'EN_CURSO',   'En Curso'
     REALIZADA  = 'REALIZADA',  'Realizada'
     CANCELADA  = 'CANCELADA',  'Cancelada' # <-- NUEVO ESTADO
     
-class Reunion(models.Model):
+class Reunion(models.Model): # Modelo principal de Reunión
     TIPO_REUNION = [
         ("Ordinaria", "Ordinaria"),
         ("Extraordinaria", "Extraordinaria"),
@@ -35,7 +43,7 @@ class Reunion(models.Model):
     def __str__(self):
         return f"{self.titulo} - {self.fecha.strftime('%d/%m/%Y')}"
 
-class Acta(models.Model):
+class Acta(models.Model): # Modelo de Acta
      # --- AÑADIR ESTOS ESTADOS DE TRANSCRIPCIÓN ---
     ESTADO_NO_SUBIDO = "NO_SUBIDO"
     ESTADO_PENDIENTE = "PENDIENTE"
@@ -52,7 +60,7 @@ class Acta(models.Model):
     ]
     # -----------------------------------------------
 
-    reunion = models.OneToOneField(
+    reunion = models.OneToOneField( # Relación 1 a 1 con Reunión
         Reunion,
         on_delete=models.CASCADE,
         related_name="acta",
@@ -73,18 +81,18 @@ class Acta(models.Model):
     # (Asegúrate de que los campos 'transcripcion_borrador' y 
     # 'transcripcion_actualizado' ya NO estén aquí)
 
-    archivo_audio = models.FileField(
+    archivo_audio = models.FileField( # Archivo de audio para transcripción
         upload_to="audios_reuniones/",  # Esto se guardará en Cellar/S3
         null=True,
         blank=True,
         help_text="Archivo de audio (.webm, .ogg) subido por la directiva."
     )
-    estado_transcripcion = models.CharField(
+    estado_transcripcion = models.CharField( # Estado del proceso de transcripción
         max_length=20,
         choices=ESTADO_TRANSCRIPCION_CHOICES, # Usamos la nueva lista
         default=ESTADO_NO_SUBIDO # Usamos el nuevo default
     )
-    calificacion_precision = models.IntegerField(
+    calificacion_precision = models.IntegerField( # Métrica de calidad
         default=0, 
         help_text="Calificación manual de la precisión (0-100) asignada por la directiva."
     )
@@ -93,7 +101,7 @@ class Acta(models.Model):
     def __str__(self):
         return f"Acta de {self.reunion.titulo}"
 
-class Asistencia(models.Model):
+class Asistencia(models.Model): # Modelo de Asistencia
     reunion = models.ForeignKey(Reunion, on_delete=models.CASCADE, related_name="asistentes")
     # (Aquí asumí que 'vecino' debe ser un Perfil, no un User, pero sigo tu modelo original)
     vecino = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="asistencias")
@@ -106,7 +114,7 @@ class Asistencia(models.Model):
         estado = "Presente" if self.presente else "Ausente"
         return f"{self.vecino.username} - {self.reunion.titulo} ({estado})"
     
-class ActaEmailLog(models.Model):
+class ActaEmailLog(models.Model): # Log de envío de actas por correo
     acta = models.ForeignKey("Acta", on_delete=models.CASCADE, related_name="emails_enviados")
     destinatarios = models.TextField()  
     enviado_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True)
@@ -115,7 +123,7 @@ class ActaEmailLog(models.Model):
     def __str__(self):
         return f"Email de acta {self.acta_id} enviado a {self.destinatarios[:50]}..."
 
-class LogConsultaActa(models.Model):
+class LogConsultaActa(models.Model): # Log transaccional de lectura de actas
     acta = models.ForeignKey(Acta, on_delete=models.CASCADE, related_name="consultas")
     vecino = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="consultas_de_actas")
     fecha_consulta = models.DateTimeField(auto_now_add=True)

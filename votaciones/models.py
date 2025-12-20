@@ -1,9 +1,18 @@
-import hashlib
+"""
+--------------------------------------------------------------------------------
+Integrantes:           Matias Pinilla, Herna Leris, Kassandra Ramos
+Fecha de Modificación: 19/12/2025
+Descripción:   Definición de modelos para el sistema de Votaciones. Incluye lógica 
+               de integridad de voto mediante hash SHA-256 y logs de auditoría.
+--------------------------------------------------------------------------------
+"""
+import hashlib  # Para hashing criptográfico
 from django.db import models
 from django.conf import settings
 from django.utils import timezone
 
 
+# 1. Modelo Votación
 class Votacion(models.Model):
     pregunta = models.CharField(max_length=255, verbose_name="Pregunta")
     fecha_cierre = models.DateTimeField(verbose_name="Fecha de cierre", db_index=True)
@@ -32,6 +41,7 @@ class Votacion(models.Model):
         verbose_name_plural = "Votaciones"
 
 
+# 2. Modelo Opción
 class Opcion(models.Model):
     votacion = models.ForeignKey(
         Votacion,
@@ -49,6 +59,7 @@ class Opcion(models.Model):
         verbose_name_plural = "Opciones"
 
 
+# 3. Modelo Voto (con integridad)
 class Voto(models.Model):
     opcion = models.ForeignKey(
         Opcion,
@@ -62,7 +73,7 @@ class Voto(models.Model):
         verbose_name="Vecino"
     )
 
-    # Hash que permite verificar integridad y unicidad fuerte del voto
+    # Hash que permite verificar integridad del voto
     hash_voto = models.CharField(
         max_length=64,
         blank=True,
@@ -71,7 +82,7 @@ class Voto(models.Model):
     )
 
     class Meta:
-        unique_together = [["opcion", "votante"]]
+        unique_together = [["opcion", "votante"]]  # Evita duplicados a nivel de BD
         verbose_name = "Voto"
         verbose_name_plural = "Votos"
 
@@ -81,20 +92,17 @@ class Voto(models.Model):
         - ID del votante
         - ID de la opción
         - SECRET_KEY del proyecto
-
-        Esto NO hace anónimo el voto, pero permite:
-        - detectar alteraciones
-        - justificar en la tesis un mecanismo básico de integridad.
+        Esto permite detectar alteraciones post-voto.
         """
         data_string = f"{self.votante.id}-{self.opcion.id}-{settings.SECRET_KEY}"
         self.hash_voto = hashlib.sha256(data_string.encode()).hexdigest()
         super().save(*args, **kwargs)
 
 
+# 4. Modelo Log de Intentos (Auditoría / BI)
 class LogIntentoVoto(models.Model):
     """
-    Registra cada intento de voto (especialmente desde la app móvil),
-    para poder calcular el KPI de 'fallos en votaciones' en el módulo BI.
+    Registra cada intento de voto (exitoso o fallido) para métricas de seguridad y uso.
     """
     ORIGENES = (
         ("APP_MOVIL", "App móvil"),

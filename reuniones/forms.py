@@ -1,8 +1,16 @@
+"""
+--------------------------------------------------------------------------------
+Integrantes:           Matias Pinilla, Herna Leris, Kassandra Ramos
+Fecha de Modificación: 19/12/2025
+Descripción:   Formularios Django para crear/editar Reuniones y Actas, incluyendo 
+               validaciones personalizadas de fecha y calificación.
+--------------------------------------------------------------------------------
+"""
 from django import forms
 from django.utils import timezone  
 from .models import Reunion, Acta
 
-class ReunionForm(forms.ModelForm):
+class ReunionForm(forms.ModelForm): # Formulario para Reunión
     class Meta:
         model = Reunion
         fields = ['titulo', 'tipo', 'fecha', 'tabla']
@@ -38,7 +46,7 @@ class ReunionForm(forms.ModelForm):
         # (Aunque la validación real la hace el método clean_fecha de arriba)
         self.fields['fecha'].widget.attrs['min'] = timezone.now().strftime('%Y-%m-%dT%H:%M')
 
-class ActaForm(forms.ModelForm):
+class ActaForm(forms.ModelForm): # Formulario para Acta
     class Meta:
         model = Acta
         fields = ['contenido']
@@ -49,7 +57,7 @@ class ActaForm(forms.ModelForm):
             'contenido': 'Contenido del Acta'
         }
 
-class CalificacionActaForm(forms.ModelForm):
+class CalificacionActaForm(forms.ModelForm): # Formulario para calificar precisión
     class Meta:
         model = Acta
         fields = ['calificacion_precision']

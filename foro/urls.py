@@ -1,7 +1,15 @@
+"""
+--------------------------------------------------------------------------------
+Integrantes:           Matias Pinilla, Herna Leris, Kassandra Ramos
+Fecha de Modificación: 19/12/2025
+Descripción:   Definición de las rutas URL para la aplicación 'foro', separadas 
+               en secciones para vistas Web (HTML) y API REST (JSON).
+--------------------------------------------------------------------------------
+"""
 from django.urls import path
 from . import views
 from .views import enviar_mensaje
-app_name = 'foro' # No necesitamos namespace
+app_name = 'foro' 
 
 urlpatterns = [
     # ---------------- WEB ----------------

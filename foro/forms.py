@@ -1,9 +1,17 @@
+"""
+--------------------------------------------------------------------------------
+Integrantes:           Matias Pinilla, Herna Leris, Kassandra Ramos
+Fecha de Modificación: 19/12/2025
+Descripción:   Definición de formularios de Django para la creación de 
+               publicaciones y comentarios, incluyendo validaciones personalizadas.
+--------------------------------------------------------------------------------
+"""
 # foro/forms.py
 from django import forms
 from .models import Publicacion
 from .models import Publicacion, Comentario
 
-
+# Formulario para crear una nueva publicación
 class PublicacionForm(forms.ModelForm):
     class Meta:
         model = Publicacion
@@ -18,17 +26,17 @@ class PublicacionForm(forms.ModelForm):
         }
         labels = {"contenido": ""}
 
+# Formulario para crear comentarios (incluye soporte para archivos)
 class ComentarioCreateForm(forms.ModelForm):
     # 1. Campo oculto para respuestas (ID del comentario padre)
     parent_id = forms.IntegerField(required=False, widget=forms.HiddenInput)
     
     # 2. Campo para subir archivos (Opcional)
-    # Le ponemos una clase para poder estilizarlo o seleccionarlo con JS si es necesario
     archivo = forms.FileField(
         required=False, 
         widget=forms.FileInput(attrs={
             'class': 'form-control form-control-sm mt-2',
-            'accept': 'image/*',  # <--- CORRECCIÓN 1: ID AÑADIDO
+            'accept': 'image/*',  # ID AÑADIDO
         })
     )
 
@@ -48,8 +56,7 @@ class ComentarioCreateForm(forms.ModelForm):
         }
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # 3. 🔹 Hacemos que el texto NO sea obligatorio a nivel de campo
-        # (La validación real la haremos en el método clean)
+        # 3. Hacemos que el texto NO sea obligatorio a nivel de campo
         self.fields['contenido'].required = False
 
     def clean(self):

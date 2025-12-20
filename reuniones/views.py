@@ -1,3 +1,12 @@
+"""
+--------------------------------------------------------------------------------
+Integrantes:           Matias Pinilla, Herna Leris, Kassandra Ramos
+Fecha de Modificación: 19/12/2025
+Descripción:   Controladores (vistas) para la interfaz web. Maneja la lógica de 
+               negocio para crear reuniones, gestionar actas, cambiar estados, 
+               generar PDFs y procesar subida de audios.
+--------------------------------------------------------------------------------
+"""
 from asgiref.sync import sync_to_async
 from django.http import HttpResponse, JsonResponse, HttpResponseBadRequest
 from django.template.loader import get_template
@@ -52,7 +61,7 @@ def _pdf_bytes_desde_xhtml(template_path: str, context: dict) -> bytes:
 
 @login_required
 @role_required("reuniones", "view")
-def reunion_list(request):
+def reunion_list(request): # Vista de lista de reuniones con filtros
     estado_query = request.GET.get("estado", "programada")
 
     if estado_query == "realizada":
@@ -79,7 +88,7 @@ def reunion_list(request):
 
 @login_required
 @role_required("reuniones", "create")
-def reunion_create(request):
+def reunion_create(request): # Vista para crear reunión
     if request.method == "POST":
         form = ReunionForm(request.POST)
         if form.is_valid():
@@ -96,7 +105,7 @@ def reunion_create(request):
 
 @login_required
 @role_required("reuniones", "view")
-def reunion_detail(request, pk):
+def reunion_detail(request, pk): # Vista de detalle de reunión
     reunion = get_object_or_404(Reunion, pk=pk)
 
     try:
@@ -130,14 +139,14 @@ def reunion_detail(request, pk):
 
 @login_required
 @role_required("actas", "edit")
-def acta_edit(request, pk):
+def acta_edit(request, pk): # Redirección a detalle para editar acta
     return redirect("reuniones:detalle_reunion", pk=pk)
 
 
 @require_POST
 @login_required
 @role_required("actas", "edit")
-def guardar_borrador_acta(request, pk):
+def guardar_borrador_acta(request, pk): # Guardar borrador de acta
     reunion = get_object_or_404(Reunion, pk=pk)
 
     try:
@@ -160,7 +169,7 @@ def guardar_borrador_acta(request, pk):
 @require_POST
 @login_required
 @role_required("actas", "approve")
-def aprobar_borrador_acta(request, pk):
+def aprobar_borrador_acta(request, pk): # Aprobar acta (finalizar edición)
     reunion = get_object_or_404(Reunion, pk=pk)
 
     if reunion.estado != EstadoReunion.REALIZADA:
@@ -190,7 +199,7 @@ def aprobar_borrador_acta(request, pk):
 @require_POST
 @login_required
 @role_required("actas", "edit")
-def rechazar_acta(request, pk):
+def rechazar_acta(request, pk): # Rechazar acta (volver a borrador)
     reunion = get_object_or_404(Reunion, pk=pk)
 
     try:
@@ -212,7 +221,7 @@ def rechazar_acta(request, pk):
 
 @login_required
 @role_required("reuniones", "asistencia")
-def asistencia_list(request, pk):
+def asistencia_list(request, pk): # Gestión masiva de asistencia
     reunion = get_object_or_404(Reunion, pk=pk)
     vecinos = Perfil.objects.all().select_related("usuario").order_by("usuario__username")
 
@@ -252,7 +261,7 @@ def asistencia_list(request, pk):
 @require_POST
 @login_required
 @role_required("reuniones", "asistencia")
-def registrar_asistencia_manual(request, pk):
+def registrar_asistencia_manual(request, pk): # Asistencia individual manual
     reunion = get_object_or_404(Reunion, pk=pk)
     vecino_id = request.POST.get("vecino_id")
 
@@ -285,7 +294,7 @@ def registrar_asistencia_manual(request, pk):
 
 @login_required
 @role_required("actas", "view")
-def acta_export_pdf(request, pk):
+def acta_export_pdf(request, pk): # Exportar acta a PDF
     reunion = get_object_or_404(Reunion, pk=pk)
 
     try:
@@ -313,7 +322,7 @@ def acta_export_pdf(request, pk):
 @login_required
 @role_required("actas", "send")
 @csrf_protect
-def enviar_acta_pdf_por_correo(request, pk):
+def enviar_acta_pdf_por_correo(request, pk): # Enviar acta PDF por email
     reunion = get_object_or_404(Reunion, pk=pk)
 
     try:
@@ -349,8 +358,8 @@ def enviar_acta_pdf_por_correo(request, pk):
                 <p>Saludos cordiales,<br>La Directiva</p>
             """,
             text_body="Se adjunta acta de reunión.",
-            attachment_bytes=pdf_bytes,   # 🔥 adjunto
-            filename=filename,            # 🔥 nombre
+            attachment_bytes=pdf_bytes,   
+            filename=filename,            
             content_type="application/pdf"
         )
 
@@ -372,7 +381,7 @@ def enviar_acta_pdf_por_correo(request, pk):
 @require_POST
 @login_required
 @role_required("reuniones", "change_estado")
-def iniciar_reunion(request, pk):
+def iniciar_reunion(request, pk): # Iniciar reunión (cambio de estado)
     reunion = get_object_or_404(Reunion, pk=pk)
 
     if reunion.estado == EstadoReunion.PROGRAMADA:
@@ -388,7 +397,7 @@ def iniciar_reunion(request, pk):
 @require_POST
 @login_required
 @role_required("reuniones", "change_estado")
-def finalizar_reunion(request, pk):
+def finalizar_reunion(request, pk): # Finalizar reunión
     reunion = get_object_or_404(Reunion, pk=pk)
 
     if reunion.estado == EstadoReunion.EN_CURSO:
@@ -404,7 +413,7 @@ def finalizar_reunion(request, pk):
 @require_POST
 @login_required
 @role_required("reuniones", "cancel")
-def cancelar_reunion(request, pk):
+def cancelar_reunion(request, pk): # Cancelar reunión
     reunion = get_object_or_404(Reunion, pk=pk)
 
     if reunion.estado == EstadoReunion.PROGRAMADA:
@@ -423,7 +432,7 @@ def cancelar_reunion(request, pk):
 
 @login_required
 @role_required("reuniones", "view")
-def reuniones_json_feed(request):
+def reuniones_json_feed(request): # Feed JSON para calendario frontend
     estado_query = request.GET.get("estado", "programada").upper()
 
     estados_validos = {
@@ -461,7 +470,7 @@ def reuniones_json_feed(request):
 @require_POST
 @login_required
 @role_required("actas", "edit")
-def subir_audio_acta(request, pk):
+def subir_audio_acta(request, pk): # Subir audio para transcripción automática
     reunion = get_object_or_404(Reunion, pk=pk)
 
     if reunion.estado != EstadoReunion.REALIZADA:
@@ -503,7 +512,7 @@ def subir_audio_acta(request, pk):
 
 @login_required
 @role_required("actas", "edit")
-def lista_grabaciones(request):
+def lista_grabaciones(request): # Listado de grabaciones disponibles
     reuniones_con_audio = Reunion.objects.filter(
         acta__archivo_audio__isnull=False
     ).exclude(
@@ -518,7 +527,7 @@ def lista_grabaciones(request):
 
 
 @login_required
-def get_acta_estado(request, pk):
+def get_acta_estado(request, pk): # API para consultar estado de transcripción
     acta = get_object_or_404(Acta, pk=pk)
     return JsonResponse({
         "estado": acta.estado_transcripcion,
@@ -529,7 +538,7 @@ def get_acta_estado(request, pk):
 @require_POST
 @login_required
 @role_required("actas", "edit")
-def calificar_acta(request, pk):
+def calificar_acta(request, pk): # Guardar calificación de precisión
     reunion = get_object_or_404(Reunion, pk=pk)
 
     try:

@@ -1,3 +1,12 @@
+"""
+--------------------------------------------------------------------------------
+Integrantes:           Matias Pinilla, Herna Leris, Kassandra Ramos
+Fecha de Modificación: 19/12/2025
+Descripción:   Definición de los modelos Taller e Inscripcion. Incluye lógica 
+               de estados (Programado, Finalizado, Cancelado) y propiedades 
+               para calcular disponibilidad.
+--------------------------------------------------------------------------------
+"""
 # en /talleres/models.py
 
 from django.db import models
@@ -20,11 +29,12 @@ class Taller(models.Model):
     cupos_totales = models.PositiveIntegerField()
     
     # --- CAMPOS MODIFICADOS ---
-    # Cambiamos DateField a DateTimeField para incluir la hora
+    # Cambiamos DateField a DateTimeField para incluir la hora exacta
     fecha_inicio = models.DateTimeField(verbose_name="Fecha y Hora de Inicio")
     fecha_termino = models.DateTimeField(verbose_name="Fecha y Hora de Término")
     # --- FIN MODIFICACIÓN ---
 
+    # Usuario directivo que creó el taller
     creado_por = models.ForeignKey(
         settings.AUTH_USER_MODEL, 
         on_delete=models.SET_NULL, 
@@ -52,7 +62,7 @@ class Taller(models.Model):
         return self.nombre
 
     class Meta:
-        ordering = ['fecha_inicio']
+        ordering = ['fecha_inicio']  # Orden por defecto
         verbose_name = "Taller"
         verbose_name_plural = "Talleres"
 
@@ -66,7 +76,7 @@ class Taller(models.Model):
     @property
     def esta_activo(self):
         """
-        Verifica si el taller está actualmente en curso.
+        Verifica si el taller está actualmente en curso (dentro del rango de fechas y activo).
         """
         ahora = timezone.now()
         return self.fecha_inicio <= ahora <= self.fecha_termino and self.estado == self.Estado.PROGRAMADO
@@ -75,21 +85,22 @@ class Taller(models.Model):
     def cupos_disponibles(self):
         """
         Calcula los cupos restantes.
-        Requiere que 'inscritos_count' sea anotado en la vista.
+        Requiere que 'inscritos_count' sea anotado en la vista para eficiencia.
         """
         # Usamos getattr por seguridad, si 'inscritos_count' no existe
         # (aunque nuestras vistas ya lo añaden)
         inscritos = getattr(self, 'inscritos_count', 0)
         return self.cupos_totales - inscritos
+
 # --- 2. CLASE INSCRIPCION  ---
 class Inscripcion(models.Model):
     vecino = models.ForeignKey(User, on_delete=models.CASCADE)
-    # Esta línea necesita que 'Taller' ya haya sido definido
+    # Relación con Taller
     taller = models.ForeignKey(Taller, on_delete=models.CASCADE)
     fecha_inscripcion = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        # Evita que un usuario se inscriba dos veces
+        # Evita que un usuario se inscriba dos veces en el mismo taller
         unique_together = ('vecino', 'taller')
 
     def __str__(self):

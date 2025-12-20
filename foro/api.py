@@ -1,3 +1,11 @@
+"""
+--------------------------------------------------------------------------------
+Integrantes:           Matias Pinilla, Herna Leris, Kassandra Ramos
+Fecha de Modificación: 19/12/2025
+Descripción:   Definición de ViewSets y API Views para exponer la funcionalidad 
+               del foro a través de una API REST (usada por la app móvil).
+--------------------------------------------------------------------------------
+"""
 from rest_framework import viewsets, status, permissions, serializers
 from rest_framework.authentication import TokenAuthentication, SessionAuthentication
 from rest_framework.decorators import action, api_view, permission_classes, authentication_classes, parser_classes
@@ -5,7 +13,7 @@ from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnl
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 
-from django.shortcuts import get_object_or_404, redirect
+from django.shortcuts import get_object_or_404, redirect, render
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
 from django.contrib import messages
@@ -15,7 +23,7 @@ from operator import attrgetter
 
 from foro.models import Publicacion, Comentario, ArchivoAdjunto
 from foro.forms import PublicacionForm, ComentarioCreateForm
-from core.authz import can, role_required  # 👈 ÚNICA IMPORTACIÓN CORRECTA DE 'can'
+from core.authz import can, role_required  # Importación del sistema de roles
 
 from .serializers import (
     PublicacionSerializer,
@@ -24,7 +32,7 @@ from .serializers import (
     ArchivoAdjuntoSerializer
 )
 
-# --- Serializer anidado SOLO para la vista tree=1 ---
+# --- Serializer anidado SOLO para la vista tree=1 (estructura de árbol) ---
 class NestedComentarioSerializer(serializers.ModelSerializer):
     autor_username = serializers.CharField(source="autor.username", read_only=True)
     respuestas = serializers.SerializerMethodField()
@@ -33,6 +41,7 @@ class NestedComentarioSerializer(serializers.ModelSerializer):
         model = Comentario
         fields = ["id", "autor_username", "contenido", "fecha_creacion", "parent", "respuestas"]
 
+    # Recursividad para obtener respuestas de respuestas
     def get_respuestas(self, obj):
         hijos = obj.respuestas.all().select_related("autor")
         return NestedComentarioSerializer(hijos, many=True, context=self.context).data
@@ -42,6 +51,7 @@ class NestedComentarioSerializer(serializers.ModelSerializer):
 # ------------------------------------------------------------------------------
 
 class PublicacionViewSet(viewsets.ModelViewSet):
+    # Consulta base optimizada con select_related y prefetch_related
     queryset = (
         Publicacion.objects
         .select_related("autor")
@@ -51,16 +61,19 @@ class PublicacionViewSet(viewsets.ModelViewSet):
     serializer_class = PublicacionSerializer
     authentication_classes = [TokenAuthentication, SessionAuthentication]
     permission_classes = [permissions.IsAuthenticated]
-    pagination_class = None
+    pagination_class = None # Sin paginación por defecto
 
+    # Asigna automáticamente el autor al crear
     def perform_create(self, serializer):
         serializer.save(autor=self.request.user)
 
+    # Acción personalizada para obtener o crear comentarios de una publicación
     @action(detail=True, methods=["get", "post"], url_path="comentarios")
     def comentarios(self, request, pk=None):
         publicacion = self.get_object()
 
         if request.method.lower() == "get":
+            # Opción para devolver comentarios en estructura de árbol (hilos)
             tree = request.query_params.get("tree") == "1"
             if tree:
                 raices = (
@@ -72,6 +85,7 @@ class PublicacionViewSet(viewsets.ModelViewSet):
                 data = NestedComentarioSerializer(raices, many=True, context={"request": request}).data
                 return Response(data, status=status.HTTP_200_OK)
 
+            # Opción plana por defecto (lista cronológica)
             qs = (
                 Comentario.objects
                 .filter(publicacion=publicacion)
@@ -81,6 +95,7 @@ class PublicacionViewSet(viewsets.ModelViewSet):
             data = ComentarioSerializer(qs, many=True, context={"request": request}).data
             return Response(data, status=status.HTTP_200_OK)
 
+        # Creación de comentario vía POST
         s = ComentarioCreateSerializer(data=request.data, context={"request": request})
         s.is_valid(raise_exception=True)
 
@@ -93,6 +108,7 @@ class PublicacionViewSet(viewsets.ModelViewSet):
         out = ComentarioSerializer(c, context={"request": request}).data
         return Response(out, status=status.HTTP_201_CREATED)
 
+    # Acción para filtrar solo las publicaciones del usuario actual
     @action(detail=False, methods=["get"], url_path="mias")
     def mias(self, request):
         qs = self.get_queryset().filter(autor=request.user)
@@ -103,11 +119,13 @@ class PublicacionViewSet(viewsets.ModelViewSet):
 # ------------------------------------------------------------------------------
 #                                   VISTAS WEB
 # ------------------------------------------------------------------------------
+# Estas vistas renderizan plantillas HTML para el navegador
 
 @login_required
 def lista_publicaciones(request):
     es_moderador = can(request.user, "foro", "moderar")
 
+    # Los moderadores ven todo, usuarios normales solo lo visible
     if es_moderador:
         publicaciones_qs = Publicacion.objects.all()
     else:
@@ -121,6 +139,7 @@ def lista_publicaciones(request):
         .order_by("-fecha_creacion")
     )
     
+    # Manejo de errores de formulario preservados en sesión (PRG pattern)
     form_con_error_data = request.session.pop("form_con_error_data", None)
     form_errors = request.session.pop("form_errors", None)
 
@@ -152,6 +171,7 @@ def detalle_publicacion(request, pk):
         messages.error(request, "Esa publicación no existe o no tienes permiso para verla.")
         return redirect("foro:lista_publicaciones")
 
+    # Procesamiento del formulario de nuevo comentario
     if request.method == "POST":
         form = ComentarioCreateForm(request.POST, request.FILES)
         if form.is_valid():
@@ -159,6 +179,7 @@ def detalle_publicacion(request, pk):
             archivo = form.cleaned_data.get('archivo')
 
             if archivo:
+                # Si trae archivo, se guarda como ArchivoAdjunto tipo mensaje
                 ArchivoAdjunto.objects.create(
                     publicacion=publicacion,
                     autor=request.user,
@@ -168,6 +189,7 @@ def detalle_publicacion(request, pk):
                 )
                 messages.success(request, "Archivo publicado.")
             elif contenido:
+                # Si solo trae texto, se guarda como Comentario
                 comentario = form.save(commit=False)
                 comentario.publicacion = publicacion
                 comentario.autor = request.user
@@ -180,6 +202,7 @@ def detalle_publicacion(request, pk):
     else:
         form = ComentarioCreateForm()
 
+    # Combinación de comentarios y archivos-mensaje en una sola línea de tiempo
     comentarios = publicacion.comentarios.filter(visible=True).select_related('autor')
     adjuntos_chat = publicacion.adjuntos.filter(es_mensaje=True).select_related('autor')
 
@@ -206,6 +229,7 @@ def crear_publicacion(request):
         publicacion.autor = request.user
         publicacion.save()
 
+        # Guarda los archivos adjuntos asociados a la publicación
         for f in request.FILES.getlist("archivos"):
             ArchivoAdjunto.objects.create(
                 publicacion=publicacion,
@@ -227,6 +251,7 @@ def crear_publicacion(request):
 @login_required
 @role_required("foro", "moderar")
 def alternar_publicacion_web(request, pk):
+    """Oculta o muestra una publicación (Moderación)"""
     publicacion = get_object_or_404(Publicacion, pk=pk)
     publicacion.visible = not publicacion.visible
     publicacion.save()
@@ -239,6 +264,7 @@ def alternar_publicacion_web(request, pk):
 @require_POST
 @login_required
 def eliminar_comentario_web(request, pk):
+    """Eliminación lógica de comentario por el propio autor o moderador"""
     comentario = get_object_or_404(Comentario, pk=pk)
     es_moderador = can(request.user, "foro", "moderar")
     if request.user == comentario.autor or es_moderador:
@@ -253,6 +279,7 @@ def eliminar_comentario_web(request, pk):
 @login_required
 @role_required("foro", "moderar")
 def restaurar_comentario_web(request, pk):
+    """Restauración de comentario oculto (Moderación)"""
     comentario = get_object_or_404(Comentario, pk=pk)
     if not comentario.visible:
         comentario.visible = True
@@ -264,6 +291,7 @@ def restaurar_comentario_web(request, pk):
 @login_required
 @role_required("foro", "delete")
 def eliminar_publicacion_web(request, pk):
+    """Eliminación física de una publicación"""
     publicacion = get_object_or_404(Publicacion, pk=pk)
     publicacion.delete()
     messages.error(request, "Publicación eliminada permanentemente.")
@@ -271,6 +299,7 @@ def eliminar_publicacion_web(request, pk):
 
 @login_required
 def reaccionar_comentario_web(request, pk):
+    """Dar o quitar like a un comentario (Web)"""
     comentario = get_object_or_404(Comentario, pk=pk, visible=True)
     if request.user in comentario.likes.all():
         comentario.likes.remove(request.user)
@@ -284,10 +313,11 @@ def reaccionar_comentario_web(request, pk):
 # ------------------------------------------------------------------------------
 
 def _adjunto_to_dict(adj: ArchivoAdjunto) -> dict:
+    """Helper para convertir adjunto a diccionario simple"""
     if hasattr(adj, "tipo_archivo") and adj.tipo_archivo:
         tipo = adj.tipo_archivo
     else:
-        # Fallback simple
+        # Fallback simple para determinar tipo por extensión
         name = getattr(adj.archivo, "name", "")
         ext = (name.rsplit(".", 1)[-1] if "." in name else "").lower()
         if ext in {"png", "jpg", "jpeg", "gif", "webp"}: tipo = "imagen"
@@ -302,6 +332,7 @@ def _adjunto_to_dict(adj: ArchivoAdjunto) -> dict:
     }
 
 def _comentario_to_dict(c: Comentario) -> dict:
+    """Helper para convertir comentario a diccionario simple"""
     return {
         "id": c.id,
         "autor_username": c.autor.username,
@@ -314,6 +345,7 @@ def _comentario_to_dict(c: Comentario) -> dict:
 @authentication_classes([TokenAuthentication, SessionAuthentication])
 @permission_classes([IsAuthenticatedOrReadOnly])
 def api_publicaciones_list(request):
+    """API: Lista de publicaciones visibles"""
     qs = (
         Publicacion.objects.filter(visible=True)
         .select_related("autor")
@@ -326,6 +358,7 @@ def api_publicaciones_list(request):
 @api_view(["GET", "POST"])
 @authentication_classes([TokenAuthentication, SessionAuthentication])
 def api_publicacion_comentarios(request, pk: int):
+    """API: Obtener comentarios de un post o crear uno nuevo"""
     pub = get_object_or_404(Publicacion, pk=pk)
 
     if request.method == "GET":
@@ -359,6 +392,7 @@ def api_publicacion_comentarios(request, pk: int):
 @permission_classes([IsAuthenticated])
 @parser_classes([MultiPartParser, FormParser])
 def api_subir_adjunto(request, pk: int):
+    """API: Subir archivo adjunto a una publicación"""
     try:
         publicacion = Publicacion.objects.get(pk=pk, visible=True)
     except Publicacion.DoesNotExist:
@@ -388,6 +422,7 @@ def api_subir_adjunto(request, pk: int):
 @authentication_classes([TokenAuthentication, SessionAuthentication])
 @permission_classes([IsAuthenticated])
 def api_eliminar_comentario(request, pk):
+    """API: Eliminar (ocultar) comentario propio"""
     try:
         comentario = Comentario.objects.get(pk=pk, visible=True)
     except Comentario.DoesNotExist:
@@ -404,6 +439,7 @@ def api_eliminar_comentario(request, pk):
 @authentication_classes([TokenAuthentication, SessionAuthentication])
 @permission_classes([IsAuthenticated])
 def api_eliminar_adjunto(request, pk):
+    """API: Eliminar adjunto propio"""
     try:
         adjunto = ArchivoAdjunto.objects.get(pk=pk)
     except ArchivoAdjunto.DoesNotExist:
@@ -418,6 +454,7 @@ def api_eliminar_adjunto(request, pk):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def api_toggle_like_comentario(request, pk):
+    """API: Dar/Quitar like a comentario"""
     comentario = get_object_or_404(Comentario, pk=pk, visible=True)
     usuario = request.user
     if usuario in comentario.likes.all():
@@ -431,6 +468,7 @@ def api_toggle_like_comentario(request, pk):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def api_toggle_like_adjunto(request, pk):
+    """API: Dar/Quitar like a adjunto"""
     adjunto = get_object_or_404(ArchivoAdjunto, pk=pk)
     usuario = request.user
     if usuario in adjunto.likes.all():

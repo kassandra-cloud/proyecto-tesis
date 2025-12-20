@@ -1,3 +1,12 @@
+"""
+--------------------------------------------------------------------------------
+Integrantes:           Matias Pinilla, Herna Leris, Kassandra Ramos
+Fecha de Modificación: 19/12/2025
+Descripción:   Utilidad auxiliar para enviar correos electrónicos utilizando un 
+               Webhook de Google Apps Script. Permite enviar correos simples y 
+               con adjuntos (PDFs) codificados en Base64.
+--------------------------------------------------------------------------------
+"""
 # usuarios/utils.py
 import base64
 import logging
@@ -21,6 +30,7 @@ def enviar_correo_via_webhook(
     Soporta adjuntos enviando Base64 + filename.
     """
 
+    # Obtiene URL y secreto desde settings
     url = getattr(settings, "APPSCRIPT_WEBHOOK_URL", None)
     secret = getattr(settings, "APPSCRIPT_WEBHOOK_SECRET", None)
 
@@ -28,6 +38,7 @@ def enviar_correo_via_webhook(
         logger.error("[WEBHOOK EMAIL] Falta APPSCRIPT_WEBHOOK_URL o APPSCRIPT_WEBHOOK_SECRET")
         return False
 
+    # Prepara payload básico
     payload = {
         "secret": secret,
         "to": to_email,
@@ -36,14 +47,14 @@ def enviar_correo_via_webhook(
         "text_body": text_body or " ",
     }
 
-    # ✅ DEBUG: confirma si viene adjunto y cuánto pesa
+    # DEBUG: confirma si viene adjunto y cuánto pesa
     logger.warning(
         f"[WEBHOOK EMAIL] to={to_email} filename={filename} "
         f"has_attachment_bytes={attachment_bytes is not None} "
         f"bytes_len={(len(attachment_bytes) if attachment_bytes is not None else 'None')}"
     )
 
-    # ✅ Adjuntar si viene archivo (aunque sea b"" lo detectamos)
+    # Adjuntar si viene archivo (aunque sea b"" lo detectamos)
     if attachment_bytes is not None and filename:
         if len(attachment_bytes) == 0:
             # PDF vacío → no adjuntamos (pero lo dejamos registrado)
@@ -51,6 +62,7 @@ def enviar_correo_via_webhook(
         else:
             payload["filename"] = filename
             payload["content_type"] = content_type
+            # Codifica a Base64 para envío HTTP
             payload["attachment"] = base64.b64encode(attachment_bytes).decode("utf-8")
 
             logger.warning(
@@ -59,9 +71,10 @@ def enviar_correo_via_webhook(
             )
 
     try:
+        # Envía la petición POST al Webhook
         resp = requests.post(
             url,
-            json=payload,   # ✅ correcto
+            json=payload,   #  correcto
             timeout=30,     # un poco más por el tamaño del PDF
         )
         resp.raise_for_status()

@@ -1,8 +1,18 @@
+"""
+--------------------------------------------------------------------------------
+Integrantes:           Matias Pinilla, Herna Leris, Kassandra Ramos
+Fecha de Modificación: 19/12/2025
+Descripción:   Formularios para la gestión web de votaciones. Incluye validaciones 
+               de fechas y procesamiento dinámico de opciones de respuesta.
+--------------------------------------------------------------------------------
+"""
 from django import forms
 from .models import Votacion
 from django.utils import timezone
 
+# Formulario para Crear Votación
 class VotacionForm(forms.ModelForm):
+    # Campos de fecha y hora separados para mejor UX
     fecha_cierre_date = forms.DateField(
         label="Fecha de Cierre",
         widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
@@ -12,7 +22,7 @@ class VotacionForm(forms.ModelForm):
         widget=forms.TimeInput(attrs={'type': 'time', 'class': 'form-control'}),
     )
     
-    
+    # Campo oculto para recibir las opciones generadas dinámicamente en el frontend
     opciones = forms.CharField(widget=forms.HiddenInput(), required=False)
 
     class Meta:
@@ -25,6 +35,7 @@ class VotacionForm(forms.ModelForm):
             'pregunta': 'Pregunta de la Votación',
         }
 
+    # Validación: La fecha no puede ser pasada
     def clean_fecha_cierre_date(self):
         fecha = self.cleaned_data.get('fecha_cierre_date')
         if fecha and fecha < timezone.now().date():
@@ -36,6 +47,7 @@ class VotacionForm(forms.ModelForm):
         fecha = cleaned_data.get('fecha_cierre_date')
         hora = cleaned_data.get('fecha_cierre_time')
 
+        # Combina fecha y hora para crear datetime aware
         if fecha and hora:
             fecha_cierre_completa = timezone.make_aware(
                 timezone.datetime.combine(fecha, hora)
@@ -44,7 +56,7 @@ class VotacionForm(forms.ModelForm):
                 self.add_error('fecha_cierre_time', "La hora de cierre no puede ser anterior a la hora actual.")
             cleaned_data['fecha_cierre'] = fecha_cierre_completa
         
-
+        # Procesa opciones dinámicas enviadas desde el frontend (inputs 'opcion_dinamica_X')
         opciones_list = [
             value.strip() for key, value in self.data.items() 
             if key.startswith('opcion_dinamica_') and value.strip()
@@ -56,8 +68,9 @@ class VotacionForm(forms.ModelForm):
         cleaned_data['opciones'] = opciones_list
         return cleaned_data
     
+# Formulario para Editar Votación (solo fecha de cierre)
 class VotacionEditForm(forms.ModelForm):
-    # Campos separados para fecha y hora, igual que en la creación
+    # Campos separados para fecha y hora
     fecha_cierre_date = forms.DateField(
         label="Nueva Fecha de Cierre",
         widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
@@ -69,7 +82,7 @@ class VotacionEditForm(forms.ModelForm):
 
     class Meta:
         model = Votacion
-        fields = [] # No tomamos campos directos del modelo aquí
+        fields = [] # No edita pregunta ni opciones directamente
 
     def clean_fecha_cierre_date(self):
         fecha = self.cleaned_data.get('fecha_cierre_date')

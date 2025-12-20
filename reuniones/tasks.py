@@ -1,3 +1,11 @@
+"""
+--------------------------------------------------------------------------------
+Integrantes:           Matias Pinilla, Herna Leris, Kassandra Ramos
+Fecha de Modificación: 19/12/2025
+Descripción:   Tareas asíncronas de Celery para envío de notificaciones FCM y 
+               procesamiento de audio con Vosk y FFmpeg.
+--------------------------------------------------------------------------------
+"""
 from celery import shared_task
 import time
 import os
@@ -22,7 +30,7 @@ vosk_model = None
 firebase_app = None
 
 
-def inicializar_firebase():
+def inicializar_firebase(): # Inicializa Firebase SDK
     global firebase_app
     if firebase_app is not None:
         return firebase_app
@@ -73,7 +81,7 @@ def _obtener_tokens_dispositivos():
 
 
 @shared_task
-def enviar_notificacion_nueva_reunion(reunion_id):
+def enviar_notificacion_nueva_reunion(reunion_id): # Notif nueva reunión
     try:
         inicializar_firebase()
         reunion = Reunion.objects.get(pk=reunion_id)
@@ -103,7 +111,7 @@ def enviar_notificacion_nueva_reunion(reunion_id):
 
 
 @shared_task
-def enviar_notificacion_reunion_iniciada(reunion_id):
+def enviar_notificacion_reunion_iniciada(reunion_id): # Notif inicio reunión
     try:
         inicializar_firebase()
         reunion = Reunion.objects.get(id=reunion_id)
@@ -130,7 +138,7 @@ def enviar_notificacion_reunion_iniciada(reunion_id):
 
 
 @shared_task
-def enviar_notificacion_reunion_finalizada(reunion_id):
+def enviar_notificacion_reunion_finalizada(reunion_id): # Notif fin reunión
     try:
         inicializar_firebase()
         reunion = Reunion.objects.get(id=reunion_id)
@@ -156,7 +164,7 @@ def enviar_notificacion_reunion_finalizada(reunion_id):
 
 
 @shared_task
-def enviar_notificacion_acta_aprobada(acta_id):
+def enviar_notificacion_acta_aprobada(acta_id): # Notif acta aprobada
     try:
         inicializar_firebase()
         acta = Acta.objects.get(pk=acta_id)
@@ -186,7 +194,7 @@ def enviar_notificacion_acta_aprobada(acta_id):
 # Tarea de transcripcion con Vosk
 
 @shared_task(name="procesar_audio_vosk")
-def procesar_audio_vosk(acta_pk):
+def procesar_audio_vosk(acta_pk): # Procesamiento de audio
     global vosk_model
     try:
         if vosk_model is None:

@@ -1,3 +1,13 @@
+"""
+--------------------------------------------------------------------------------
+Integrantes:           Matias Pinilla, Herna Leris, Kassandra Ramos
+Fecha de Modificación: 19/12/2025
+Descripción:   Vistas de Django para la interfaz web.
+               - Gestión CRUD de Recursos.
+               - Gestión de Solicitudes (Aprobar/Rechazar) con lógica de 
+                 rechazo automático por conflictos de horario.
+--------------------------------------------------------------------------------
+"""
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -7,13 +17,13 @@ from django.views.decorators.http import require_POST
 from django.utils import timezone
 from .models import Recurso, SolicitudReserva, Reserva
 from datetime import datetime, time
+
 @login_required
 @role_required("recursos", "view")
 def lista_recursos(request):
     """
-    Muestra listas separadas de recursos disponibles y no disponibles.
+    Muestra el listado de recursos, separados por Activos e Inactivos.
     """
-    # --- LÓGICA MODIFICADA ---
     recursos_activos = Recurso.objects.filter(disponible=True).order_by('nombre')
     recursos_inactivos = Recurso.objects.filter(disponible=False).order_by('nombre')
     
@@ -27,7 +37,7 @@ def lista_recursos(request):
 @login_required
 @role_required("recursos", "create")
 def crear_recurso(request):
-    # ... (Esta vista sigue igual)
+    """Vista para crear un nuevo recurso"""
     if request.method == 'POST':
         form = RecursoForm(request.POST)
         if form.is_valid():
@@ -46,7 +56,7 @@ def crear_recurso(request):
 @login_required
 @role_required("recursos", "edit")
 def editar_recurso(request, pk):
-    # ... (Esta vista sigue igual)
+    """Vista para editar un recurso existente"""
     recurso = get_object_or_404(Recurso, pk=pk)
     
     if request.method == 'POST':
@@ -65,14 +75,11 @@ def editar_recurso(request, pk):
     }
     return render(request, 'recursos/recurso_form.html', context)
 
-# --- VISTA 'eliminar_recurso' ELIMINADA ---
-
-# --- NUEVAS VISTAS (basadas en usuarios/views.py) ---
-
 @login_required
-@role_required("recursos", "edit") # Usamos el permiso de "edit"
+@role_required("recursos", "edit")
 @require_POST
 def deshabilitar_recurso(request, pk):
+    """Marca un recurso como no disponible (borrado lógico)"""
     recurso = get_object_or_404(Recurso, pk=pk)
     if not recurso.disponible:
         messages.info(request, "El recurso ya estaba deshabilitado.")
@@ -82,11 +89,11 @@ def deshabilitar_recurso(request, pk):
         messages.success(request, f"Recurso “{recurso.nombre}” deshabilitado.")
     return redirect('recursos:lista_recursos')
 
-
 @login_required
-@role_required("recursos", "edit") # Usamos el permiso de "edit"
+@role_required("recursos", "edit")
 @require_POST
 def restaurar_recurso(request, pk):
+    """Restaura un recurso a disponible"""
     recurso = get_object_or_404(Recurso, pk=pk)
     if recurso.disponible:
         messages.info(request, "El recurso ya estaba disponible.")
@@ -99,13 +106,18 @@ def restaurar_recurso(request, pk):
 @login_required
 @role_required("reservas", "manage_all")
 def gestionar_reservas(request):
-    # Estados y filtro
+    """
+    Panel para que la directiva gestione las solicitudes.
+    Permite filtrar por estado (PENDIENTE, APROBADA, etc).
+    """
     estados_posibles = SolicitudReserva.ESTADOS
     filtro_actual = request.GET.get('estado', 'PENDIENTE').upper()
+    
+    # Validar que el filtro sea un estado válido
     if filtro_actual not in dict(estados_posibles):
         filtro_actual = 'PENDIENTE'
 
-    # Cargamos SOLICITUDES, pero las exponemos como "reservas" al template
+    # Obtener solicitudes filtradas
     qs = (SolicitudReserva.objects
           .filter(estado=filtro_actual)
           .select_related('recurso','solicitante','solicitante__perfil')
@@ -118,23 +130,28 @@ def gestionar_reservas(request):
         "estados_posibles": estados_posibles,
         "filtro_actual": filtro_actual,
         "conteo_pendientes": conteo_pendientes,
-        "reservas": qs,  # <- mismo nombre que espera el template
+        "reservas": qs, 
     }
     return render(request, "recursos/gestionar_reservas.html", ctx)
+
 @login_required
 @role_required("reservas", "manage_all")
 @require_POST
 def actualizar_estado_reserva(request, pk):
+    """
+    Procesa la aprobación o rechazo de una reserva.
+    Incluye lógica crítica para evitar solapamiento de reservas aprobadas.
+    """
     sol = get_object_or_404(SolicitudReserva, pk=pk)
     accion = request.POST.get('accion')
     estado_anterior = sol.estado
 
     if accion == 'APROBADA':
-        # 1. Aprobar la solicitud actual
+        # 1. Aprobar la solicitud
         sol.estado = "APROBADA"
         sol.save(update_fields=["estado"])
 
-        # 2. Crear la Reserva “espejo” (para mantener tu lógica actual)
+        # 2. Crear la Reserva espejo para compatibilidad con lógica antigua
         Reserva.objects.create(
             recurso=sol.recurso,
             vecino=sol.solicitante,
@@ -144,31 +161,25 @@ def actualizar_estado_reserva(request, pk):
             estado=Reserva.Estado.APROBADA,
         )
 
-        # -------------------------------------------------------
-        # 🔥 NUEVO: Rechazo Automático de Conflictos
-        # -------------------------------------------------------
-        # Buscamos todas las solicitudes PENDIENTES para el MISMO recurso
-        # que se solapen en fechas con la que acabamos de aprobar.
+        # 3. RECHAZO AUTOMÁTICO DE CONFLICTOS
+        # Busca otras solicitudes PENDIENTES que coincidan en fechas y recurso
         conflictos = SolicitudReserva.objects.filter(
             recurso=sol.recurso,
             estado="PENDIENTE"
         ).filter(
-            # Lógica de solapamiento:
-            # (InicioCandidata < FinAprobada) AND (FinCandidata > InicioAprobada)
             fecha_inicio__lt=sol.fecha_fin,
             fecha_fin__gt=sol.fecha_inicio
-        ).exclude(pk=sol.pk)  # Importante: no excluirse a sí misma (aunque ya no es pendiente)
+        ).exclude(pk=sol.pk)
 
         cantidad_rechazada = conflictos.count()
         
         if cantidad_rechazada > 0:
-            # Actualizamos todas de un golpe
+            # Rechaza masivamente las conflictivas
             conflictos.update(estado="RECHAZADA")
             messages.warning(
                 request, 
                 f"⚠️ Se han rechazado automáticamente otras {cantidad_rechazada} solicitudes por conflicto de fechas."
             )
-        # -------------------------------------------------------
 
         messages.success(request, f"Solicitud #{sol.id} APROBADA exitosamente.")
 
@@ -181,7 +192,7 @@ def actualizar_estado_reserva(request, pk):
         sol.estado = "PENDIENTE"
         sol.save(update_fields=["estado"])
         
-        # Si venía de APROBADA, borramos la reserva espejo
+        # Si venía de APROBADA, se debe borrar la reserva espejo
         if estado_anterior == 'APROBADA':
             Reserva.objects.filter(
                 recurso=sol.recurso,

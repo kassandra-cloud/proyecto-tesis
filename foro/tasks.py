@@ -1,4 +1,11 @@
-# foro/tasks.py
+"""
+--------------------------------------------------------------------------------
+Integrantes:           Matias Pinilla, Herna Leris, Kassandra Ramos
+Fecha de Modificación: 19/12/2025
+Descripción:   Tareas asíncronas de Celery para el envío de notificaciones push 
+               vía Firebase Cloud Messaging (FCM).
+--------------------------------------------------------------------------------
+"""
 from celery import shared_task
 from django.conf import settings
 import firebase_admin

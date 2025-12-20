@@ -1,12 +1,13 @@
-#Integrantes de servidor:Herna Leris,Matias Pinilla,Kassandra Ramos
-#Fecha de creación:15/06/2025
-#Fecha de modificación:14/12/2025
-# Descripción:
-# Este archivo define la estructura de datos  para la aplicación 'foro'.
-# Incluye las entidades principales como Publicacion, Comentario (con soporte para anidamiento
-# a través del campo 'parent') y ArchivoAdjunto.
-# La implementación soporta características clave como eliminación lógica (visible),
-# almacenamiento de likes (ManyToManyField) y la clasificación automática del tipo de archivo adjunto.
+"""
+--------------------------------------------------------------------------------
+Integrantes:           Matias Pinilla, Herna Leris, Kassandra Ramos
+Fecha de Modificación: 19/12/2025
+Descripción:   Este archivo define la estructura de datos para la aplicación 'foro'.
+               Incluye las entidades principales como Publicacion, Comentario y 
+               ArchivoAdjunto. Soporta eliminación lógica, likes y clasificación 
+               automática de tipos de archivo.
+--------------------------------------------------------------------------------
+"""
 from django.db import models
 from django.contrib.auth.models import User
 import os
@@ -99,7 +100,7 @@ class Comentario(models.Model):
         related_name="respuestas",
     )
 
-    # ✅ AGREGA ESTO
+    # Agregado soporte de likes para comentarios
     likes = models.ManyToManyField(
         settings.AUTH_USER_MODEL,
         related_name="comentarios_liked",

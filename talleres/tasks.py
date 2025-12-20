@@ -1,6 +1,14 @@
+"""
+--------------------------------------------------------------------------------
+Integrantes:           Matias Pinilla, Herna Leris, Kassandra Ramos
+Fecha de Modificación: 19/12/2025
+Descripción:   Tareas de Celery para enviar notificaciones Push (FCM) a los 
+               usuarios cuando se crea o cancela un taller.
+--------------------------------------------------------------------------------
+"""
 # talleres/tasks.py
-from celery import shared_task
-from django.conf import settings
+from celery import shared_task  # Importa decorador de tareas
+from django.conf import settings  # Importa configuraciones
 import firebase_admin
 from firebase_admin import messaging, credentials
 from .models import Taller
@@ -9,7 +17,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 def inicializar_firebase():
-    """Inicializa Firebase si no está activo ya"""
+    """Inicializa Firebase si no está activo ya, usando credenciales del entorno"""
     if not firebase_admin._apps:
         try:
             project_id = getattr(settings, "FIREBASE_PROJECT_ID", None)
@@ -35,7 +43,7 @@ def inicializar_firebase():
 
 @shared_task
 def notificar_nuevo_taller(taller_id):
-    """Notifica creación de taller"""
+    """Notifica creación de taller al topic general"""
     inicializar_firebase()
     try:
         taller = Taller.objects.get(pk=taller_id)
@@ -46,7 +54,7 @@ def notificar_nuevo_taller(taller_id):
                 title="¡Nuevo Taller Disponible!",
                 body=f"{taller.nombre}\nInicio: {fecha_str}"
             ),
-            topic="talleres_generales",
+            topic="talleres_generales", # Envía a todos los suscritos a este topic
             data={
                 "tipo": "nuevo_taller",
                 "taller_id": str(taller.id)
@@ -57,10 +65,10 @@ def notificar_nuevo_taller(taller_id):
     except Exception as e:
         return f"Error enviando notif taller: {e}"
 
-# 👇 NUEVA TAREA AGREGADA
+# NUEVA TAREA AGREGADA
 @shared_task
 def notificar_cancelacion_taller(taller_id):
-    """Notifica cancelación de taller"""
+    """Notifica cancelación de taller al topic general"""
     inicializar_firebase()
     try:
         taller = Taller.objects.get(pk=taller_id)

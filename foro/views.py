@@ -1,7 +1,16 @@
+"""
+--------------------------------------------------------------------------------
+Integrantes:           Matias Pinilla, Herna Leris, Kassandra Ramos
+Fecha de Modificación: 19/12/2025
+Descripción:   Controladores (Vistas) para la aplicación 'foro'. Maneja tanto la 
+               interfaz web (HTML) como los endpoints de la API REST (JSON).
+               Incluye lógica de moderación, manejo de adjuntos y sistema de likes.
+--------------------------------------------------------------------------------
+"""
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 # --- OPTIMIZACIÓN DE CACHÉ ---
-from django.views.decorators.cache import cache_page # <-- NUEVA IMPORTACIÓN
+from django.views.decorators.cache import cache_page 
 # -----------------------------
 from django.views.decorators.http import require_POST
 from django.contrib import messages
@@ -72,6 +81,7 @@ def lista_publicaciones(request):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def crear_mensaje(request):
+    """API Endpoint simple para crear mensajes o comentarios desde móvil"""
     publicacion_id = request.data.get("publicacion_id")
     texto = request.data.get("texto", "").strip()
     archivo = request.FILES.get("archivo")
@@ -102,6 +112,7 @@ def crear_mensaje(request):
     
 @login_required
 def detalle_publicacion(request, pk):
+    """Vista de detalle de publicación con hilo de conversación (Web)"""
     es_moderador = can(request.user, "foro", "moderar")
 
     # 1) Publicación
@@ -123,7 +134,7 @@ def detalle_publicacion(request, pk):
     # 2) POST (comentario / respuesta / adjunto)
     if request.method == "POST":
         parent_id = request.POST.get("parent_id")
-        reply_to_adjunto_id = request.POST.get("reply_to_adjunto_id") # ✅ NUEVO
+        reply_to_adjunto_id = request.POST.get("reply_to_adjunto_id")
 
         # ---- CASO A: Respuesta (a comentario o a adjunto) ----
         if parent_id or reply_to_adjunto_id:
@@ -164,7 +175,7 @@ def detalle_publicacion(request, pk):
                 autor=request.user,
                 contenido=contenido,
                 parent=parent_comment,
-                reply_to_adjunto=reply_adjunto # ✅ NUEVO
+                reply_to_adjunto=reply_adjunto 
             )
 
             messages.success(request, "Respuesta publicada.")
@@ -209,7 +220,7 @@ def detalle_publicacion(request, pk):
     comentarios = (
         publicacion.comentarios
         .filter(visible=True)
-        .select_related("autor", "parent__autor", "reply_to_adjunto__autor") # ✅ Optimizado
+        .select_related("autor", "parent__autor", "reply_to_adjunto__autor") 
     )
     adjuntos_chat = (
         publicacion.adjuntos
@@ -235,6 +246,7 @@ def detalle_publicacion(request, pk):
 @login_required
 @role_required("foro", "moderar")
 def alternar_publicacion_web(request, pk):
+    """Oculta o muestra una publicación"""
     publicacion = get_object_or_404(Publicacion, pk=pk)
     publicacion.visible = not publicacion.visible
     publicacion.save()
@@ -249,9 +261,10 @@ def alternar_publicacion_web(request, pk):
 @require_POST
 @login_required
 def eliminar_comentario_web(request, pk):
+    """Eliminación lógica de comentario"""
     comentario = get_object_or_404(Comentario, pk=pk)
 
-    # ✅ SOLO el autor puede eliminar
+    #  SOLO el autor puede eliminar
     if request.user != comentario.autor:
         messages.error(request, "Solo puedes eliminar tus propios comentarios.")
         return redirect("foro:detalle_publicacion", pk=comentario.publicacion_id)
@@ -266,6 +279,7 @@ def eliminar_comentario_web(request, pk):
 @login_required
 @role_required("foro", "moderar")
 def restaurar_comentario_web(request, pk):
+    """Restauración de comentario oculto"""
     comentario = get_object_or_404(Comentario, pk=pk)
     
     if not comentario.visible:
@@ -279,6 +293,7 @@ def restaurar_comentario_web(request, pk):
 @login_required
 @role_required("foro", "delete")
 def eliminar_publicacion_web(request, pk):
+    """Eliminación física de una publicación"""
     publicacion = get_object_or_404(Publicacion, pk=pk)
     contenido_truncado = (publicacion.contenido[:20] + '...') if len(publicacion.contenido) > 20 else publicacion.contenido
     
@@ -325,6 +340,7 @@ def _comentario_to_dict(c: Comentario) -> dict:
     }
 @login_required
 def crear_publicacion(request):
+    """Vista para crear publicación desde Web"""
     if request.method != "POST":
         return redirect("foro:lista_publicaciones")
 
@@ -356,6 +372,7 @@ def crear_publicacion(request):
 @authentication_classes([TokenAuthentication, SessionAuthentication])
 @permission_classes([IsAuthenticatedOrReadOnly])
 def api_publicaciones_list(request):
+    """API: Listar publicaciones"""
     # Optimización: Queries prefetch_related y select_related ya están aplicadas
     qs = (
         Publicacion.objects.filter(visible=True)
@@ -369,6 +386,7 @@ def api_publicaciones_list(request):
 @api_view(["GET", "POST"])
 @authentication_classes([TokenAuthentication, SessionAuthentication])
 def api_publicacion_comentarios(request, pk: int):
+    """API: Ver o crear comentarios"""
     pub = get_object_or_404(Publicacion, pk=pk)
 
     if request.method == "GET":
@@ -404,6 +422,7 @@ def api_publicacion_comentarios(request, pk: int):
 @permission_classes([IsAuthenticated])
 @parser_classes([MultiPartParser, FormParser])
 def api_subir_adjunto(request, pk: int):
+    """API: Subir archivo adjunto"""
     try:
         publicacion = Publicacion.objects.get(pk=pk, visible=True)
     except Publicacion.DoesNotExist:
@@ -428,7 +447,7 @@ def api_subir_adjunto(request, pk: int):
         archivo=archivo,
         autor=request.user,
         es_mensaje=es_mensaje, # Usamos el valor recibido
-        descripcion=descripcion # <--- Guardamos el texto aquí
+        descripcion=descripcion # Guardamos el texto aquí
     )
     adj.save()
 
@@ -493,6 +512,7 @@ def enviar_mensaje(request, publicacion_id):
 @authentication_classes([TokenAuthentication, SessionAuthentication])
 @permission_classes([IsAuthenticated])
 def api_eliminar_comentario(request, pk):
+    """API: Eliminar comentario"""
     try:
         comentario = Comentario.objects.get(pk=pk, visible=True)
     except Comentario.DoesNotExist:
@@ -509,6 +529,7 @@ def api_eliminar_comentario(request, pk):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def api_toggle_like_comentario(request, pk):
+    """API: Like a comentario"""
     comentario = get_object_or_404(Comentario, pk=pk, visible=True)
     usuario = request.user
 
@@ -527,6 +548,7 @@ def api_toggle_like_comentario(request, pk):
 @require_POST
 @login_required
 def reaccionar_comentario_web(request, pk):
+    """Web: Like a comentario"""
     comentario = get_object_or_404(Comentario, pk=pk, visible=True)
 
     if request.user in comentario.likes.all():
@@ -541,6 +563,7 @@ def reaccionar_comentario_web(request, pk):
 @authentication_classes([TokenAuthentication, SessionAuthentication])
 @permission_classes([IsAuthenticated])
 def api_eliminar_adjunto(request, pk):
+    """API: Eliminar adjunto"""
     try:
         # Buscamos el adjunto por ID
         adjunto = ArchivoAdjunto.objects.get(pk=pk)
@@ -559,6 +582,7 @@ def api_eliminar_adjunto(request, pk):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def api_toggle_like_adjunto(request, pk):
+    """API: Like a adjunto"""
     adjunto = get_object_or_404(ArchivoAdjunto, pk=pk)
     usuario = request.user
 
@@ -576,6 +600,7 @@ def api_toggle_like_adjunto(request, pk):
 @require_POST
 @login_required
 def reaccionar_adjunto_web(request, pk):
+    """Web: Like a adjunto"""
     adjunto = get_object_or_404(ArchivoAdjunto, pk=pk)
 
     if request.user in adjunto.likes.all():
@@ -589,9 +614,10 @@ def reaccionar_adjunto_web(request, pk):
 @require_POST
 @login_required
 def eliminar_adjunto_web(request, pk):
+    """Web: Eliminar adjunto"""
     adjunto = get_object_or_404(ArchivoAdjunto, pk=pk)
 
-    # ✅ SOLO el autor puede eliminar su adjunto
+    # SOLO el autor puede eliminar su adjunto
     if request.user != adjunto.autor:
         messages.error(request, "Solo puedes eliminar tus propios archivos.")
         return redirect("foro:detalle_publicacion", pk=adjunto.publicacion_id)
