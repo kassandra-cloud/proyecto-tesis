@@ -40,7 +40,7 @@ from core.authz import can, role_required
 # ------------------------------------------------------------------------------
 
 # OPTIMIZACIÓN: Aplica caché de 60 segundos a la lista de publicaciones
-@cache_page(60) 
+
 @login_required
 def lista_publicaciones(request):
     """Listado web. Ahora solo carga publicaciones, no comentarios."""

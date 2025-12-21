@@ -22,7 +22,7 @@ from .models import Anuncio
 from .forms import AnuncioForm
 
 # Aplica caché de 60 segundos a la vista y requiere inicio de sesión.
-@cache_page(60)
+
 @login_required
 def lista_anuncios(request):
     """

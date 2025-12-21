@@ -29,7 +29,6 @@ from rest_framework.views import APIView
 from django.db.models import Q
 
 # OPTIMIZACIÓN 1: Cache para la lista de votaciones (60 segundos)
-@cache_page(60)
 @login_required
 @role_required("votaciones", "view")
 def lista_votaciones(request):
