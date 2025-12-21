@@ -35,19 +35,7 @@
                                                 <button type="submit" class="btn btn-sm btn-outline-success">Mostrar</button>
                                             {% endif %}
                                         </form>
-                                        
-                                        {% user_can 'foro' 'delete' as puede_eliminar_perm %}
-                                        {% if puede_eliminar_perm %}
-                                            <form class="m-0" method="POST" 
-                                                {# CORREGIDO: Se añadió 'foro:' #}
-                                                action="{% url 'foro:eliminar_publicacion_web' publicacion.id %}" 
-                                                onsubmit="return confirm('¡ADVERTENCIA!\n\nVas a ELIMINAR PERMANENTEMENTE esta publicación y TODOS sus comentarios.\n\nEsta acción NO se puede deshacer.\n\n¿Estás seguro?');">
-                                                {% csrf_token %}
-                                                <button type="submit" class="btn btn-sm btn-danger ms-2">
-                                                    <i class="fas fa-trash-alt"></i>
-                                                </button>
-                                            </form>
-                                        {% endif %}
+                                    
                                     </div>
                                 {% endif %}
                                 </p>
