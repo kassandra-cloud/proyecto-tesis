@@ -221,21 +221,32 @@ def rechazar_acta(request, pk): # Rechazar acta (volver a borrador)
 
 @login_required
 @role_required("reuniones", "asistencia")
-def asistencia_list(request, pk): # Gestión masiva de asistencia
+def asistencia_list(request, pk):
     reunion = get_object_or_404(Reunion, pk=pk)
-    vecinos = Perfil.objects.all().select_related("usuario").order_by("usuario__username")
+    vecinos = Perfil.objects.all().select_related("usuario")
 
     if request.method == "POST":
         presentes_pks = request.POST.getlist("presentes")
-        presentes_set = set(str(pk) for pk in presentes_pks)
+        # Convertimos a enteros para comparar con los IDs de Perfil
+        presentes_ids = [int(p_pk) for p_pk in presentes_pks]
 
-        for perfil in vecinos:
-            esta_presente = str(perfil.pk) in presentes_set
-            Asistencia.objects.update_or_create(
-                reunion=reunion,
-                vecino=perfil.usuario,
-                defaults={"presente": esta_presente}
-            )
+        # 1. Obtenemos todos los perfiles de los que marcaron presente
+        perfiles_presentes = Perfil.objects.filter(id__in=presentes_ids).select_related("usuario")
+        
+        # 2. Usamos una transacción para limpiar y guardar rápido
+        from django.db import transaction
+        with transaction.atomic():
+            # Borramos la asistencia previa de esta reunión para evitar duplicados
+            Asistencia.objects.filter(reunion=reunion).delete()
+            
+            # Creamos la lista de nuevos objetos Asistencia (solo los presentes)
+            nuevas_asistencias = [
+                Asistencia(reunion=reunion, vecino=p.usuario, presente=True)
+                for p in perfiles_presentes
+            ]
+            
+            # Guardamos todo de un solo golpe (Bulk Create)
+            Asistencia.objects.bulk_create(nuevas_asistencias)
 
         messages.success(request, "Asistencia guardada correctamente.")
         return redirect("reuniones:detalle_reunion", pk=pk)
